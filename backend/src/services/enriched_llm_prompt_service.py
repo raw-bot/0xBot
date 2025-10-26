@@ -309,9 +309,8 @@ Required format:
     "side": "long",
     "stop_loss": {example_sl:.2f},
     "profit_target": {example_tp:.2f},
-    "invalidation_condition": "Price closes below X on Y timeframe",
-    "leverage": 1,
-    "risk_usd": 500.0
+    "size_pct": 0.05,
+    "invalidation_condition": "Price closes below X on Y timeframe"
   }}
 }}
 

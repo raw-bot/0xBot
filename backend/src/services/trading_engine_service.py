@@ -345,6 +345,9 @@ class TradingEngine:
 
                         logger.info(f"⚡ ENRICHED | Entry: ${entry_price:,.2f} | SL: ${stop_loss:,.2f} | TP: ${take_profit:,.2f} (market: ${float(current_price):,.2f})")
 
+                        # Get size_pct from LLM or use default (5% of capital)
+                        size_pct = parsed_decision.get("size_pct") or parsed_decision.get("risk_pct") or 0.05
+                        
                         llm_decision = {
                             "action": parsed_decision["signal"],
                             "confidence": parsed_decision["confidence"],
@@ -352,13 +355,20 @@ class TradingEngine:
                             "entry_price": entry_price,
                             "stop_loss": stop_loss,
                             "take_profit": take_profit,
-                            "side": parsed_decision.get("side", "long")  # Default to long if not specified
+                            "side": parsed_decision.get("side", "long"),  # Default to long if not specified
+                            "size_pct": size_pct  # Position size as percentage
                         }
                     
                     # Save decision (using enriched prompt)
+                    # Convert Decimal to float for JSON serialization
+                    llm_decision_json = llm_decision.copy()
+                    for key in ['entry_price', 'stop_loss', 'take_profit', 'size_pct']:
+                        if key in llm_decision_json and isinstance(llm_decision_json[key], Decimal):
+                            llm_decision_json[key] = float(llm_decision_json[key])
+                    
                     llm_result = {
                         "response": response_text,
-                        "parsed_decisions": llm_decision,
+                        "parsed_decisions": llm_decision_json,
                         "tokens_used": llm_response.get("tokens_used", 0),
                         "cost": llm_response.get("cost", 0.0)
                     }
