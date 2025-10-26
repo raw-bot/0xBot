@@ -59,7 +59,7 @@ class TradingMemoryService:
             open_positions = []
         
         invested = sum(
-            float(pos.entry_price * pos.size) 
+            float(pos.entry_price * pos.quantity)
             for pos in open_positions
             if pos.status == "open"
         )
@@ -106,23 +106,23 @@ class TradingMemoryService:
             
             # Calculate PnL
             if position.side == "long":
-                pnl = (position.current_price - position.entry_price) * position.size
+                pnl = (position.current_price - position.entry_price) * position.quantity
             else:
-                pnl = (position.entry_price - position.current_price) * position.size
+                pnl = (position.entry_price - position.current_price) * position.quantity
             
-            pnl_pct = (pnl / (position.entry_price * position.size)) * 100 if position.size > 0 else 0
+            pnl_pct = (pnl / (position.entry_price * position.quantity)) * 100 if position.quantity > 0 else 0
             
             positions_data.append({
                 "symbol": position.symbol,
                 "side": position.side.upper(),
-                "size": position.size,
-                "entry_price": position.entry_price,
-                "current_price": position.current_price,
-                "pnl": pnl,
-                "pnl_pct": pnl_pct,
-                "stop_loss": position.stop_loss,
-                "take_profit": position.take_profit,
-                "notional_usd": position.entry_price * position.size
+                "size": float(position.quantity),  # Use quantity, display as size
+                "entry_price": float(position.entry_price),
+                "current_price": float(position.current_price),
+                "pnl": float(pnl),
+                "pnl_pct": float(pnl_pct),
+                "stop_loss": float(position.stop_loss) if position.stop_loss else None,
+                "take_profit": float(position.take_profit) if position.take_profit else None,
+                "notional_usd": float(position.entry_price * position.quantity)
             })
         
         return positions_data
