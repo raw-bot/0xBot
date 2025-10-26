@@ -12,9 +12,30 @@ Guide complet pour installer et lancer le bot de trading IA **0xBot** sur votre 
 - ✅ Windows (avec WSL2)
 
 ### Logiciels Requis
-- **Docker Desktop** : [Télécharger ici](https://www.docker.com/products/docker-desktop)
-- **Git** : [Télécharger ici](https://git-scm.com/downloads)
-- **Python 3.11+** : [Télécharger ici](https://www.python.org/downloads/)
+
+#### 1. Docker Desktop (OBLIGATOIRE)
+**Pourquoi ?** Le bot utilise PostgreSQL et Redis qui tournent dans Docker.
+
+- 📥 **Télécharger** : [https://www.docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop)
+- 💾 **Installer** : Double-cliquer sur le fichier téléchargé et suivre l'assistant
+- ▶️ **Lancer** : Ouvrir l'application Docker Desktop (elle doit tourner en arrière-plan)
+
+**Vérifier l'installation** :
+```bash
+docker --version
+# Devrait afficher : Docker version 20.x.x ou plus récent
+
+docker-compose --version
+# Devrait afficher : Docker Compose version 2.x.x ou plus récent
+```
+
+#### 2. Git
+- 📥 **Télécharger** : [https://git-scm.com/downloads](https://git-scm.com/downloads)
+- Vérifier : `git --version`
+
+#### 3. Python 3.11+
+- 📥 **Télécharger** : [https://www.python.org/downloads/](https://www.python.org/downloads/)
+- Vérifier : `python3 --version`
 
 ### Pour macOS uniquement
 ```bash
@@ -96,22 +117,75 @@ ls -la
 
 ---
 
-## 🐳 Étape 3 : Démarrer PostgreSQL et Redis
+## 🐳 Étape 3 : Démarrer PostgreSQL et Redis avec Docker
+
+### 3.1 Lancer Docker Desktop
+
+**Avant de continuer, assurez-vous que Docker Desktop est lancé !**
+
+- Sur **macOS** : Chercher "Docker" dans Spotlight (Cmd+Space) et ouvrir
+- Sur **Windows** : Chercher "Docker Desktop" dans le menu Démarrer
+- Sur **Linux** : Docker tourne automatiquement en service
+
+**Vérifier que Docker tourne** :
+```bash
+docker ps
+# Si ça fonctionne, Docker est bien lancé ✅
+# Si erreur "Cannot connect to Docker daemon", Docker n'est pas lancé ❌
+```
+
+### 3.2 Démarrer PostgreSQL et Redis
 
 ```bash
-# Démarrer Docker Desktop (GUI)
-# Puis dans le terminal :
-
+# Se placer dans le dossier docker
 cd docker
+
+# Démarrer les conteneurs en arrière-plan
 docker-compose up -d
+
+# Attendre 5-10 secondes que les conteneurs démarrent
+sleep 10
 
 # Vérifier que tout tourne bien
 docker ps
-# Vous devriez voir : trading_agent_postgres et trading_agent_redis
+```
+
+**Vous devriez voir** :
+```
+NAMES                    STATUS                  PORTS
+trading_agent_postgres   Up X seconds (healthy)  0.0.0.0:5432->5432/tcp
+trading_agent_redis      Up X seconds (healthy)  0.0.0.0:6379->6379/tcp
 ```
 
 ✅ PostgreSQL tourne sur le port **5432**  
 ✅ Redis tourne sur le port **6379**
+
+### 3.3 Que faire en cas de problème ?
+
+**Problème : "Cannot connect to Docker daemon"**
+```bash
+# Solution : Lancer Docker Desktop et attendre qu'il soit prêt
+# Puis réessayer : docker-compose up -d
+```
+
+**Problème : Port 5432 ou 6379 déjà utilisé**
+```bash
+# Voir quel processus utilise le port
+sudo lsof -i :5432  # Pour PostgreSQL
+sudo lsof -i :6379  # Pour Redis
+
+# Arrêter le processus ou changer le port dans docker-compose.yml
+```
+
+**Problème : Les conteneurs ne démarrent pas**
+```bash
+# Voir les logs
+docker-compose logs
+
+# Redémarrer proprement
+docker-compose down
+docker-compose up -d
+```
 
 ---
 

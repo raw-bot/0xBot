@@ -23,6 +23,8 @@ from .llm_prompt_service import LLMPromptService
 from .trade_executor_service import TradeExecutorService
 from .risk_manager_service import RiskManagerService
 from .market_analysis_service import MarketAnalysisService
+from .enriched_llm_prompt_service import EnrichedLLMPromptService
+from .trading_memory_service import get_trading_memory
 
 logger = get_logger(__name__)
 
@@ -81,6 +83,10 @@ class TradingEngine:
         self.position_service = PositionService(db)
         self.trade_executor = TradeExecutorService(db)
         self.llm_client = llm_client or get_llm_client()
+        
+        # Initialize enriched LLM services (Phase 3B - Expert Roadmap)
+        self.enriched_prompt_service = EnrichedLLMPromptService(db)
+        self.trading_memory = get_trading_memory(db, bot.id)
         
         # Trading parameters - ALIGNED timeframe with cycle
         self.trading_symbols = bot.trading_symbols  # List of trading pairs
@@ -224,6 +230,35 @@ class TradingEngine:
                     market_snapshot = market_data['snapshot']
                     indicators_4h = market_data['indicators_4h']
                     
+                    # Enrich market_snapshot with time series (Phase 3E - Expert Roadmap)
+                    try:
+                        candles_5m = await self.market_data_service.fetch_ohlcv(
+                            symbol=symbol,
+                            timeframe="5m",
+                            limit=100
+                        )
+                        if len(candles_5m) >= 20:
+                            closes = self.market_data_service.extract_closes(candles_5m)
+                            
+                            # Add price series (last 10 points)
+                            market_snapshot["price_series"] = [float(c) for c in closes[-10:]]
+                            
+                            # Add EMA series (last 10 points)
+                            ema_series = []
+                            for i in range(len(closes) - 10, len(closes)):
+                                ema = self._calculate_ema(closes[:i+1], 20)
+                                ema_series.append(ema)
+                            market_snapshot["ema_series"] = ema_series
+                            
+                            # Add RSI series (last 10 points)
+                            rsi_series = []
+                            for i in range(len(closes) - 10, len(closes)):
+                                rsi = self._calculate_rsi(closes[:i+1], 7)
+                                rsi_series.append(rsi)
+                            market_snapshot["rsi_series"] = rsi_series
+                    except Exception as e:
+                        logger.warning(f"Could not enrich market_snapshot with series: {e}")
+                    
                     # Calculate indicators
                     indicators = await self._calculate_indicators(market_snapshot)
                     latest_indicators = IndicatorService.get_latest_values(indicators)
@@ -245,31 +280,65 @@ class TradingEngine:
                     # Check exits for positions of this symbol
                     await self._check_position_exits(symbol_positions, market_snapshot['current_price'])
                     
-                    # Build enhanced LLM prompt with multi-coin context for this symbol
-                    prompt = LLMPromptService.build_enhanced_market_prompt(
+                    # Build enriched prompt with complete context (Phase 3D - Expert Roadmap)
+                    # Get all coins snapshot for multi-coin context
+                    all_coins_data = await self._get_all_coins_quick_snapshot()
+                    
+                    # Build enriched prompt (pass all_positions to avoid async DB queries)
+                    prompt_data = self.enriched_prompt_service.get_simple_decision(
+                        bot=current_bot,
                         symbol=symbol,
-                        market_data=market_snapshot,
-                        indicators=latest_indicators,
-                        positions=symbol_positions,
-                        portfolio=portfolio_state,
-                        risk_params=current_bot.risk_params,
-                        indicators_4h=indicators_4h,
-                        market_context=market_context  # NEW: Include multi-coin analysis
+                        market_snapshot=market_snapshot,
+                        market_regime=market_context,
+                        all_coins_data=all_coins_data,
+                        bot_positions=all_positions  # Pass positions to avoid async issues
                     )
                     
-                    # Get LLM decision for this symbol
-                    llm_result = await self.llm_client.analyze_market(
+                    # Get LLM decision with enriched context
+                    llm_response = await self.llm_client.analyze_market(
                         model=current_bot.model_name,
-                        prompt=prompt,
+                        prompt=prompt_data["prompt"],
                         max_tokens=1024,
                         temperature=0.7
                     )
                     
-                    # Save decision
-                    await self._save_llm_decision(prompt=prompt, llm_result=llm_result, symbol=symbol)
+                    # Get response text (LLM client returns "response" key, not "text")
+                    response_text = llm_response.get("response", "")
+                    
+                    # Debug: log response preview if parsing fails
+                    if not response_text:
+                        logger.error(f"🤖 BOT | Empty response from LLM for {symbol}")
+                        logger.error(f"🤖 BOT | LLM response keys: {list(llm_response.keys())}")
+                    
+                    # Parse structured response
+                    parsed_decision = self.enriched_prompt_service.parse_llm_response(
+                        response_text,
+                        symbol
+                    )
+                    
+                    if not parsed_decision:
+                        logger.warning(f"🤖 BOT | Failed to parse LLM decision for {symbol}, using fallback")
+                        logger.debug(f"Response preview: {response_text[:300]}...")
+                        decision = {"action": "hold", "confidence": 0.5, "reasoning": "Parse error - defaulting to HOLD"}
+                    else:
+                        decision = {
+                            "action": parsed_decision["signal"],
+                            "confidence": parsed_decision["confidence"],
+                            "reasoning": parsed_decision["justification"],
+                            "stop_loss": parsed_decision.get("stop_loss"),
+                            "take_profit": parsed_decision.get("profit_target")
+                        }
+                    
+                    # Save decision (using enriched prompt)
+                    llm_result = {
+                        "response": response_text,
+                        "parsed_decisions": decision,
+                        "tokens_used": llm_response.get("tokens_used", 0),
+                        "cost": llm_response.get("cost", 0.0)
+                    }
+                    await self._save_llm_decision(prompt=prompt_data["prompt"], llm_result=llm_result, symbol=symbol)
                     
                     # Parse and display decision
-                    decision = llm_result['parsed_decisions']
                     action = decision.get('action', 'hold').upper()
                     reasoning = decision.get('reasoning', 'No reasoning provided')
                     confidence = decision.get('confidence', 0)
@@ -691,3 +760,89 @@ class TradingEngine:
         except Exception as e:
             logger.error(f"Error getting multi-coin market context: {e}")
             return {}
+    
+    async def _get_all_coins_quick_snapshot(self) -> dict:
+        """
+        Obtenir un snapshot rapide de tous les coins tradables
+        Pour enrichir le contexte multi-coin du prompt LLM
+        Phase 3C - Expert Roadmap
+        """
+        all_coins = {}
+        for symbol in self.trading_symbols:
+            try:
+                ticker = await self.market_data_service.fetch_ticker(symbol)
+                if ticker:
+                    # Fetch candles for RSI calculation
+                    candles_5m = await self.market_data_service.fetch_ohlcv(
+                        symbol=symbol,
+                        timeframe="5m",
+                        limit=50
+                    )
+                    if len(candles_5m) >= 20:
+                        closes = self.market_data_service.extract_closes(candles_5m)
+                        rsi = self._calculate_rsi(closes, 14)
+                        ema20 = self._calculate_ema(closes, 20)
+                        trend = "BULLISH" if closes[-1] > ema20 else "BEARISH"
+                        all_coins[symbol] = {
+                            "price": float(ticker.last),
+                            "rsi": rsi,
+                            "trend": trend
+                        }
+            except Exception as e:
+                logger.warning(f"Error fetching snapshot for {symbol}: {e}")
+                continue
+        return all_coins
+    
+    def _calculate_rsi(self, prices: list, period: int = 14) -> float:
+        """
+        Calculer le RSI (Relative Strength Index)
+        Phase 3C - Expert Roadmap
+        """
+        if len(prices) < period + 1:
+            return 50.0
+        
+        # Convert to float if needed
+        prices = [float(p) for p in prices]
+        
+        # Calculate price changes
+        deltas = [prices[i] - prices[i-1] for i in range(1, len(prices))]
+        
+        # Separate gains and losses
+        gains = [d if d > 0 else 0 for d in deltas]
+        losses = [-d if d < 0 else 0 for d in deltas]
+        
+        # Calculate average gain and loss
+        avg_gain = sum(gains[-period:]) / period
+        avg_loss = sum(losses[-period:]) / period
+        
+        if avg_loss == 0:
+            return 100.0
+        
+        # Calculate RS and RSI
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        
+        return round(rsi, 2)
+    
+    def _calculate_ema(self, prices: list, period: int) -> float:
+        """
+        Calculer l'EMA (Exponential Moving Average)
+        Phase 3C - Expert Roadmap
+        """
+        if len(prices) < period:
+            return sum([float(p) for p in prices]) / len(prices)
+        
+        # Convert to float
+        prices = [float(p) for p in prices]
+        
+        # Calculate multiplier
+        multiplier = 2 / (period + 1)
+        
+        # Initialize with SMA
+        ema = sum(prices[:period]) / period
+        
+        # Calculate EMA for remaining prices
+        for price in prices[period:]:
+            ema = (price - ema) * multiplier + ema
+        
+        return round(ema, 2)
