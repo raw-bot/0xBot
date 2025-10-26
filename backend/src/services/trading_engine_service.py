@@ -321,15 +321,20 @@ class TradingEngine:
                         llm_decision = {"action": "hold", "confidence": 0.5, "reasoning": "Parse error"}
                     else:
                         # Get current price for default SL/TP calculation
-                        current_price = market_snapshot.get("price", 0)
+                        current_price = market_snapshot.get("current_price", market_snapshot.get("price", 0))
+                        
+                        # Validate we have a valid price
+                        if not current_price or current_price <= 0:
+                            logger.error(f"❌ Invalid market price for {symbol}: {current_price}")
+                            continue
                         
                         # Get SL/TP from bot's risk_params with fallback values
                         stop_loss_pct = current_bot.risk_params.get("stop_loss_pct", 0.035)  # 3.5% default
                         take_profit_pct = current_bot.risk_params.get("take_profit_pct", 0.07)  # 7% default
                         
                         # Calculate default stop loss and take profit prices
-                        default_sl = current_price * (Decimal("1") - Decimal(str(stop_loss_pct))) if current_price > 0 else None
-                        default_tp = current_price * (Decimal("1") + Decimal(str(take_profit_pct))) if current_price > 0 else None
+                        default_sl = current_price * (Decimal("1") - Decimal(str(stop_loss_pct)))
+                        default_tp = current_price * (Decimal("1") + Decimal(str(take_profit_pct)))
                         
                         # Parse avec fallback sur defaults
                         stop_loss = parsed_decision.get("stop_loss") or default_sl

@@ -91,8 +91,8 @@ Winning Trades: {trades['winning_trades']}/{trades['total_closed_trades']}
     def _format_market_data(self, symbol: str, market_snapshot: Dict) -> str:
         """Formater les données de marché (format similaire au bot +93%)"""
         
-        # Extract data
-        current_price = market_snapshot.get("price", 0)
+        # Extract data - use current_price consistently
+        current_price = market_snapshot.get("current_price", market_snapshot.get("price", 0))
         technical = market_snapshot.get("technical_indicators", {})
         
         # Multi-timeframe data
@@ -201,8 +201,8 @@ QUICK SNAPSHOT (All Tradable Assets)
         memory = get_trading_memory(self.db, bot.id)
         context = memory.get_full_context(bot, bot_positions)
         
-        # Get current price for example calculations
-        current_price = market_snapshot.get("price", market_snapshot.get("current_price", 0))
+        # Get current price for example calculations - consistent order: current_price first
+        current_price = market_snapshot.get("current_price", market_snapshot.get("price", 0))
         
         # Get SL/TP percentages from bot's risk_params
         stop_loss_pct = bot.risk_params.get("stop_loss_pct", 0.035)  # 3.5% default
