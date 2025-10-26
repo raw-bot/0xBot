@@ -23,13 +23,13 @@ class RiskManagerService:
     ) -> tuple[bool, str]:
         """
         Validate a new position entry against risk parameters.
-        
+
         Args:
             bot: Bot instance with risk parameters
             decision: LLM decision dict with entry details
             current_positions: List of current open positions
             current_price: Current market price
-            
+
         Returns:
             Tuple of (is_valid, reason)
         """
@@ -37,49 +37,102 @@ class RiskManagerService:
             # Extract decision details
             size_pct = Decimal(str(decision.get('size_pct', 0)))
             symbol = decision.get('symbol', '')
-            
+
             # 1. Check position size constraint
             max_position_pct = Decimal(str(bot.risk_params.get('max_position_pct', 0.15)))  # 15% max au lieu de 10%
             if size_pct > max_position_pct:
                 return False, f"Position size {size_pct:.1%} exceeds max {max_position_pct:.1%}"
-            
+
             # 2. Check total exposure
             total_exposure = sum(pos.position_value for pos in current_positions if pos.status == PositionStatus.OPEN)
             position_value = bot.capital * size_pct
             new_total_exposure = total_exposure + position_value
-            
+
             # Max total exposure: 85% of capital (permet plus d'utilisation du capital)
             max_exposure = bot.capital * Decimal("0.85")
             if new_total_exposure > max_exposure:
                 return False, f"Total exposure ${new_total_exposure:,.2f} would exceed max ${max_exposure:,.2f}"
-            
+
             # 3. Check if already have position in this symbol
             existing_position = any(pos.symbol == symbol and pos.status == PositionStatus.OPEN for pos in current_positions)
             if existing_position:
                 return False, f"Already have open position in {symbol}"
-            
-            # 4. Validate stop loss and take profit
-            stop_loss_pct = decision.get('stop_loss_pct', 0)
-            take_profit_pct = decision.get('take_profit_pct', 0)
-            
+
+            # 4. Validate stop loss and take profit with detailed logging
+            logger.info(f"   🔍 Validating SL/TP for {symbol}...")
+
+            # Extract prices from decision (LLM provides absolute prices, not percentages)
+            stop_loss_price = decision.get('stop_loss')
+            take_profit_price = decision.get('take_profit')
+            entry_price = decision.get('entry_price') or decision.get('price')  # LLM might provide entry_price or price
+
+            # If no entry_price provided by LLM, use current market price
+            if not entry_price or entry_price <= 0:
+                entry_price = float(current_price)
+                logger.info(f"   📝 Using market price as entry_price: ${entry_price:,.2f}")
+
+            # Convert to Decimal for calculations
+            entry_price = Decimal(str(entry_price))
+            current_price_decimal = current_price
+
+            # Validate that we have valid prices
+            if not stop_loss_price or stop_loss_price <= 0:
+                return False, f"Invalid stop loss price: {stop_loss_price}"
+            if not take_profit_price or take_profit_price <= 0:
+                return False, f"Invalid take profit price: {take_profit_price}"
+
+            stop_loss_price = Decimal(str(stop_loss_price))
+            take_profit_price = Decimal(str(take_profit_price))
+
+            # Determine side (assume LONG if not specified, as most crypto trading is long-biased)
+            side = decision.get('side', 'long').lower()
+            if side not in ['long', 'short']:
+                side = 'long'  # Default to long
+
+            # Calculate percentages based on side
+            if side == 'long':
+                # LONG: SL below entry, TP above entry
+                # sl_pct = (entry_price - sl_price) / entry_price  (distance down from entry)
+                # tp_pct = (tp_price - entry_price) / entry_price   (distance up from entry)
+                stop_loss_pct = (entry_price - stop_loss_price) / entry_price if entry_price > 0 else Decimal("0")
+                take_profit_pct = (take_profit_price - entry_price) / entry_price if entry_price > 0 else Decimal("0")
+            else:
+                # SHORT: SL above entry, TP below entry
+                # sl_pct = (sl_price - entry_price) / entry_price   (distance up from entry)
+                # tp_pct = (entry_price - tp_price) / entry_price   (distance down from entry)
+                stop_loss_pct = (stop_loss_price - entry_price) / entry_price if entry_price > 0 else Decimal("0")
+                take_profit_pct = (entry_price - take_profit_price) / entry_price if entry_price > 0 else Decimal("0")
+
+            # Validate position relationships
+            if side == 'long':
+                if not (stop_loss_price < entry_price < take_profit_price):
+                    return False, f"Invalid price relationships for LONG: SL({stop_loss_price:,.2f}) < ENTRY({entry_price:,.2f}) < TP({take_profit_price:,.2f})"
+            else:  # short
+                if not (take_profit_price < entry_price < stop_loss_price):
+                    return False, f"Invalid price relationships for SHORT: TP({take_profit_price:,.2f}) < ENTRY({entry_price:,.2f}) < SL({stop_loss_price:,.2f})"
+
+            # Validate percentages are positive
             if stop_loss_pct <= 0:
-                return False, "Stop loss percentage must be positive"
-            
+                return False, f"Stop loss percentage must be positive (calculated: {stop_loss_pct:.4f})"
+
             if take_profit_pct <= 0:
-                return False, "Take profit percentage must be positive"
-            
+                return False, f"Take profit percentage must be positive (calculated: {take_profit_pct:.4f})"
+
+            # Log detailed validation info
+            logger.info(f"   💰 Entry: ${entry_price:,.2f} | SL: ${stop_loss_price:,.2f} ({stop_loss_pct:.3%}) | TP: ${take_profit_price:,.2f} ({take_profit_pct:.3%}) | Side: {side.upper()}")
+
             # Risk/reward ratio should be reasonable (min 1:1.3)
             risk_reward = take_profit_pct / stop_loss_pct if stop_loss_pct > 0 else 0
             if risk_reward < 1.3:  # Légèrement plus permissif
-                return False, f"Risk/reward ratio {risk_reward:.2f} too low (min 1.3)"
-            
+                return False, f"Risk/reward ratio {risk_reward:.2f} too low (min 1.3) - SL: {stop_loss_pct:.3%}, TP: {take_profit_pct:.3%}"
+
             # 5. Check minimum position size (at least $50 for meaningful trades)
             if position_value < Decimal("50"):
                 return False, f"Position size ${position_value:,.2f} below minimum $50"
-            
-            logger.info(f"Entry validation passed for {symbol}")
+
+            logger.info(f"   ✅ Entry validation passed for {symbol}")
             return True, "Validation passed"
-            
+
         except Exception as e:
             logger.error(f"Error validating entry: {e}")
             return False, f"Validation error: {str(e)}"

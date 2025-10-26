@@ -59,9 +59,17 @@ class TradeExecutorService:
             symbol = decision.get('symbol', '')
             side = decision.get('side', 'long')
             size_pct = Decimal(str(decision.get('size_pct', 0)))
-            stop_loss_pct = Decimal(str(decision.get('stop_loss_pct', 0)))
-            take_profit_pct = Decimal(str(decision.get('take_profit_pct', 0)))
-            
+
+            # Use absolute prices provided by LLM (not percentages)
+            stop_loss_price = Decimal(str(decision.get('stop_loss', 0)))
+            take_profit_price = Decimal(str(decision.get('take_profit', 0)))
+            entry_price = Decimal(str(decision.get('entry_price', current_price)))
+
+            # Validate prices are provided and reasonable
+            if stop_loss_price <= 0 or take_profit_price <= 0:
+                logger.error(f"Invalid SL/TP prices: SL={stop_loss_price}, TP={take_profit_price}")
+                return None, None
+
             # Calculate position size
             quantity = RiskManagerService.calculate_position_size(
                 capital=bot.capital,
@@ -70,22 +78,9 @@ class TradeExecutorService:
                 leverage=1.0  # No leverage for v1
             )
             
-            # Calculate stop loss and take profit prices
-            stop_loss_price = RiskManagerService.calculate_stop_loss_price(
-                entry_price=current_price,
-                stop_loss_pct=stop_loss_pct,
-                side=side
-            )
-            
-            take_profit_price = RiskManagerService.calculate_take_profit_price(
-                entry_price=current_price,
-                take_profit_pct=take_profit_pct,
-                side=side
-            )
-            
             # Determine order side (buy for long, sell for short)
             order_side = 'buy' if side.lower() == 'long' else 'sell'
-            
+
             # Execute market order (if not paper trading)
             if not bot.paper_trading:
                 try:
@@ -95,25 +90,25 @@ class TradeExecutorService:
                         amount=float(quantity),
                         order_type='market'
                     )
-                    
+
                     # Get actual execution price and fees from order
                     actual_price = Decimal(str(order.get('price', current_price)))
                     fees = Decimal(str(order.get('fee', {}).get('cost', 0)))
-                    
-                    logger.info(f"Market order executed: {order_side} {quantity} {symbol} @ {actual_price}")
-                    
+
+                    logger.info(f"Market order executed: {order_side} {quantity} {symbol} @ {actual_price} (planned: {entry_price})")
+
                 except Exception as e:
                     logger.error(f"Error executing market order: {e}")
                     # In case of exchange error, still create position with current price
                     actual_price = current_price
                     fees = Decimal("0")
             else:
-                # Paper trading mode
-                actual_price = current_price
+                # Paper trading mode - use the entry_price from decision, not current market price
+                actual_price = entry_price
                 fees = actual_price * quantity * Decimal("0.001")  # Estimate 0.1% fee
-                logger.info(f"PAPER: {order_side} {quantity} {symbol} @ {actual_price}")
+                logger.info(f"PAPER: {order_side} {quantity} {symbol} @ {actual_price} (planned entry)")
             
-            # Create position record
+            # Create position record with prices from LLM decision
             position_data = PositionOpen(
                 symbol=symbol,
                 side=side,
@@ -122,6 +117,8 @@ class TradeExecutorService:
                 stop_loss=stop_loss_price,
                 take_profit=take_profit_price
             )
+
+            logger.info(f"Position created: Entry @ {actual_price:,.2f}, SL @ {stop_loss_price:,.2f}, TP @ {take_profit_price:,.2f}")
             
             position = await self.position_service.open_position(bot.id, position_data)
             

@@ -305,6 +305,8 @@ Required format:
                       2. Why this decision makes sense
                       3. Your risk management plan
                       4. How this fits your portfolio",
+    "entry_price": {current_price:.2f},
+    "side": "long",
     "stop_loss": {example_sl:.2f},
     "profit_target": {example_tp:.2f},
     "invalidation_condition": "Price closes below X on Y timeframe",
@@ -379,12 +381,20 @@ Now analyze {symbol} and respond with ONLY valid JSON (no text, no markdown, no 
             if symbol in data:
                 decision = data[symbol]
                 
-                # Validate required fields
+                # Validate required fields for entry signals
                 required = ["signal", "confidence", "justification"]
                 missing = [f for f in required if f not in decision]
                 if missing:
                     logger.error(f"⚡ ENRICHED | Missing required fields: {missing}")
                     return None
+
+                # For entry signals, validate additional required fields
+                if decision["signal"].lower() == "entry":
+                    entry_required = ["entry_price", "side", "stop_loss", "profit_target"]
+                    entry_missing = [f for f in entry_required if f not in decision]
+                    if entry_missing:
+                        logger.error(f"⚡ ENRICHED | Missing entry fields: {entry_missing}")
+                        return None
                 
                 # Normalize signal
                 signal = decision["signal"].lower()

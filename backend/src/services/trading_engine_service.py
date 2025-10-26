@@ -334,15 +334,20 @@ class TradingEngine:
                         # Parse avec fallback sur defaults
                         stop_loss = parsed_decision.get("stop_loss") or default_sl
                         take_profit = parsed_decision.get("profit_target") or default_tp
-                        
-                        logger.info(f"⚡ ENRICHED | SL/TP: {stop_loss}/{take_profit} (price: {current_price})")
-                        
+
+                        # Ensure entry_price is provided (use current market price if LLM didn't provide it)
+                        entry_price = parsed_decision.get("entry_price") or parsed_decision.get("price") or float(current_price)
+
+                        logger.info(f"⚡ ENRICHED | Entry: ${entry_price:,.2f} | SL: ${stop_loss:,.2f} | TP: ${take_profit:,.2f} (market: ${float(current_price):,.2f})")
+
                         llm_decision = {
                             "action": parsed_decision["signal"],
                             "confidence": parsed_decision["confidence"],
                             "reasoning": parsed_decision["justification"],
+                            "entry_price": entry_price,
                             "stop_loss": stop_loss,
-                            "take_profit": take_profit
+                            "take_profit": take_profit,
+                            "side": parsed_decision.get("side", "long")  # Default to long if not specified
                         }
                     
                     # Save decision (using enriched prompt)
