@@ -39,7 +39,7 @@ class RiskManagerService:
             symbol = decision.get('symbol', '')
             
             # 1. Check position size constraint
-            max_position_pct = Decimal(str(bot.risk_params.get('max_position_pct', 0.10)))
+            max_position_pct = Decimal(str(bot.risk_params.get('max_position_pct', 0.15)))  # 15% max au lieu de 10%
             if size_pct > max_position_pct:
                 return False, f"Position size {size_pct:.1%} exceeds max {max_position_pct:.1%}"
             
@@ -48,8 +48,8 @@ class RiskManagerService:
             position_value = bot.capital * size_pct
             new_total_exposure = total_exposure + position_value
             
-            # Max total exposure: 80% of capital
-            max_exposure = bot.capital * Decimal("0.80")
+            # Max total exposure: 85% of capital (permet plus d'utilisation du capital)
+            max_exposure = bot.capital * Decimal("0.85")
             if new_total_exposure > max_exposure:
                 return False, f"Total exposure ${new_total_exposure:,.2f} would exceed max ${max_exposure:,.2f}"
             
@@ -68,14 +68,14 @@ class RiskManagerService:
             if take_profit_pct <= 0:
                 return False, "Take profit percentage must be positive"
             
-            # Risk/reward ratio should be reasonable (min 1:1.5)
+            # Risk/reward ratio should be reasonable (min 1:1.3)
             risk_reward = take_profit_pct / stop_loss_pct if stop_loss_pct > 0 else 0
-            if risk_reward < 1.5:
-                return False, f"Risk/reward ratio {risk_reward:.2f} too low (min 1.5)"
+            if risk_reward < 1.3:  # Légèrement plus permissif
+                return False, f"Risk/reward ratio {risk_reward:.2f} too low (min 1.3)"
             
-            # 5. Check minimum position size (at least $10)
-            if position_value < Decimal("10"):
-                return False, f"Position size ${position_value:,.2f} below minimum $10"
+            # 5. Check minimum position size (at least $50 for meaningful trades)
+            if position_value < Decimal("50"):
+                return False, f"Position size ${position_value:,.2f} below minimum $50"
             
             logger.info(f"Entry validation passed for {symbol}")
             return True, "Validation passed"

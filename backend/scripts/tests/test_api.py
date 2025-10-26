@@ -104,7 +104,7 @@ def test_create_bot(token: str) -> Optional[str]:
     headers = {"Authorization": f"Bearer {token}"}
     
     bot_data = {
-        "name": "Test Bot Qwen",
+        "name": "0xBot",
         "model_name": "qwen-max-3",
         "capital": 1000.0,
         "paper_trading": True,

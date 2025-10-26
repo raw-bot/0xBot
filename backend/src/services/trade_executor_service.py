@@ -140,8 +140,11 @@ class TradeExecutorService:
             
             self.db.add(trade)
             
-            # Merge bot into current session to update capital
-            bot = await self.db.merge(bot)
+            # CRITICAL: Reload bot from DB to get latest capital BEFORE modifying
+            from sqlalchemy import select
+            query = select(Bot).where(Bot.id == bot.id)
+            result = await self.db.execute(query)
+            bot = result.scalar_one()
             
             # Update bot capital: deduct the cost of the position
             cost = actual_price * quantity + fees
@@ -149,7 +152,7 @@ class TradeExecutorService:
             
             await self.db.commit()
             await self.db.refresh(trade)
-            await self.db.refresh(bot)
+            await self.db.refresh(position)
             
             # Set stop loss and take profit orders (if not paper trading)
             if not bot.paper_trading:
@@ -232,8 +235,11 @@ class TradeExecutorService:
             
             self.db.add(trade)
             
-            # Merge bot into current session to update capital
-            bot = await self.db.merge(bot)
+            # CRITICAL: Reload bot from DB to get latest capital BEFORE modifying
+            from sqlalchemy import select
+            query = select(Bot).where(Bot.id == position.bot_id)
+            result = await self.db.execute(query)
+            bot = result.scalar_one()
             
             # Update bot capital: add back the proceeds from selling
             proceeds = actual_price * position.quantity - fees

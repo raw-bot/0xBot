@@ -1,286 +1,358 @@
-# AI Trading Agent
+# 🤖 0xBot - AI-Powered Crypto Trading Bot
 
-Autonomous AI-powered cryptocurrency trading platform with support for Claude, GPT-4, DeepSeek, and Gemini.
+Bot de trading automatisé utilisant l'intelligence artificielle **Qwen-max** pour trader les cryptomonnaies sur **OKX**.
+
+---
+
+## ✨ Caractéristiques
+
+- 🧠 **IA Qwen-max** - Décisions de trading intelligentes basées sur l'analyse technique
+- 📊 **5 Cryptos** - BTC, ETH, SOL, BNB, XRP (configurable)
+- 💰 **Paper Trading** - Testez sans risque avec de l'argent virtuel
+- 🔄 **Auto-Trading** - Cycles automatiques toutes les 3 minutes
+- 📈 **Analyse Multi-Timeframe** - 5min + 1H pour des décisions précises
+- ⚡ **Gestion du Risque** - Stop-loss, take-profit, exposition maximale
+- 🎯 **100% Automatisé** - Configuration et lancement en quelques minutes
+
+---
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### 1. Prérequis
 
-- Python 3.11+
-- Node.js 18+
-- Docker & Docker Compose
-- PostgreSQL 15 (via Docker)
-- Redis 7 (via Docker)
+- **Docker Desktop** installé et lancé
+- **Python 3.11+** installé
+- **Clé API Alibaba Cloud** (Qwen-max) : [Obtenir ici](https://modelstudio.console.alibabacloud.com/?tab=globalset#/efm/api_key)
 
-### Setup
+### 2. Installation Rapide
 
-1. **Clone and navigate to project**
 ```bash
-cd /Users/cube/Documents/00-code/nof1
-git checkout 001-ai-trading-agent
-```
+# Cloner le projet
+git clone <URL_DU_REPO>
+cd 0xBot
 
-2. **Start infrastructure services**
-```bash
-cd docker
-docker-compose up -d
-```
+# Démarrer PostgreSQL & Redis
+cd docker && docker-compose up -d && cd ..
 
-3. **Setup Backend**
-```bash
-cd ../backend
+# Configurer les variables d'environnement
+cp .env.example .env
+nano .env  # Ajouter votre DASHSCOPE_API_KEY
 
-# Create virtual environment
+# Installer les dépendances
+cd backend
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
+source venv/bin/activate
 pip install -r requirements.txt
 
-# Setup environment variables
-cp ../.env.example ../.env
-# Edit .env and add your API keys
-
-# Run database migrations
+# Lancer les migrations
 alembic upgrade head
 
-# Start backend server
-python -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+# Créer le bot
+python scripts/create_test_bot.py
+# ✨ Le bot ID est automatiquement sauvegardé dans .env.dev
+
+# Lancer le bot
+cd ..
+./dev.sh
 ```
 
-4. **Setup Frontend** (in new terminal)
+🎉 **C'est tout !** Votre bot trade maintenant.
+
+---
+
+## 📚 Documentation Complète
+
+Pour une **installation pas à pas détaillée** avec explications :
+
+👉 **[Guide d'Installation Complet](docs/INSTALLATION_GUIDE.md)**
+
+Autres guides :
+- 📖 [Quick Start](docs/QUICK_START.md)
+- 🔧 [Gestion du Bot](corrections/guide-gestion-bot.md)
+- 📊 [Scripts Utiles](backend/scripts/README.md)
+
+---
+
+## 🎯 Configuration par Défaut
+
+| Paramètre | Valeur | Description |
+|-----------|--------|-------------|
+| **Capital Initial** | $10,000 | Montant de départ (virtuel) |
+| **Cryptos** | BTC, ETH, SOL, BNB, XRP | Top 5 cryptomonnaies |
+| **Modèle IA** | qwen-max | LLM d'Alibaba Cloud |
+| **Mode** | Paper Trading | Trades simulés (sans risque) |
+| **Cycles** | 3 minutes | Fréquence d'analyse |
+| **Max Position** | 15% | Maximum par crypto |
+| **Max Exposure** | 85% | Capital total utilisé |
+| **Stop Loss** | 3.5% | Protection contre les pertes |
+| **Take Profit** | 7% | Objectif de gains |
+
+---
+
+## 🔧 Gestion Quotidienne
+
+### Lancer le bot
 ```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
+./dev.sh
 ```
 
-### Access Points
-
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
-- **Health Check**: http://localhost:8000/health
-
-## 📁 Project Structure
-
-```
-nof1/
-├── backend/               # Python FastAPI backend
-│   ├── src/
-│   │   ├── models/       # SQLAlchemy database models
-│   │   ├── routes/       # API endpoints
-│   │   ├── services/     # Business logic
-│   │   ├── core/         # Core utilities (DB, Redis, LLM, Exchange)
-│   │   └── middleware/   # Auth, security, error handling
-│   ├── alembic/          # Database migrations
-│   ├── tests/            # Unit tests
-│   └── requirements.txt  # Python dependencies
-├── frontend/             # React TypeScript frontend
-│   ├── src/
-│   │   ├── components/   # Reusable UI components
-│   │   ├── pages/        # Page components
-│   │   ├── lib/          # Utilities (API client, WebSocket)
-│   │   ├── hooks/        # Custom React hooks
-│   │   └── contexts/     # React contexts (Auth)
-│   └── package.json      # Node dependencies
-├── docker/               # Docker Compose configuration
-├── docs/                 # Documentation
-└── specs/                # Project specifications
-```
-
-## 🔧 Technology Stack
-
-### Backend
-- **Framework**: FastAPI (async Python)
-- **Database**: PostgreSQL 15 + TimescaleDB
-- **Cache**: Redis 7
-- **ORM**: SQLAlchemy 2.0 (async)
-- **Auth**: JWT (python-jose)
-- **Trading**: CCXT (Binance)
-- **Technical Analysis**: TA-Lib
-- **LLMs**: Anthropic, OpenAI, DeepSeek APIs
-
-### Frontend
-- **Framework**: React 18 + TypeScript
-- **Build Tool**: Vite
-- **Routing**: React Router v6
-- **State**: Zustand
-- **UI**: shadcn/ui + Tailwind CSS
-- **Charts**: Recharts
-- **API**: Axios
-- **WebSocket**: Native WebSocket API
-
-## 🎯 Features Implemented
-
-### Phase 1: Setup ✅
-- [x] Project structure
-- [x] Backend dependencies (FastAPI, SQLAlchemy, Redis, CCXT, LLM clients)
-- [x] Frontend dependencies (React, TypeScript, Vite, shadcn/ui)
-- [x] Docker Compose (PostgreSQL + Redis)
-- [x] Environment configuration
-- [x] Linting (Black, mypy, ESLint, Prettier)
-
-### Phase 2: Foundation ✅
-- [x] Database models (User, Bot, Position, Trade, LLMDecision, Alert)
-- [x] Alembic migrations
-- [x] JWT authentication (register, login)
-- [x] API client with auto-JWT
-- [x] Redis connection manager
-- [x] WebSocket connection manager
-- [x] Error handling middleware
-- [x] Security headers
-- [x] Structured logging
-- [x] CCXT Exchange client (Binance)
-- [x] LLM client interface (Claude, GPT-4, DeepSeek)
-- [x] Rate limiting (50 RPM per model)
-- [x] React Router + Auth context
-- [x] Login/Register pages
-
-### Phase 3: User Story 1 (In Progress)
-- [ ] Bot CRUD operations
-- [ ] Trading engine with 3-minute cycle
-- [ ] Market data service
-- [ ] Technical indicators (EMA, RSI, MACD)
-- [ ] LLM prompt builder
-- [ ] Trade executor
-- [ ] Risk manager
-- [ ] Bot dashboard UI
-
-## 🔐 Environment Variables
-
-Required in `.env`:
-
+### Arrêter le bot
 ```bash
-# Database
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/trading_agent
-
-# Redis
-REDIS_URL=redis://localhost:6379
-
-# Authentication
-JWT_SECRET=your-secret-key-change-in-production
-
-# LLM APIs
-CLAUDE_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
-DEEPSEEK_API_KEY=...
-GEMINI_API_KEY=...
-
-# Exchange APIs
-BINANCE_API_KEY=...
-BINANCE_SECRET_KEY=...
+Ctrl+C
 ```
 
-## 📊 API Endpoints
+### Reset rapide (tests)
+```bash
+cd backend/scripts
+./reset.sh <bot-id>
+```
 
-### Authentication
-- `POST /auth/register` - Create account
-- `POST /auth/login` - Sign in
-- `POST /auth/refresh` - Refresh token
-- `GET /auth/me` - Get current user
-
-### Bots (Coming in Phase 3)
-- `POST /bots` - Create bot
-- `GET /bots` - List user's bots
-- `GET /bots/{id}` - Get bot details
-- `PUT /bots/{id}` - Update bot
-- `DELETE /bots/{id}` - Delete bot
-- `POST /bots/{id}/start` - Start trading
-- `POST /bots/{id}/stop` - Stop trading
-
-### WebSocket
-- `ws://localhost:8000/bots/{id}/stream` - Real-time updates
-
-## 🧪 Testing
-
-### Backend
+### Créer un nouveau bot
 ```bash
 cd backend
 source venv/bin/activate
-pytest tests/
+python scripts/create_test_bot.py
+# Le bot ID est auto-configuré ✨
 ```
 
-### Frontend
+### Voir les logs
 ```bash
-cd frontend
-npm run lint
-npm run build
+tail -f backend.log
 ```
 
-## 📝 Development
+---
 
-### Backend Development
+## 📊 API et Interfaces
+
+### Backend API
+- **URL** : http://localhost:8020
+- **Documentation** : http://localhost:8020/docs
+- **Health Check** : http://localhost:8020/health
+
+### Base de Données
+- **PostgreSQL** : `localhost:5432`
+- **Redis** : `localhost:6379`
+
+---
+
+## 🔑 Clés API Requises
+
+### Obligatoire
+
+**Alibaba Cloud (Qwen-max LLM)**
+- 🔗 [Obtenir la clé API](https://modelstudio.console.alibabacloud.com/?tab=globalset#/efm/api_key)
+- Variable : `DASHSCOPE_API_KEY=sk-...`
+- Utilisation : Prise de décisions IA
+
+### Optionnel (pour trading réel)
+
+**OKX Exchange**
+- 🔗 [Obtenir les clés](https://www.okx.com/account/my-api)
+- Variables : `OKX_API_KEY`, `OKX_SECRET_KEY`, `OKX_PASSPHRASE`
+- Utilisation : Trading réel (laisser vide pour paper trading)
+
+---
+
+## 💡 Modes de Trading
+
+### Paper Trading (Par défaut) ✅
+- ✅ **Pas besoin de clés OKX**
+- ✅ Trades simulés
+- ✅ Données réelles de marché
+- ✅ **Zéro risque**
+- ✅ Parfait pour tester
+
+### Trading Réel ⚠️
+- ⚠️ Nécessite clés API OKX
+- ⚠️ Argent réel en jeu
+- ⚠️ **Testez d'abord en paper trading !**
+- ⚠️ Commencez avec un petit capital
+
+---
+
+## 🛠️ Technologies
+
+### Backend
+- **Python 3.11+** - Langage principal
+- **FastAPI** - API REST async
+- **SQLAlchemy** - ORM async
+- **PostgreSQL** - Base de données
+- **Redis** - Cache
+- **Alembic** - Migrations
+- **CCXT** - Connexion exchanges crypto
+
+### IA & Analyse
+- **Qwen-max (Alibaba Cloud)** - Décisions de trading
+- **TA-Lib** - Indicateurs techniques (RSI, MACD, EMA, etc.)
+- **Pandas/NumPy** - Analyse de données
+
+### Infrastructure
+- **Docker** - PostgreSQL & Redis
+- **Uvicorn** - Serveur ASGI
+
+---
+
+## 📈 Performance
+
+Le bot analyse en temps réel :
+- 📊 Prix et volumes
+- 📉 Indicateurs techniques (RSI, MACD, Bollinger, EMA, etc.)
+- 🔄 Corrélations entre cryptos
+- 📈 Tendances multi-timeframe (5min + 1H)
+- 🧠 Sentiment de marché (risk-on/risk-off)
+
+L'IA Qwen-max prend ensuite des décisions de :
+- 📍 **ENTRY** - Ouvrir une position (LONG/SHORT)
+- 🚪 **EXIT** - Fermer une position
+- ⏸️ **HOLD** - Maintenir les positions actuelles
+
+---
+
+## 🔐 Sécurité
+
+- ✅ Authentification JWT pour l'API
+- ✅ Variables d'environnement pour les clés
+- ✅ `.env` exclu du versioning (`.gitignore`)
+- ✅ Mode paper trading par défaut
+- ✅ Stop-loss automatique
+- ✅ Limites d'exposition
+
+⚠️ **Important** : Ne commitez JAMAIS vos fichiers `.env` !
+
+---
+
+## 📝 Logs et Monitoring
+
+Le bot log toutes ses actions :
+- 📊 Analyses de marché
+- 🧠 Décisions de l'IA
+- 💰 Entrées/sorties de positions
+- 📈 PnL en temps réel
+- ⚠️ Erreurs et warnings
+
+Format optimisé pour la lisibilité :
+```
+13:35:22 | ✅ 0xBot | qwen-max | $10,000.00 | 3min cycles
+13:35:22 | 📊 Analyzing BTC/USDT
+13:35:24 | 💰 Equity: $9,994.95 | Return: -0.05%
+13:35:24 | 📍 Total Positions: 2
+```
+
+---
+
+## 🐛 Dépannage
+
+### PostgreSQL ne démarre pas
 ```bash
-# Format code
-black backend/src
+cd docker
+docker-compose down
+docker-compose up -d
+```
 
-# Type checking
-mypy backend/src
-
-# Create migration
+### Module manquant
+```bash
 cd backend
-alembic revision --autogenerate -m "Description"
-alembic upgrade head
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
-### Frontend Development
+### Erreur "Not authorized"
 ```bash
-# Lint
-npm run lint
-
-# Build
-npm run build
-
-# Preview build
-npm run preview
+# Transférer le bot au bon utilisateur
+docker exec -i trading_agent_postgres psql -U postgres -d trading_agent -c \
+"UPDATE bots SET user_id = (SELECT id FROM users WHERE email = 'demo@0xbot.com' LIMIT 1) WHERE status = 'active';"
 ```
 
-## 🐛 Debugging
+### Plus de détails
+👉 Voir le [Guide d'Installation Complet](docs/INSTALLATION_GUIDE.md) section Dépannage
 
-### Check Services
+---
+
+## 🎯 Exemples d'Utilisation
+
+### Ajouter des cryptos
 ```bash
-# Check Docker services
-docker-compose ps
+# Via SQL
+docker exec -i trading_agent_postgres psql -U postgres -d trading_agent -c \
+"UPDATE bots SET trading_symbols = '[\"BTC/USDT\", \"ETH/USDT\", \"SOL/USDT\", \"BNB/USDT\", \"XRP/USDT\", \"DOGE/USDT\"]'::jsonb WHERE status = 'active';"
 
-# Check logs
-docker-compose logs postgres
-docker-compose logs redis
-
-# Connect to PostgreSQL
-psql postgresql://postgres:postgres@localhost:5432/trading_agent
-
-# Connect to Redis
-redis-cli
+# Relancer le bot
+./dev.sh
 ```
 
-## 📖 Documentation
+### Changer le capital
+```bash
+cd backend/scripts
+./reset.sh <bot-id> 5000  # Reset à $5,000
+```
 
-- **Specification**: `specs/001-ai-trading-agent/spec.md`
-- **Technical Plan**: `specs/001-ai-trading-agent/plan.md`
-- **Tasks**: `specs/001-ai-trading-agent/tasks.md`
-- **Implementation Status**: `docs/IMPLEMENTATION_STATUS.md`
+### Modifier les paramètres de risque
+Éditer `backend/scripts/create_test_bot.py` avant de créer le bot.
 
-## 🎯 Current Status
+---
 
-- **Phase 1**: ✅ 100% Complete (7/7 tasks)
-- **Phase 2**: ✅ 100% Complete (19/19 tasks)
-- **Phase 3**: 🔄 In Progress (0/23 tasks)
-- **Phase 4**: ⏳ Pending (0/16 tasks)
+## 📦 Structure du Projet
 
-**Total Progress**: 26/120 tasks (21.7%)
+```
+0xBot/
+├── backend/           # API FastAPI + Services de trading
+│   ├── alembic/       # Migrations de base de données
+│   ├── scripts/       # Scripts utilitaires (reset, create bot)
+│   ├── src/           # Code source
+│   │   ├── core/      # Database, Redis, Exchange, LLM
+│   │   ├── models/    # Modèles SQLAlchemy
+│   │   ├── routes/    # Endpoints API
+│   │   └── services/  # Logique métier (trading, analyse)
+│   └── requirements.txt
+├── docker/            # PostgreSQL + Redis
+├── docs/              # Documentation
+│   └── INSTALLATION_GUIDE.md  # Guide complet
+├── corrections/       # Guides de gestion
+├── .env               # Config principale (à créer)
+├── .env.dev           # Config auto-start (créé automatiquement)
+└── dev.sh             # Script de lancement
+```
 
-## 📄 License
+---
 
-MIT
+## 🤝 Contribution
 
-## 🤝 Contributing
+Améliorations bienvenues ! Le bot est en développement actif.
 
-1. Create feature branch: `git checkout -b 001-feature-name`
-2. Make changes
-3. Run tests
-4. Submit pull request
+---
+
+## 📄 Licence
+
+Privé - Usage personnel uniquement.
+
+---
+
+## 🆘 Support
+
+- 📖 [Guide d'Installation](docs/INSTALLATION_GUIDE.md)
+- 🔧 [Guide de Gestion](corrections/guide-gestion-bot.md)
+- 📊 [Documentation Scripts](backend/scripts/README.md)
+
+---
+
+## 🎉 Démarrage Rapide Ultime
+
+**Pour les pressés** :
+
+```bash
+# 1. Démarrer Docker Desktop
+# 2. Obtenir clé API : https://modelstudio.console.alibabacloud.com/?tab=globalset#/efm/api_key
+# 3. Tout installer et lancer :
+
+cd docker && docker-compose up -d && cd ..
+cp .env.example .env  # Puis ajouter DASHSCOPE_API_KEY
+cd backend && python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt && alembic upgrade head
+python scripts/create_test_bot.py && cd .. && ./dev.sh
+```
+
+**C'est tout ! Votre bot trade ! 🚀**
+
+---
+
+*Bot de trading alimenté par IA - Utilisez-le de manière responsable*

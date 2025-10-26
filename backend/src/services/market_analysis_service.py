@@ -181,29 +181,35 @@ class MarketAnalysisService:
             
             # Risk-on: Low correlation, alts outperform BTC, moderate volatility
             risk_on_score = 0
-            if avg_correlation < 0.5:
+            if avg_correlation < 0.6:  # Plus strict (nécessite vraiment low correlation)
                 risk_on_score += 1
-            if avg_alt_performance > btc_performance:
+            if avg_alt_performance > btc_performance + 0.01:  # Alts doivent VRAIMENT surperformer (+1%)
                 risk_on_score += 1
-            if avg_volatility < volatility_threshold:
+            if avg_volatility < volatility_threshold * 0.8:  # Volatilité vraiment basse
                 risk_on_score += 1
             
             # Risk-off: High correlation, BTC outperforms alts, high volatility
             risk_off_score = 0
             if avg_correlation > 0.7:
                 risk_off_score += 1
-            if btc_performance > avg_alt_performance:
+            if btc_performance > avg_alt_performance + 0.01:  # BTC doit VRAIMENT surperformer
                 risk_off_score += 1
-            if avg_volatility > volatility_threshold:
+            if avg_volatility > volatility_threshold * 1.2:  # Volatilité vraiment haute
                 risk_off_score += 1
             
-            # Determine regime
-            if risk_on_score >= 2:
+            # Determine regime - PLUS STRICT
+            if risk_on_score == 3:  # Exiger 3/3 pour risk-on avec haute confiance
                 regime = 'risk_on'
-                confidence = risk_on_score / 3
-            elif risk_off_score >= 2:
+                confidence = 1.0
+            elif risk_on_score == 2:  # 2/3 = risk-on mais confiance moyenne
+                regime = 'risk_on'
+                confidence = 0.67
+            elif risk_off_score == 3:  # 3/3 pour risk-off
                 regime = 'risk_off'
-                confidence = risk_off_score / 3
+                confidence = 1.0
+            elif risk_off_score == 2:  # 2/3 pour risk-off
+                regime = 'risk_off'
+                confidence = 0.67
             else:
                 regime = 'neutral'
                 confidence = 0.5

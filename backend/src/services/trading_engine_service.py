@@ -72,6 +72,10 @@ class TradingEngine:
         self.cycle_interval = cycle_interval
         self.is_running = False
         
+        # Performance tracking
+        self.cycle_count = 0  # Track number of cycles for hourly summaries
+        self.session_start = datetime.utcnow()
+        
         # Initialize services
         self.market_data_service = MarketDataService()
         self.position_service = PositionService(db)
@@ -169,6 +173,9 @@ class TradingEngine:
         logger.info("=" * 80)
         
         try:
+            # 0. Update position prices FIRST to get accurate equity
+            await self._update_position_prices()
+            
             # 1. Get portfolio state once (this will reload bot with latest capital)
             portfolio_state, current_bot = await self._get_portfolio_state()
             
@@ -294,9 +301,17 @@ class TradingEngine:
             # 3. Update all position prices at the end
             await self._update_position_prices()
             
+            # Increment cycle count
+            self.cycle_count += 1
+            
             cycle_duration = (datetime.utcnow() - cycle_start).total_seconds()
             logger.info("─" * 80)
             logger.info(f"✅ Cycle completed in {cycle_duration:.1f}s | Next in {self.cycle_interval//60}min")
+            
+            # Hourly performance summary (every 12 cycles = 1 hour at 5min intervals)
+            if self.cycle_count % 12 == 0:
+                await self._log_hourly_summary(current_bot)
+            
             logger.info("=" * 80)
             
         except Exception as e:
@@ -540,6 +555,47 @@ class TradingEngine:
                 await self.position_service.update_current_price(position.id, current_price)
             except Exception as e:
                 logger.error(f"Error updating price for position {position.id}: {e}")
+    
+    async def _log_hourly_summary(self, bot: Bot) -> None:
+        """Log hourly performance summary."""
+        # Get current portfolio state
+        portfolio_state, _ = await self._get_portfolio_state()
+        
+        # Get positions
+        positions = await self.position_service.get_open_positions(self.bot_id)
+        
+        # Get trades count today
+        trades_today = await self._get_trades_today_count()
+        
+        # Calculate metrics
+        equity = portfolio_state['total_value']
+        invested = portfolio_state['invested']
+        unrealized_pnl = portfolio_state['unrealized_pnl']
+        return_pct = ((equity - bot.initial_capital) / bot.initial_capital) * 100
+        capital_utilization = (invested / equity * 100) if equity > 0 else 0
+        
+        # Calculate session duration
+        session_duration = (datetime.utcnow() - self.session_start).total_seconds() / 3600  # in hours
+        
+        # Colors
+        pnl_color = GREEN if unrealized_pnl >= 0 else RED
+        return_color = GREEN if return_pct >= 0 else RED
+        
+        logger.info("")
+        logger.info("╔" + "═" * 78 + "╗")
+        logger.info("║" + " " * 25 + "📊 HOURLY SUMMARY" + " " * 36 + "║")
+        logger.info("╠" + "═" * 78 + "╣")
+        logger.info(f"║  ⏱️  Session Time: {session_duration:.1f}h | Cycles: {self.cycle_count}" + " " * (78 - 38 - len(str(self.cycle_count))) + "║")
+        logger.info("╠" + "─" * 78 + "╣")
+        logger.info(f"║  💰 Equity: ${equity:,.2f} | Initial: ${bot.initial_capital:,.2f}" + " " * (78 - 37 - len(f"{equity:,.2f}") - len(f"{bot.initial_capital:,.2f}")) + "║")
+        logger.info(f"║  {return_color}📈 Return: {return_pct:+.2f}%{RESET}" + " " * (78 - 17 - len(f"{return_pct:+.2f}")) + "║")
+        logger.info(f"║  {pnl_color}💵 Unrealized PnL: ${unrealized_pnl:+,.2f}{RESET}" + " " * (78 - 24 - len(f"{unrealized_pnl:+,.2f}")) + "║")
+        logger.info("╠" + "─" * 78 + "╣")
+        logger.info(f"║  📍 Open Positions: {len(positions)}" + " " * (78 - 22 - len(str(len(positions)))) + "║")
+        logger.info(f"║  🎯 Trades Today: {trades_today}" + " " * (78 - 20 - len(str(trades_today))) + "║")
+        logger.info(f"║  📊 Capital Utilization: {capital_utilization:.1f}%" + " " * (78 - 28 - len(f"{capital_utilization:.1f}")) + "║")
+        logger.info("╚" + "═" * 78 + "╝")
+        logger.info("")
     
     async def _get_trades_today_count(self) -> int:
         """

@@ -127,15 +127,35 @@ class HumanReadableFormatter(logging.Formatter):
         else:
             level_color = reset = dim = bold = timestamp_color = logger_color = key_color = ""
         
-        # Format timestamp
-        timestamp = datetime.fromtimestamp(record.created).strftime("%H:%M:%S.%f")[:-3]
+        # Format timestamp (only time, no milliseconds for cleaner look)
+        timestamp = datetime.fromtimestamp(record.created).strftime("%H:%M:%S")
+        
+        # Abbreviate logger names for cleaner output
+        logger_abbrev = {
+            "trading_engine_service": "🤖 BOT",
+            "trade_executor_service": "💰 TRADE",
+            "market_data_service": "📊 DATA",
+            "market_analysis_service": "📈 ANALYSIS",
+            "llm_prompt_service": "🧠 LLM",
+            "position_service": "📍 POSITION",
+            "risk_manager_service": "⚠️  RISK",
+            "bot_service": "🔧 SERVICE",
+            "exchange_client": "🔗 EXCHANGE",
+            "indicator_service": "📉 INDICATOR",
+        }
         
         # Extract short logger name (last part)
         logger_parts = record.name.split(".")
         short_logger = logger_parts[-1] if logger_parts else record.name
         
-        # Align logger names (longest is "trading_engine_service" = 22 chars)
-        aligned_logger = f"{short_logger:22s}"
+        # Use abbreviation or show only for warnings/errors
+        if record.levelno >= logging.WARNING:
+            # Show full context for errors/warnings
+            aligned_logger = logger_abbrev.get(short_logger, f"⚡ {short_logger[:8].upper()}")
+            log_line_prefix = f"{timestamp_color}{timestamp}{reset} | {level_color}{aligned_logger}{reset} | "
+        else:
+            # For INFO/DEBUG, just timestamp
+            log_line_prefix = f"{timestamp_color}{timestamp}{reset} | "
         
         # Color based on level
         if record.levelno >= logging.ERROR:
@@ -145,8 +165,8 @@ class HumanReadableFormatter(logging.Formatter):
         else:
             msg_color = ""
         
-        # Build main log line (no level display)
-        log_line = f"{timestamp_color}{timestamp}{reset} | {logger_color}{aligned_logger}{reset} | {msg_color}{record.getMessage()}{reset}"
+        # Build main log line
+        log_line = f"{log_line_prefix}{msg_color}{record.getMessage()}{reset}"
         
         # Add extra fields if present
         extras = []
@@ -182,6 +202,46 @@ class HumanReadableFormatter(logging.Formatter):
             log_line += f"\n  {dim}📍 {location}{reset}"
         
         return log_line
+
+
+class NoiseFilter(logging.Filter):
+    """
+    Filter out noisy/repetitive log messages.
+    
+    Filters out common patterns like "Fetching", "Created", etc.
+    """
+    
+    def __init__(self):
+        """Initialize filter with patterns to exclude."""
+        super().__init__()
+        self.excluded_patterns = [
+            "Fetching",
+            "Created order",
+            "Closing database connection",
+            "Opening database connection",
+            "Connection pool",
+            "HTTP Request:",
+            "HTTP Response:",
+        ]
+    
+    def filter(self, record: logging.LogRecord) -> bool:
+        """
+        Determine if record should be logged.
+        
+        Args:
+            record: Log record
+            
+        Returns:
+            True if should be logged, False otherwise
+        """
+        message = record.getMessage()
+        
+        # Check if message contains any excluded pattern
+        for pattern in self.excluded_patterns:
+            if pattern.lower() in message.lower():
+                return False
+        
+        return True
 
 
 class RequestLogger:
@@ -259,6 +319,10 @@ def setup_logging(log_level: str = "INFO", use_json: bool = False) -> None:
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(getattr(logging, log_level.upper()))
     
+    # Add noise filter to reduce clutter
+    noise_filter = NoiseFilter()
+    console_handler.addFilter(noise_filter)
+    
     # Choose formatter based on configuration
     if log_format == "json":
         formatter = JSONFormatter()
@@ -272,9 +336,15 @@ def setup_logging(log_level: str = "INFO", use_json: bool = False) -> None:
     # Add handler to root logger
     root_logger.addHandler(console_handler)
     
-    # Silence noisy loggers
+    # Silence noisy loggers - keep only important messages
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("asyncio").setLevel(logging.WARNING)
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    logging.getLogger("sqlalchemy.pool").setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> logging.Logger:
