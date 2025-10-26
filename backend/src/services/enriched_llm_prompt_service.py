@@ -6,6 +6,7 @@ import json
 import logging
 from typing import Dict, List, Optional
 from datetime import datetime
+from decimal import Decimal
 
 from .trading_memory_service import get_trading_memory
 from sqlalchemy.orm import Session
@@ -200,6 +201,21 @@ QUICK SNAPSHOT (All Tradable Assets)
         memory = get_trading_memory(self.db, bot.id)
         context = memory.get_full_context(bot, bot_positions)
         
+        # Get current price for example calculations
+        current_price = market_snapshot.get("price", market_snapshot.get("current_price", 0))
+        
+        # Get SL/TP percentages from bot's risk_params
+        stop_loss_pct = bot.risk_params.get("stop_loss_pct", 0.035)  # 3.5% default
+        take_profit_pct = bot.risk_params.get("take_profit_pct", 0.07)  # 7% default
+        
+        # Calculate example prices using Decimal to avoid type errors
+        if current_price > 0:
+            example_sl = float(Decimal(str(current_price)) * (Decimal("1") - Decimal(str(stop_loss_pct))))
+            example_tp = float(Decimal(str(current_price)) * (Decimal("1") + Decimal(str(take_profit_pct))))
+        else:
+            example_sl = 112000.0
+            example_tp = 115000.0
+        
         # Build sections
         session_text = self._format_session_context(context)
         portfolio_text = self._format_portfolio_context(context)
@@ -264,6 +280,15 @@ CONFIDENCE THRESHOLDS
   → Profit target reached
   → Setup invalidated
 
+⚠️ MANDATORY FIELDS FOR ENTRY SIGNALS ⚠️
+============================================
+For ANY "entry" signal, you MUST provide valid price levels:
+- stop_loss: Price BELOW current (example: ${example_sl:.2f})
+- profit_target: Price ABOVE current (example: ${example_tp:.2f})
+NEVER use null, 0, "TBD", or omit these fields!
+Calculate actual prices based on ${current_price:.2f}
+
+
 RESPONSE FORMAT
 ===============
 ⚠️ CRITICAL: Respond with ONLY a valid JSON object. No explanation text before or after.
@@ -280,8 +305,8 @@ Required format:
                       2. Why this decision makes sense
                       3. Your risk management plan
                       4. How this fits your portfolio",
-    "stop_loss": 112000.0,
-    "profit_target": 115000.0,
+    "stop_loss": {example_sl:.2f},
+    "profit_target": {example_tp:.2f},
     "invalidation_condition": "Price closes below X on Y timeframe",
     "leverage": 1,
     "risk_usd": 500.0

@@ -317,31 +317,47 @@ class TradingEngine:
                     )
                     
                     if not parsed_decision:
-                        logger.warning(f"🤖 BOT | Failed to parse LLM decision for {symbol}, using fallback")
-                        logger.debug(f"Response preview: {response_text[:300]}...")
-                        decision = {"action": "hold", "confidence": 0.5, "reasoning": "Parse error - defaulting to HOLD"}
+                        logger.warning(f"Failed to parse LLM decision for {symbol}, using fallback")
+                        llm_decision = {"action": "hold", "confidence": 0.5, "reasoning": "Parse error"}
                     else:
-                        decision = {
+                        # Get current price for default SL/TP calculation
+                        current_price = market_snapshot.get("price", 0)
+                        
+                        # Get SL/TP from bot's risk_params with fallback values
+                        stop_loss_pct = current_bot.risk_params.get("stop_loss_pct", 0.035)  # 3.5% default
+                        take_profit_pct = current_bot.risk_params.get("take_profit_pct", 0.07)  # 7% default
+                        
+                        # Calculate default stop loss and take profit prices
+                        default_sl = current_price * (Decimal("1") - Decimal(str(stop_loss_pct))) if current_price > 0 else None
+                        default_tp = current_price * (Decimal("1") + Decimal(str(take_profit_pct))) if current_price > 0 else None
+                        
+                        # Parse avec fallback sur defaults
+                        stop_loss = parsed_decision.get("stop_loss") or default_sl
+                        take_profit = parsed_decision.get("profit_target") or default_tp
+                        
+                        logger.info(f"⚡ ENRICHED | SL/TP: {stop_loss}/{take_profit} (price: {current_price})")
+                        
+                        llm_decision = {
                             "action": parsed_decision["signal"],
                             "confidence": parsed_decision["confidence"],
                             "reasoning": parsed_decision["justification"],
-                            "stop_loss": parsed_decision.get("stop_loss"),
-                            "take_profit": parsed_decision.get("profit_target")
+                            "stop_loss": stop_loss,
+                            "take_profit": take_profit
                         }
                     
                     # Save decision (using enriched prompt)
                     llm_result = {
                         "response": response_text,
-                        "parsed_decisions": decision,
+                        "parsed_decisions": llm_decision,
                         "tokens_used": llm_response.get("tokens_used", 0),
                         "cost": llm_response.get("cost", 0.0)
                     }
                     await self._save_llm_decision(prompt=prompt_data["prompt"], llm_result=llm_result, symbol=symbol)
                     
                     # Parse and display decision
-                    action = decision.get('action', 'hold').upper()
-                    reasoning = decision.get('reasoning', 'No reasoning provided')
-                    confidence = decision.get('confidence', 0)
+                    action = llm_decision.get('action', 'hold').upper()
+                    reasoning = llm_decision.get('reasoning', 'No reasoning provided')
+                    confidence = llm_decision.get('confidence', 0)
                     
                     # Color decision based on action
                     if action == 'ENTRY':
@@ -356,12 +372,12 @@ class TradingEngine:
                     # Execute decision for this symbol
                     if action == 'ENTRY':
                         # Ensure the decision includes the correct symbol
-                        decision['symbol'] = symbol
-                        await self._handle_entry_decision(decision, market_snapshot['current_price'], portfolio_state, current_bot)
+                        llm_decision['symbol'] = symbol
+                        await self._handle_entry_decision(llm_decision, market_snapshot['current_price'], portfolio_state, current_bot)
                     elif action == 'EXIT':
-                        await self._handle_exit_decision(decision, symbol_positions, market_snapshot['current_price'])
+                        await self._handle_exit_decision(llm_decision, symbol_positions, market_snapshot['current_price'])
                     elif action == 'CLOSE_POSITION':
-                        await self._handle_close_position(decision, symbol_positions, market_snapshot['current_price'])
+                        await self._handle_close_position(llm_decision, symbol_positions, market_snapshot['current_price'])
                     
                 except Exception as e:
                     logger.error(f"❌ Error analyzing {symbol}: {e}")
@@ -832,11 +848,11 @@ class TradingEngine:
         if len(prices) < period:
             return sum([float(p) for p in prices]) / len(prices)
         
-        # Convert to float
+        # Convert to float (handles both Decimal and float)
         prices = [float(p) for p in prices]
         
         # Calculate multiplier
-        multiplier = 2 / (period + 1)
+        multiplier = 2.0 / (period + 1)
         
         # Initialize with SMA
         ema = sum(prices[:period]) / period

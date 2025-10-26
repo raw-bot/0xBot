@@ -79,7 +79,9 @@ class Bot(Base):
         default=lambda: {
             "max_position_pct": 0.10,
             "max_drawdown_pct": 0.20,
-            "max_trades_per_day": 10
+            "max_trades_per_day": 10,
+            "stop_loss_pct": 0.035,      # 3.5% stop loss (default if not specified)
+            "take_profit_pct": 0.07       # 7% take profit (default if not specified)
         }
     )
     
