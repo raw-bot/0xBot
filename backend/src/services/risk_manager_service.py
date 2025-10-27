@@ -232,7 +232,7 @@ class RiskManagerService:
         capital: Decimal,
         size_pct: Decimal,
         current_price: Decimal,
-        leverage: float = 1.0
+        leverage: Decimal = Decimal("1.0")
     ) -> Decimal:
         """
         Calculate position size in base currency.
@@ -246,7 +246,13 @@ class RiskManagerService:
         Returns:
             Position quantity in base currency
         """
-        position_value = capital * size_pct * Decimal(str(leverage))
+        # Ensure all values are Decimal for consistent arithmetic
+        capital = Decimal(str(capital))
+        size_pct = Decimal(str(size_pct))
+        current_price = Decimal(str(current_price))
+        leverage = Decimal(str(leverage))
+        
+        position_value = capital * size_pct * leverage
         quantity = position_value / current_price
         return quantity
     
