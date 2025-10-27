@@ -230,11 +230,17 @@ class LLMClient:
     ) -> Dict[str, Any]:
         """Call Qwen API (Alibaba Cloud)."""
         try:
+            # Add system message to enforce JSON output
+            system_message = """You are a trading assistant. You MUST respond with valid JSON only.
+Do not include any explanatory text before or after the JSON object.
+Your response must be parseable JSON starting with { and ending with }."""
+            
             response = await self.qwen_client.chat.completions.create(
                 model="qwen-max",  # Qwen Max model
                 max_tokens=max_tokens,
                 temperature=temperature,
                 messages=[
+                    {"role": "system", "content": system_message},
                     {"role": "user", "content": prompt}
                 ]
             )

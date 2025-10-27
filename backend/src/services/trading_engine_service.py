@@ -310,10 +310,12 @@ class TradingEngine:
                         logger.error(f"🤖 BOT | Empty response from LLM for {symbol}")
                         logger.error(f"🤖 BOT | LLM response keys: {list(llm_response.keys())}")
                     
-                    # Parse structured response
+                    # Parse (with prompt for logging and current_price for fallback)
                     parsed_decision = self.enriched_prompt_service.parse_llm_response(
                         response_text,
-                        symbol
+                        symbol,
+                        original_prompt=prompt_data["prompt"],  # Pass prompt for logging
+                        current_price=float(market_snapshot['current_price'])  # Pass price for fallback parser
                     )
                     
                     if not parsed_decision:
@@ -328,35 +330,38 @@ class TradingEngine:
                             logger.error(f"❌ Invalid market price for {symbol}: {current_price}")
                             continue
                         
+                        # Convert to Decimal for calculations
+                        current_price_decimal = Decimal(str(current_price))
+                        
                         # Get SL/TP from bot's risk_params with fallback values
                         stop_loss_pct = current_bot.risk_params.get("stop_loss_pct", 0.035)  # 3.5% default
                         take_profit_pct = current_bot.risk_params.get("take_profit_pct", 0.07)  # 7% default
                         
                         # Calculate default stop loss and take profit prices
-                        default_sl = current_price * (Decimal("1") - Decimal(str(stop_loss_pct)))
-                        default_tp = current_price * (Decimal("1") + Decimal(str(take_profit_pct)))
+                        default_sl = current_price_decimal * (Decimal("1") - Decimal(str(stop_loss_pct)))
+                        default_tp = current_price_decimal * (Decimal("1") + Decimal(str(take_profit_pct)))
                         
-                        # Parse avec fallback sur defaults
-                        stop_loss = parsed_decision.get("stop_loss") or default_sl
-                        take_profit = parsed_decision.get("profit_target") or default_tp
+                        # Parse avec fallback sur defaults - ensure all are Decimal for consistency
+                        stop_loss = Decimal(str(parsed_decision.get("stop_loss"))) if parsed_decision.get("stop_loss") else default_sl
+                        take_profit = Decimal(str(parsed_decision.get("profit_target"))) if parsed_decision.get("profit_target") else default_tp
 
                         # Ensure entry_price is provided (use current market price if LLM didn't provide it)
-                        entry_price = parsed_decision.get("entry_price") or parsed_decision.get("price") or float(current_price)
+                        entry_price = parsed_decision.get("entry_price") or parsed_decision.get("price") or float(current_price_decimal)
 
-                        logger.info(f"⚡ ENRICHED | Entry: ${entry_price:,.2f} | SL: ${stop_loss:,.2f} | TP: ${take_profit:,.2f} (market: ${float(current_price):,.2f})")
+                        logger.info(f"⚡ ENRICHED | Entry: ${entry_price:,.2f} | SL: ${float(stop_loss):,.2f} | TP: ${float(take_profit):,.2f} (market: ${float(current_price_decimal):,.2f})")
 
                         # Get size_pct from LLM or use default (5% of capital)
                         size_pct = parsed_decision.get("size_pct") or parsed_decision.get("risk_pct") or 0.05
                         
                         llm_decision = {
                             "action": parsed_decision["signal"],
-                            "confidence": parsed_decision["confidence"],
+                            "confidence": float(parsed_decision["confidence"]),
                             "reasoning": parsed_decision["justification"],
-                            "entry_price": entry_price,
-                            "stop_loss": stop_loss,
-                            "take_profit": take_profit,
+                            "entry_price": float(entry_price),
+                            "stop_loss": float(stop_loss),
+                            "take_profit": float(take_profit),
                             "side": parsed_decision.get("side", "long"),  # Default to long if not specified
-                            "size_pct": size_pct  # Position size as percentage
+                            "size_pct": float(size_pct)  # Position size as percentage
                         }
                     
                     # Save decision (using enriched prompt)
@@ -429,24 +434,24 @@ class TradingEngine:
             symbol: Trading pair (e.g., "BTC/USDT")
             
         Returns:
-            Dictionary with snapshot and 4h indicators
+            Dictionary with snapshot (already enriched with 4h data)
         """
         logger.debug(f"Fetching multi-timeframe market data for {symbol}...")
         
         # Fetch multi-timeframe data (5min + 1h)
-        multi_tf_data = await self.market_data_service.get_market_data_multi_timeframe(
+        # This returns an enriched snapshot with both timeframes combined
+        snapshot = await self.market_data_service.get_market_data_multi_timeframe(
             symbol=symbol,
             timeframe_short=self.timeframe,  # Current timeframe (5min - ALIGNED with cycle)
             timeframe_long=self.timeframe_long  # Long-term context (1h)
         )
         
-        snapshot = multi_tf_data['short']
         logger.debug(f"{symbol} current price: ${snapshot['current_price']}")
         
-        # Return both short and long timeframe data
+        # Return snapshot (which already contains both timeframes)
         return {
             'snapshot': snapshot,
-            'indicators_4h': multi_tf_data['long']
+            'indicators_4h': snapshot['technical_indicators']['1h']
         }
     
     async def _calculate_indicators(self, market_snapshot: dict) -> dict:

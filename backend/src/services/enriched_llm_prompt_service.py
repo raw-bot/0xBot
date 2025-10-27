@@ -267,16 +267,11 @@ First, analyze EACH coin's current state:
 For each coin:
 1. Review the position (if exists) - check if invalidation condition is met
 2. Analyze technical indicators for new opportunities
-3. Make HOLD/ENTRY/CLOSE decision based on:
+3. Make HOLD/ENTRY/EXIT decision based on:
    - Invalidation conditions (non-negotiable)
    - Technical alignment (RSI, MACD, EMA, trend)
    - Risk/reward ratio
    - Portfolio balance
-
-DECISION POLICY:
-- HOLD: If position exists AND invalidation NOT triggered
-- CLOSE: If invalidation condition met OR technical deterioration
-- ENTRY: If no position AND confidence ≥ 60% AND good setup
 
 CONFIDENCE LEVELS:
 - 75-85%: Very strong (all indicators aligned)
@@ -284,61 +279,86 @@ CONFIDENCE LEVELS:
 - 55-65%: Decent (mixed but positive bias)
 - Below 55%: Avoid or be cautious
 
-OUTPUT REQUIREMENTS:
-You must output your chain of thought analysis for each coin, checking:
-- Current price vs invalidation condition
-- Position health and distance to SL/TP
-- Technical indicators alignment
-- Decision rationale with confidence level
+▶ CRITICAL: YOU MUST OUTPUT JSON
+After your analysis, you MUST output a JSON object. No exceptions.
+The JSON MUST be valid and parseable. Do not add any text after the JSON.
 
-Then output JSON decisions in this format:
-
-▶ TRADING_DECISIONS
-
-For each coin, output:
-[COIN] [HOLD/ENTRY/CLOSE] [confidence%] [optional: QUANTITY: X]
-
-Example:
-BTC HOLD 72% QUANTITY: 0.12
-ETH ENTRY 68% QUANTITY: 5.0
-SOL CLOSE 45%
-
-Required JSON Format (for system processing):
+JSON FORMAT (THIS IS MANDATORY):
 {{
   "{symbol}": {{
-    "trade_signal_args": {{
-      "signal": "hold/entry/close",
-      "coin": "{symbol}",
-      "quantity": <float>,
-      "profit_target": <float>,
-      "stop_loss": <float>,
-      "invalidation_condition": "<string>",
-      "leverage": <int>,
-      "confidence": <0-1>,
-      "risk_usd": <float>
-    }}
+    "signal": "hold" or "entry" or "exit",
+    "confidence": 0.65,
+    "justification": "Brief reason for decision",
+    "entry_price": {current_price:.2f},
+    "stop_loss": {example_sl:.2f},
+    "profit_target": {example_tp:.2f},
+    "side": "long",
+    "size_pct": 0.05
   }}
 }}
 
-For ENTRY signals, calculate:
-- stop_loss: Price BELOW current (example: ${example_sl:.2f})
-- profit_target: Price ABOVE current (example: ${example_tp:.2f})
-Based on current price: ${current_price:.2f}
+RULES:
+- signal: Must be "hold", "entry", or "exit" (lowercase)
+- confidence: Float between 0 and 1 (e.g., 0.65 for 65%)
+- entry_price: Current market price ${current_price:.2f}
+- stop_loss: Price below entry (example: ${example_sl:.2f} is {stop_loss_pct*100:.1f}% below)
+- profit_target: Price above entry (example: ${example_tp:.2f} is {take_profit_pct*100:.1f}% above)
+- side: Always "long" for now
+- size_pct: Position size as decimal (0.05 = 5% of capital)
 
-Now analyze ALL coins and make your decisions.
+Now analyze {symbol} and output ONLY the JSON object.
 """
         
         return prompt
+    
+    def _parse_text_decision(self, response_text: str, symbol: str, current_price: float = 0) -> Optional[Dict]:
+        """
+        Fallback parser for text-only responses (when LLM doesn't output JSON).
+        Looks for keywords like HOLD, ENTRY, EXIT in the text.
+        """
+        import re
+        from decimal import Decimal
+        
+        text_lower = response_text.lower()
+        
+        # Try to find decision keyword
+        signal = "hold"  # default
+        if "entry" in text_lower or "buy" in text_lower:
+            signal = "entry"
+        elif "exit" in text_lower or "sell" in text_lower or "close" in text_lower:
+            signal = "exit"
+        
+        # Try to extract confidence
+        confidence = 0.5
+        conf_match = re.search(r'confidence[:\s]+(\d+)%', text_lower)
+        if conf_match:
+            confidence = float(conf_match.group(1)) / 100.0
+        
+        # Build fallback decision - use Decimal for price calculations
+        decision = {
+            "signal": signal,
+            "confidence": confidence,
+            "justification": f"Parsed from text response: {response_text[:100]}...",
+            "entry_price": float(current_price) if current_price else 0,
+            "stop_loss": float(Decimal(str(current_price)) * Decimal("0.965")) if current_price else 0,  # 3.5% below
+            "profit_target": float(Decimal(str(current_price)) * Decimal("1.07")) if current_price else 0,  # 7% above
+            "side": "long",
+            "size_pct": 0.05
+        }
+        
+        logger.info(f"⚡ ENRICHED | Fallback text parser extracted: {signal.upper()} @ {confidence:.0%}")
+        return decision
     
     def parse_llm_response(
         self,
         response_text: str,
         symbol: str,
-        original_prompt: Optional[str] = None
+        original_prompt: Optional[str] = None,
+        current_price: float = 0
     ) -> Optional[Dict]:
         """
-        Parser la réponse JSON du LLM - version robuste
-        Gère les cas où le LLM ajoute du texte avant/après le JSON
+        Parser la réponse JSON du LLM - version robuste avec fallback text parser.
+        Gère les cas où le LLM ajoute du texte avant/après le JSON.
         """
         try:
             # Remove markdown code fences if present
@@ -359,16 +379,30 @@ Now analyze ALL coins and make your decisions.
             # Try to find JSON in response
             start_idx = cleaned.find('{')
             if start_idx == -1:
-                logger.error(f"⚡ ENRICHED | No JSON found in LLM response (len={len(response_text)})")
-                logger.debug(f"Response preview: {response_text[:200]}...")
+                logger.warning(f"⚡ ENRICHED | No JSON found in LLM response (len={len(response_text)})")
+                logger.info(f"⚡ ENRICHED | Attempting fallback text parser...")
                 
-                # Log error with detailed info
+                # Try fallback text parser
+                fallback_decision = self._parse_text_decision(response_text, symbol, current_price)
+                if fallback_decision:
+                    # Log with detailed info
+                    if LLM_LOGGER_ENABLED and original_prompt:
+                        llm_logger = get_llm_decision_logger()
+                        llm_logger.log_error(
+                            symbol=symbol,
+                            prompt=original_prompt,
+                            error_message="No JSON found - used fallback text parser",
+                            llm_response=response_text
+                        )
+                    return fallback_decision
+                
+                # If fallback also fails
                 if LLM_LOGGER_ENABLED and original_prompt:
                     llm_logger = get_llm_decision_logger()
                     llm_logger.log_error(
                         symbol=symbol,
                         prompt=original_prompt,
-                        error_message="No JSON found in LLM response",
+                        error_message="No JSON found and fallback parser failed",
                         llm_response=response_text
                     )
                 
