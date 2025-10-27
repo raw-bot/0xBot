@@ -305,6 +305,16 @@ class MarketDataService:
             # Calculate average volume (last 100 candles)
             avg_volume = sum(volumes) / len(volumes) if volumes else 0
             
+            # Helper function to get last valid value (skip None values from warmup period)
+            def get_last_valid(series):
+                """Get last non-None value from series, scanning backwards"""
+                if not series:
+                    return None
+                for val in reversed(series):
+                    if val is not None:
+                        return val
+                return None
+            
             snapshot = {
                 'symbol': symbol,
                 'timeframe': timeframe,
@@ -323,14 +333,14 @@ class MarketDataService:
                 'rsi7_series': rsi7_series,
                 'rsi14_series': rsi14_series,
                 
-                # Technical indicators (current values)
+                # Technical indicators (current values) - use helper to get last valid value
                 'technical_indicators': {
                     '5m': {  # Actually using the provided timeframe
-                        'ema20': ema20_series[-1] if ema20_series and ema20_series[-1] is not None else 0,
-                        'ema50': ema50_series[-1] if ema50_series and ema50_series[-1] is not None else 0,
-                        'macd': macd_series[-1] if macd_series and macd_series[-1] is not None else 0,
-                        'rsi7': rsi7_series[-1] if rsi7_series and rsi7_series[-1] is not None else 50,
-                        'rsi14': rsi14_series[-1] if rsi14_series and rsi14_series[-1] is not None else 50,
+                        'ema20': get_last_valid(ema20_series) or 0,
+                        'ema50': get_last_valid(ema50_series) or 0,
+                        'macd': get_last_valid(macd_series) or 0,
+                        'rsi7': get_last_valid(rsi7_series) or 50,
+                        'rsi14': get_last_valid(rsi14_series) or 50,
                     },
                     '1h': {  # For longer-term context
                         'ema20': 0,  # Will be filled by get_market_data_multi_timeframe
@@ -405,14 +415,24 @@ class MarketDataService:
             snapshot['macd_series_4h'] = macd_4h['macd']
             snapshot['rsi14_series_4h'] = rsi14_4h
             
+            # Helper function to get last valid value (local scope)
+            def get_last_valid_4h(series):
+                """Get last non-None value from series, scanning backwards"""
+                if not series:
+                    return None
+                for val in reversed(series):
+                    if val is not None:
+                        return val
+                return None
+            
             # Update 1h (4h) technical indicators with actual values
             snapshot['technical_indicators']['1h'] = {
-                'ema20': ema20_4h[-1] if ema20_4h and ema20_4h[-1] is not None else 0,
-                'ema50': ema50_4h[-1] if ema50_4h and ema50_4h[-1] is not None else 0,
-                'macd': macd_4h['macd'][-1] if macd_4h['macd'] and macd_4h['macd'][-1] is not None else 0,
-                'rsi14': rsi14_4h[-1] if rsi14_4h and rsi14_4h[-1] is not None else 50,
-                'atr3': atr3_4h[-1] if atr3_4h and atr3_4h[-1] is not None else 0,
-                'atr14': atr14_4h[-1] if atr14_4h and atr14_4h[-1] is not None else 0,
+                'ema20': get_last_valid_4h(ema20_4h) or 0,
+                'ema50': get_last_valid_4h(ema50_4h) or 0,
+                'macd': get_last_valid_4h(macd_4h['macd']) or 0,
+                'rsi14': get_last_valid_4h(rsi14_4h) or 50,
+                'atr3': get_last_valid_4h(atr3_4h) or 0,
+                'atr14': get_last_valid_4h(atr14_4h) or 0,
                 'volume': volumes_4h[-1] if volumes_4h else 0,
                 'avg_volume': avg_volume_4h,
             }

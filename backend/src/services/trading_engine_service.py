@@ -804,31 +804,25 @@ class TradingEngine:
     
     async def _get_all_coins_quick_snapshot(self) -> dict:
         """
-        Obtenir un snapshot rapide de tous les coins tradables
-        Pour enrichir le contexte multi-coin du prompt LLM
-        Phase 3C - Expert Roadmap
+        Obtenir un snapshot COMPLET de tous les coins tradables
+        Avec TOUS les indicateurs techniques nécessaires
+        Phase 3C - Expert Roadmap - FIXED
         """
         all_coins = {}
         for symbol in self.trading_symbols:
             try:
-                ticker = await self.market_data_service.fetch_ticker(symbol)
-                if ticker:
-                    # Fetch candles for RSI calculation
-                    candles_5m = await self.market_data_service.fetch_ohlcv(
-                        symbol=symbol,
-                        timeframe="5m",
-                        limit=50
-                    )
-                    if len(candles_5m) >= 20:
-                        closes = self.market_data_service.extract_closes(candles_5m)
-                        rsi = self._calculate_rsi(closes, 14)
-                        ema20 = self._calculate_ema(closes, 20)
-                        trend = "BULLISH" if closes[-1] > ema20 else "BEARISH"
-                        all_coins[symbol] = {
-                            "price": float(ticker.last),
-                            "rsi": rsi,
-                            "trend": trend
-                        }
+                # Fetch COMPLETE snapshot with all technical indicators
+                snapshot = await self.market_data_service.get_market_data_multi_timeframe(
+                    symbol=symbol,
+                    timeframe_short=self.timeframe,
+                    timeframe_long=self.timeframe_long
+                )
+                
+                if snapshot:
+                    # Use the COMPLETE snapshot with all calculated indicators
+                    all_coins[symbol] = snapshot
+                    logger.debug(f"✓ {symbol}: Complete snapshot with technical indicators")
+                    
             except Exception as e:
                 logger.warning(f"Error fetching snapshot for {symbol}: {e}")
                 continue

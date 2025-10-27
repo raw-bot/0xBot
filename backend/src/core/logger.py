@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from fastapi import Request
@@ -332,8 +333,23 @@ def setup_logging(log_level: str = "INFO", use_json: bool = False) -> None:
         formatter = HumanReadableFormatter(use_colors=use_colors)
     
     console_handler.setFormatter(formatter)
+
+    # Create file handler for persistent logging
+    # Get project root (3 levels up from this file: backend/src/core/logger.py)
+    project_root = Path(__file__).parent.parent.parent.parent
+    log_dir = project_root / "logs"
+    log_dir.mkdir(exist_ok=True)
     
-    # Add handler to root logger
+    log_file = log_dir / "bot.log"
+    file_handler = logging.FileHandler(str(log_file))
+    file_handler.setLevel(getattr(logging, log_level.upper()))
+    file_handler.addFilter(noise_filter)
+    # Use JSON formatter for file logs (structured)
+    json_formatter = JSONFormatter()
+    file_handler.setFormatter(json_formatter)
+    root_logger.addHandler(file_handler)
+
+    # Add console handler to root logger
     root_logger.addHandler(console_handler)
     
     # Silence noisy loggers - keep only important messages

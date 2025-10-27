@@ -75,7 +75,7 @@ class TradeExecutorService:
                 capital=bot.capital,
                 size_pct=size_pct,
                 current_price=current_price,
-                leverage=1.0  # No leverage for v1
+                leverage=Decimal("1.0")  # No leverage for v1 (use Decimal)
             )
             
             # Determine order side (buy for long, sell for short)
@@ -205,8 +205,8 @@ class TradeExecutorService:
                     actual_price = current_price
                     fees = Decimal("0")
             else:
-                # Paper trading mode
-                actual_price = current_price
+                # Paper trading mode - ensure Decimal types for all calculations
+                actual_price = Decimal(str(current_price)) if not isinstance(current_price, Decimal) else current_price
                 fees = actual_price * position.quantity * Decimal("0.001")
                 logger.info(f"PAPER EXIT: {order_side} {position.quantity} {position.symbol} @ {actual_price}")
             

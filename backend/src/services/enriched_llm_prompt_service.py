@@ -116,13 +116,30 @@ Winning Trades: {trades['winning_trades']}/{trades['total_closed_trades']}
         oi_average = open_interest.get("average", 0)
         funding_rate = market_snapshot.get("funding_rate", 0)
         
+        # Get values with validation - detect if we have real data or defaults
+        ema20_val = tf_5m.get('ema20', 0)
+        macd_val = tf_5m.get('macd', 0)
+        rsi7_val = tf_5m.get('rsi7')
+        rsi14_val = tf_5m.get('rsi14')
+        
+        # Build indicator string with validation warnings
+        if rsi7_val is None or rsi7_val == 50:
+            rsi7_str = "N/A (need more data)"
+        else:
+            rsi7_str = f"{rsi7_val:.3f}"
+        
+        if rsi14_val is None or rsi14_val == 50:
+            rsi14_str = "N/A (need more data)"
+        else:
+            rsi14_str = f"{rsi14_val:.3f}"
+        
         output = f"""ALL {symbol} DATA
-current_price = {current_price}, current_ema20 = {tf_5m.get('ema20', 0)}, current_macd = {tf_5m.get('macd', 0):.3f}, current_rsi (7 period) = {tf_5m.get('rsi7', 50):.3f}
+current_price = {current_price}, current_ema20 = {ema20_val}, current_macd = {macd_val:.3f}, current_rsi (7 period) = {rsi7_str}, current_rsi (14 period) = {rsi14_str}
 In addition, here is the latest {symbol} open interest and funding rate for perps (the instrument you are trading):
 Open Interest: Latest: {oi_latest:.2f} Average: {oi_average:.2f}
 Funding Rate: {funding_rate}
 
-Intraday series (3‑minute intervals, oldest → latest):
+Intraday series (5‑minute intervals, oldest → latest):
 """
         
         # Series data if available (last 10 points)
@@ -273,11 +290,15 @@ For each coin:
    - Risk/reward ratio
    - Portfolio balance
 
+⚠️ IMPORTANT: If you see "N/A (need more data)" for any indicator, it means insufficient historical data.
+In this case, you MUST use "hold" signal with confidence below 0.55 (55%) and explain that more data is needed.
+DO NOT make trading decisions based on incomplete or default indicator values.
+
 CONFIDENCE LEVELS:
-- 75-85%: Very strong (all indicators aligned)
-- 65-75%: Strong (most indicators aligned)
-- 55-65%: Decent (mixed but positive bias)
-- Below 55%: Avoid or be cautious
+- 75-85%: Very strong (all indicators aligned with real data)
+- 65-75%: Strong (most indicators aligned with real data)
+- 55-65%: Decent (mixed but positive bias with real data)
+- Below 55%: Insufficient data, use "hold" to wait for more candles
 
 ▶ CRITICAL: YOU MUST OUTPUT JSON
 After your analysis, you MUST output a JSON object. No exceptions.

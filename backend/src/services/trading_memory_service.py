@@ -7,7 +7,7 @@ import logging
 
 from ..models.bot import Bot
 from ..models.trade import Trade
-from ..models.position import Position
+from ..models.position import Position, PositionStatus
 from ..models.llm_decision import LLMDecision
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ class TradingMemoryService:
         invested = sum(
             float(pos.entry_price * pos.quantity)
             for pos in open_positions
-            if pos.status == "open"
+            if pos.status == PositionStatus.OPEN
         )
         
         # Available cash = total capital - invested in positions
@@ -99,7 +99,7 @@ class TradingMemoryService:
             open_positions = []
         
         # Filter only open positions
-        open_positions = [pos for pos in open_positions if pos.status == "open"]
+        open_positions = [pos for pos in open_positions if pos.status == PositionStatus.OPEN]
         
         positions_data = []
         for position in open_positions:
