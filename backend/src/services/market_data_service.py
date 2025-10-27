@@ -184,6 +184,40 @@ class MarketDataService:
             logger.error(f"Error fetching funding rate: {e}")
             return 0.0
     
+    async def get_open_interest(self, symbol: str) -> dict:
+        """
+        Get open interest data for perpetual futures.
+        
+        Args:
+            symbol: Trading pair
+            
+        Returns:
+            Dictionary with 'latest' and 'average' open interest values
+        """
+        try:
+            # Try to fetch open interest from exchange
+            oi_data = await self.exchange.fetch_open_interest(symbol)
+            
+            # OKX returns openInterest as a number
+            latest = float(oi_data.get('openInterest', 0)) if oi_data else 0
+            
+            # For average, we'd need historical data - for now use latest as average
+            # TODO: Could fetch historical OI and calculate real average
+            average = latest
+            
+            logger.debug(f"Open Interest for {symbol}: {latest}")
+            return {
+                'latest': latest,
+                'average': average
+            }
+            
+        except Exception as e:
+            logger.error(f"Error fetching open interest for {symbol}: {e}")
+            return {
+                'latest': 0,
+                'average': 0
+            }
+    
     def extract_closes(self, ohlcv_list: list[OHLCV]) -> list[float]:
         """
         Extract closing prices from OHLCV data.
@@ -234,29 +268,81 @@ class MarketDataService:
     
     async def get_market_snapshot(self, symbol: str, timeframe: str = '1h') -> dict:
         """
-        Get complete market snapshot with OHLCV and current ticker.
+        Get complete market snapshot with OHLCV, indicators, and series data.
         
         Args:
             symbol: Trading pair
             timeframe: Candle timeframe
             
         Returns:
-            Dictionary with OHLCV data and current ticker
+            Dictionary with OHLCV data, current ticker, and series data
         """
         try:
             # Fetch both OHLCV and current ticker
             ohlcv = await self.fetch_ohlcv(symbol, timeframe, limit=100)
             ticker = await self.fetch_ticker(symbol)
             funding_rate = await self.get_funding_rate(symbol)
+            open_interest = await self.get_open_interest(symbol)
+            
+            # Extract price series for indicators
+            closes = self.extract_closes(ohlcv)
+            highs = self.extract_highs(ohlcv)
+            lows = self.extract_lows(ohlcv)
+            volumes = self.extract_volumes(ohlcv)
+            
+            # Calculate indicators with series
+            from .indicator_service import IndicatorService
+            
+            ema20_series = IndicatorService.calculate_ema(closes, 20)
+            ema50_series = IndicatorService.calculate_ema(closes, 50)
+            rsi7_series = IndicatorService.calculate_rsi(closes, 7)
+            rsi14_series = IndicatorService.calculate_rsi(closes, 14)
+            macd_data = IndicatorService.calculate_macd(closes)
+            macd_series = macd_data['macd']
+            atr3_series = IndicatorService.calculate_atr(highs, lows, closes, 3)
+            atr14_series = IndicatorService.calculate_atr(highs, lows, closes, 14)
+            
+            # Calculate average volume (last 100 candles)
+            avg_volume = sum(volumes) / len(volumes) if volumes else 0
             
             snapshot = {
                 'symbol': symbol,
                 'timeframe': timeframe,
                 'ohlcv': ohlcv,
                 'ticker': ticker,
-                'current_price': ticker.last,
+                'current_price': float(ticker.last),
                 'funding_rate': funding_rate,
-                'timestamp': datetime.utcnow()
+                'open_interest': open_interest,
+                'timestamp': datetime.utcnow(),
+                
+                # Series data (last 10 points for prompt)
+                'price_series': closes,
+                'ema20_series': ema20_series,
+                'ema50_series': ema50_series,
+                'macd_series': macd_series,
+                'rsi7_series': rsi7_series,
+                'rsi14_series': rsi14_series,
+                
+                # Technical indicators (current values)
+                'technical_indicators': {
+                    '5m': {  # Actually using the provided timeframe
+                        'ema20': ema20_series[-1] if ema20_series and ema20_series[-1] is not None else 0,
+                        'ema50': ema50_series[-1] if ema50_series and ema50_series[-1] is not None else 0,
+                        'macd': macd_series[-1] if macd_series and macd_series[-1] is not None else 0,
+                        'rsi7': rsi7_series[-1] if rsi7_series and rsi7_series[-1] is not None else 50,
+                        'rsi14': rsi14_series[-1] if rsi14_series and rsi14_series[-1] is not None else 50,
+                    },
+                    '1h': {  # For longer-term context
+                        'ema20': 0,  # Will be filled by get_market_data_multi_timeframe
+                        'ema50': 0,
+                        'macd': 0,
+                        'rsi14': 50,
+                        'atr3': atr3_series[-1] if atr3_series and atr3_series[-1] is not None else 0,
+                        'atr14': atr14_series[-1] if atr14_series and atr14_series[-1] is not None else 0,
+                        'volume': volumes[-1] if volumes else 0,
+                        'avg_volume': avg_volume,
+                    }
+                }
             }
             
             logger.info(f"Created market snapshot for {symbol}")
@@ -264,6 +350,7 @@ class MarketDataService:
             
         except Exception as e:
             logger.error(f"Error creating market snapshot: {e}")
+            raise
     
     async def get_market_data_multi_timeframe(
         self,
@@ -272,7 +359,7 @@ class MarketDataService:
         timeframe_long: str = '4h'
     ) -> dict:
         """
-        Get market data for multiple timeframes.
+        Get market data for multiple timeframes with full series data.
         
         Args:
             symbol: Trading pair (e.g., 'BTC/USDT')
@@ -280,47 +367,60 @@ class MarketDataService:
             timeframe_long: Long timeframe for context (default: '4h')
         
         Returns:
-            Dictionary with both timeframes data
+            Dictionary with complete snapshot including 4h series
         """
         logger.debug(f"Fetching multi-timeframe data for {symbol}: {timeframe_short} + {timeframe_long}")
         
-        # Fetch short timeframe (existing data)
-        data_short = await self.get_market_snapshot(symbol, timeframe_short)
+        # Fetch short timeframe (existing data with series)
+        snapshot = await self.get_market_snapshot(symbol, timeframe_short)
         
-        # Fetch long timeframe (4H)
+        # Fetch long timeframe (4H) and add to snapshot
         try:
             ohlcv_long = await self.fetch_ohlcv(symbol, timeframe_long, limit=100)
             
             if not ohlcv_long:
                 logger.warning(f"No data returned for {symbol} on {timeframe_long}")
-                return {
-                    'short': data_short,
-                    'long': None
-                }
+                return snapshot
             
             # Calculate indicators for 4H
             from .indicator_service import IndicatorService
             
-            closes = self.extract_closes(ohlcv_long)
-            highs = self.extract_highs(ohlcv_long)
-            lows = self.extract_lows(ohlcv_long)
+            closes_4h = self.extract_closes(ohlcv_long)
+            highs_4h = self.extract_highs(ohlcv_long)
+            lows_4h = self.extract_lows(ohlcv_long)
+            volumes_4h = self.extract_volumes(ohlcv_long)
             
-            indicators_long = IndicatorService.calculate_all_indicators(closes, highs, lows)
+            # Calculate all 4h indicators with series
+            ema20_4h = IndicatorService.calculate_ema(closes_4h, 20)
+            ema50_4h = IndicatorService.calculate_ema(closes_4h, 50)
+            macd_4h = IndicatorService.calculate_macd(closes_4h)
+            rsi14_4h = IndicatorService.calculate_rsi(closes_4h, 14)
+            atr3_4h = IndicatorService.calculate_atr(highs_4h, lows_4h, closes_4h, 3)
+            atr14_4h = IndicatorService.calculate_atr(highs_4h, lows_4h, closes_4h, 14)
             
-            # Get current values from 4H
-            latest_4h = IndicatorService.get_latest_values(indicators_long)
+            # Calculate average volume
+            avg_volume_4h = sum(volumes_4h) / len(volumes_4h) if volumes_4h else 0
             
-            logger.debug(f"Successfully fetched {timeframe_long} data for {symbol}")
+            # Add 4h series to snapshot
+            snapshot['macd_series_4h'] = macd_4h['macd']
+            snapshot['rsi14_series_4h'] = rsi14_4h
             
-            return {
-                'short': data_short,
-                'long': latest_4h
+            # Update 1h (4h) technical indicators with actual values
+            snapshot['technical_indicators']['1h'] = {
+                'ema20': ema20_4h[-1] if ema20_4h and ema20_4h[-1] is not None else 0,
+                'ema50': ema50_4h[-1] if ema50_4h and ema50_4h[-1] is not None else 0,
+                'macd': macd_4h['macd'][-1] if macd_4h['macd'] and macd_4h['macd'][-1] is not None else 0,
+                'rsi14': rsi14_4h[-1] if rsi14_4h and rsi14_4h[-1] is not None else 50,
+                'atr3': atr3_4h[-1] if atr3_4h and atr3_4h[-1] is not None else 0,
+                'atr14': atr14_4h[-1] if atr14_4h and atr14_4h[-1] is not None else 0,
+                'volume': volumes_4h[-1] if volumes_4h else 0,
+                'avg_volume': avg_volume_4h,
             }
+            
+            logger.debug(f"Successfully added {timeframe_long} data to snapshot for {symbol}")
+            return snapshot
             
         except Exception as e:
             logger.error(f"Error fetching {timeframe_long} data for {symbol}: {e}")
-            return {
-                'short': data_short,
-                'long': None
-            }
-            raise
+            # Return snapshot with short timeframe data only
+            return snapshot

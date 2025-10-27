@@ -11,6 +11,17 @@ from decimal import Decimal
 from .trading_memory_service import get_trading_memory
 from sqlalchemy.orm import Session
 
+# Import du logger dédié aux décisions LLM
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+try:
+    from llm_decision_logger import get_llm_decision_logger
+    LLM_LOGGER_ENABLED = True
+except ImportError:
+    LLM_LOGGER_ENABLED = False
+    print("⚠️ LLM Decision Logger not found - detailed logging disabled")
+
 logger = logging.getLogger(__name__)
 
 
@@ -89,7 +100,7 @@ Winning Trades: {trades['winning_trades']}/{trades['total_closed_trades']}
         return output + "\n"
     
     def _format_market_data(self, symbol: str, market_snapshot: Dict) -> str:
-        """Formater les données de marché (format similaire au bot +93%)"""
+        """Formater les données de marché (format EXACT du bot +93%)"""
         
         # Extract data - use current_price consistently
         current_price = market_snapshot.get("current_price", market_snapshot.get("price", 0))
@@ -99,57 +110,59 @@ Winning Trades: {trades['winning_trades']}/{trades['total_closed_trades']}
         tf_5m = technical.get("5m", {})
         tf_1h = technical.get("1h", {})
         
-        output = f"""MARKET DATA FOR {symbol}
-{'='*50}
+        # Open Interest and Funding Rate (from market_snapshot)
+        open_interest = market_snapshot.get("open_interest", {})
+        oi_latest = open_interest.get("latest", 0)
+        oi_average = open_interest.get("average", 0)
+        funding_rate = market_snapshot.get("funding_rate", 0)
+        
+        output = f"""ALL {symbol} DATA
+current_price = {current_price}, current_ema20 = {tf_5m.get('ema20', 0)}, current_macd = {tf_5m.get('macd', 0):.3f}, current_rsi (7 period) = {tf_5m.get('rsi7', 50):.3f}
+In addition, here is the latest {symbol} open interest and funding rate for perps (the instrument you are trading):
+Open Interest: Latest: {oi_latest:.2f} Average: {oi_average:.2f}
+Funding Rate: {funding_rate}
 
-CURRENT STATE
--------------
-Price: ${current_price:,.2f}
-EMA20 (5m): ${tf_5m.get('ema20', 0):,.2f}
-MACD (5m): {tf_5m.get('macd', 0):.3f}
-RSI7 (5m): {tf_5m.get('rsi7', 50):.1f}
-RSI14 (5m): {tf_5m.get('rsi14', 50):.1f}
-
-INTRADAY SERIES (5-minute intervals, oldest → newest)
----------------------------------------------------
+Intraday series (3‑minute intervals, oldest → latest):
 """
         
-        # Series data if available
+        # Series data if available (last 10 points)
         if "price_series" in market_snapshot:
-            prices = market_snapshot["price_series"][-10:]  # Last 10 points
-            output += f"Prices: [{', '.join([f'{p:,.2f}' for p in prices])}]\n"
+            prices = market_snapshot["price_series"][-10:]
+            output += f"Mid prices: [{', '.join([str(p) for p in prices])}]\n"
         
-        if "ema_series" in market_snapshot:
-            ema = market_snapshot["ema_series"][-10:]
-            output += f"EMA20: [{', '.join([f'{e:,.2f}' for e in ema])}]\n"
+        if "ema20_series" in market_snapshot:
+            ema = market_snapshot["ema20_series"][-10:]
+            output += f"EMA indicators (20‑period): [{', '.join([str(e) for e in ema])}]\n"
         
-        if "rsi_series" in market_snapshot:
-            rsi = market_snapshot["rsi_series"][-10:]
-            output += f"RSI7: [{', '.join([f'{r:.1f}' for r in rsi])}]\n"
+        if "macd_series" in market_snapshot:
+            macd = market_snapshot["macd_series"][-10:]
+            output += f"MACD indicators: [{', '.join([str(m) for m in macd])}]\n"
         
-        # Longer-term context
-        output += f"""
-LONGER-TERM CONTEXT (1-hour timeframe)
--------------------------------------
-EMA20: ${tf_1h.get('ema20', 0):,.2f} vs EMA50: ${tf_1h.get('ema50', 0):,.2f}
-MACD: {tf_1h.get('macd', 0):.3f}
-RSI14: {tf_1h.get('rsi14', 50):.1f}
-Volume: {tf_1h.get('volume', 0):,.2f} (Avg: {tf_1h.get('avg_volume', 0):,.2f})
+        if "rsi7_series" in market_snapshot:
+            rsi7 = market_snapshot["rsi7_series"][-10:]
+            output += f"RSI indicators (7‑Period): [{', '.join([f'{r:.3f}' for r in rsi7])}]\n"
+        
+        if "rsi14_series" in market_snapshot:
+            rsi14 = market_snapshot["rsi14_series"][-10:]
+            output += f"RSI indicators (14‑Period): [{', '.join([f'{r:.3f}' for r in rsi14])}]\n"
+        
+        # Longer-term context (4-hour timeframe)
+        output += f"""Longer‑term context (4‑hour timeframe):
+20‑Period EMA: {tf_1h.get('ema20', 0)} vs. 50‑Period EMA: {tf_1h.get('ema50', 0)}
+3‑Period ATR: {tf_1h.get('atr3', 0)} vs. 14‑Period ATR: {tf_1h.get('atr14', 0)}
+Current Volume: {tf_1h.get('volume', 0)} vs. Average Volume: {tf_1h.get('avg_volume', 0)}
 """
         
-        # Trend analysis
-        trend_5m = "BULLISH" if tf_5m.get('ema20', 0) > tf_5m.get('ema50', 0) else "BEARISH"
-        trend_1h = "BULLISH" if tf_1h.get('ema20', 0) > tf_1h.get('ema50', 0) else "BEARISH"
+        # MACD and RSI series for 4h if available
+        if "macd_series_4h" in market_snapshot:
+            macd_4h = market_snapshot["macd_series_4h"][-10:]
+            output += f"MACD indicators: [{', '.join([str(m) for m in macd_4h])}]\n"
         
-        output += f"""
-TREND ANALYSIS
---------------
-5-minute: {trend_5m}
-1-hour: {trend_1h}
-Alignment: {'✓ ALIGNED' if trend_5m == trend_1h else '✗ DIVERGENT'}
-"""
+        if "rsi14_series_4h" in market_snapshot:
+            rsi14_4h = market_snapshot["rsi14_series_4h"][-10:]
+            output += f"RSI indicators (14‑Period): [{', '.join([f'{r:.3f}' for r in rsi14_4h])}]\n"
         
-        return output + "\n"
+        return output
     
     def _format_multi_coin_market_state(self, market_regime: Dict, all_coins_data: Dict) -> str:
         """Formater l'état global du marché (tous les coins)"""
@@ -186,14 +199,14 @@ QUICK SNAPSHOT (All Tradable Assets)
     ) -> str:
         """
         Construire le prompt enrichi complet
-        Similaire au format du bot +93%
+        Format EXACT du bot +93% - affiche TOUS les coins en détail
         
         Args:
             bot: Bot instance
-            symbol: Trading symbol
+            symbol: Trading symbol (principal)
             market_snapshot: Market data snapshot
             market_regime: Market regime analysis
-            all_coins_data: Multi-coin snapshot
+            all_coins_data: Multi-coin snapshot (DICT avec toutes les données de chaque coin)
             bot_positions: List of bot positions (to avoid async DB queries)
         """
         
@@ -221,113 +234,108 @@ QUICK SNAPSHOT (All Tradable Assets)
         portfolio_text = self._format_portfolio_context(context)
         positions_text = self._format_positions_context(context)
         trades_text = self._format_trades_today_context(context)
-        market_state_text = self._format_multi_coin_market_state(market_regime, all_coins_data)
-        market_data_text = self._format_market_data(symbol, market_snapshot)
         
-        # Build the full prompt
-        prompt = f"""You are an expert crypto trader managing a portfolio with Qwen3 Max AI.
+        # Format ALL COINS DATA (comme le bot +93%)
+        all_coins_market_data = "CURRENT MARKET STATE FOR ALL COINS\n"
+        all_coins_market_data += "="*50 + "\n\n"
+        
+        # Afficher TOUS les coins en détail
+        for coin_symbol, coin_data in all_coins_data.items():
+            all_coins_market_data += self._format_market_data(coin_symbol, coin_data)
+            all_coins_market_data += "\n"
+        
+        # Build the full prompt - Format EXACT du bot +93%
+        prompt = f"""It has been {context['session']['session_minutes']} minutes since you started trading. The current time is {context['session']['current_time']} and you've been invoked {context['session']['total_invocations']} times. Below, we are providing you with a variety of state data, price data, and predictive signals so you can discover alpha. Below that is your current account information, value, performance, positions, etc. ALL OF THE PRICE OR SIGNAL DATA BELOW IS ORDERED: OLDEST → NEWEST Timeframes note: Unless stated otherwise in a section title, intraday series are provided at 3‑minute intervals. If a coin uses a different interval, it is explicitly stated in that coin's section.
 
-{session_text}
+{all_coins_market_data}
 
-{portfolio_text}
+HERE IS YOUR ACCOUNT INFORMATION & PERFORMANCE
+Current Total Return (percent): {context['portfolio']['return_pct']:.2f}%
+Available Cash: {context['portfolio']['available_cash']:.2f}
+Current Account Value: {context['portfolio']['current_equity']:.2f}
 
 {positions_text}
 
-{trades_text}
+Sharpe Ratio: {context['sharpe_ratio']:.3f}
 
-{market_state_text}
+▶ CHAIN_OF_THOUGHT
+First, analyze EACH coin's current state:
+- Check existing positions for invalidation conditions
+- Review technical indicators for entry opportunities
+- Consider portfolio balance and risk management
 
-{market_data_text}
+For each coin:
+1. Review the position (if exists) - check if invalidation condition is met
+2. Analyze technical indicators for new opportunities
+3. Make HOLD/ENTRY/CLOSE decision based on:
+   - Invalidation conditions (non-negotiable)
+   - Technical alignment (RSI, MACD, EMA, trend)
+   - Risk/reward ratio
+   - Portfolio balance
 
-YOUR MISSION
-============
-You are personally responsible for this portfolio's performance.
+DECISION POLICY:
+- HOLD: If position exists AND invalidation NOT triggered
+- CLOSE: If invalidation condition met OR technical deterioration
+- ENTRY: If no position AND confidence ≥ 60% AND good setup
 
-Current Status:
-- Return: {context['portfolio']['return_pct']:+.2f}%
-- Cash Available: ${context['portfolio']['available_cash']:,.2f}
-- Trades Today: {context['trades_today']['trades_today']}/{context['trades_today']['max_trades_per_day']}
-- Active Positions: {len(context['positions'])}
+CONFIDENCE LEVELS:
+- 75-85%: Very strong (all indicators aligned)
+- 65-75%: Strong (most indicators aligned)
+- 55-65%: Decent (mixed but positive bias)
+- Below 55%: Avoid or be cautious
 
-DECISION FRAMEWORK
-==================
-Be HIGHLY SELECTIVE. Only trade when:
-1. Setup is EXCEPTIONAL (not just good)
-2. Risk/reward is clearly favorable
-3. Aligns with portfolio objectives
-4. You have available cash (don't overextend)
+OUTPUT REQUIREMENTS:
+You must output your chain of thought analysis for each coin, checking:
+- Current price vs invalidation condition
+- Position health and distance to SL/TP
+- Technical indicators alignment
+- Decision rationale with confidence level
 
-Consider:
-- "Do I REALLY need to enter this trade right now?"
-- "Am I adding value or just overtrading?"
-- "What's my exit plan if this goes wrong?"
-- "How does this fit my existing positions?"
+Then output JSON decisions in this format:
 
-CONFIDENCE THRESHOLDS
-======================
-- ENTRY: 75%+ confidence (very high bar)
-  → Only if setup is crystal clear
-  → Strong trend + good entry point
-  → Clear stop loss and profit target
+▶ TRADING_DECISIONS
 
-- HOLD: 50-75% confidence
-  → Position performing as expected
-  → No clear exit signal yet
-  → Let winners run
+For each coin, output:
+[COIN] [HOLD/ENTRY/CLOSE] [confidence%] [optional: QUANTITY: X]
 
-- EXIT: 50%+ confidence
-  → Stop loss hit or approaching
-  → Profit target reached
-  → Setup invalidated
+Example:
+BTC HOLD 72% QUANTITY: 0.12
+ETH ENTRY 68% QUANTITY: 5.0
+SOL CLOSE 45%
 
-⚠️ MANDATORY FIELDS FOR ENTRY SIGNALS ⚠️
-============================================
-For ANY "entry" signal, you MUST provide valid price levels:
-- stop_loss: Price BELOW current (example: ${example_sl:.2f})
-- profit_target: Price ABOVE current (example: ${example_tp:.2f})
-NEVER use null, 0, "TBD", or omit these fields!
-Calculate actual prices based on ${current_price:.2f}
-
-
-RESPONSE FORMAT
-===============
-⚠️ CRITICAL: Respond with ONLY a valid JSON object. No explanation text before or after.
-Do NOT include markdown code fences (```json). Just pure JSON.
-
-Required format:
-
+Required JSON Format (for system processing):
 {{
   "{symbol}": {{
-    "signal": "entry|hold|exit",
-    "confidence": 0.75,
-    "justification": "Detailed multi-sentence reasoning explaining:
-                      1. What you see in the market
-                      2. Why this decision makes sense
-                      3. Your risk management plan
-                      4. How this fits your portfolio",
-    "entry_price": {current_price:.2f},
-    "side": "long",
-    "stop_loss": {example_sl:.2f},
-    "profit_target": {example_tp:.2f},
-    "size_pct": 0.05,
-    "invalidation_condition": "Price closes below X on Y timeframe"
+    "trade_signal_args": {{
+      "signal": "hold/entry/close",
+      "coin": "{symbol}",
+      "quantity": <float>,
+      "profit_target": <float>,
+      "stop_loss": <float>,
+      "invalidation_condition": "<string>",
+      "leverage": <int>,
+      "confidence": <0-1>,
+      "risk_usd": <float>
+    }}
   }}
 }}
 
-CRITICAL REMINDERS
-==================
-1. You are managing real capital - be conservative
-2. Preservation of capital is priority #1
-3. Better to miss a trade than force a bad one
-4. Quality over quantity - be selective
-5. Consider portfolio balance before adding positions
+For ENTRY signals, calculate:
+- stop_loss: Price BELOW current (example: ${example_sl:.2f})
+- profit_target: Price ABOVE current (example: ${example_tp:.2f})
+Based on current price: ${current_price:.2f}
 
-Now analyze {symbol} and respond with ONLY valid JSON (no text, no markdown, no explanation):
+Now analyze ALL coins and make your decisions.
 """
         
         return prompt
     
-    def parse_llm_response(self, response_text: str, symbol: str) -> Optional[Dict]:
+    def parse_llm_response(
+        self,
+        response_text: str,
+        symbol: str,
+        original_prompt: Optional[str] = None
+    ) -> Optional[Dict]:
         """
         Parser la réponse JSON du LLM - version robuste
         Gère les cas où le LLM ajoute du texte avant/après le JSON
@@ -353,6 +361,17 @@ Now analyze {symbol} and respond with ONLY valid JSON (no text, no markdown, no 
             if start_idx == -1:
                 logger.error(f"⚡ ENRICHED | No JSON found in LLM response (len={len(response_text)})")
                 logger.debug(f"Response preview: {response_text[:200]}...")
+                
+                # Log error with detailed info
+                if LLM_LOGGER_ENABLED and original_prompt:
+                    llm_logger = get_llm_decision_logger()
+                    llm_logger.log_error(
+                        symbol=symbol,
+                        prompt=original_prompt,
+                        error_message="No JSON found in LLM response",
+                        llm_response=response_text
+                    )
+                
                 return None
             
             # Find the matching closing brace
@@ -369,6 +388,17 @@ Now analyze {symbol} and respond with ONLY valid JSON (no text, no markdown, no 
             
             if brace_count != 0:
                 logger.error("⚡ ENRICHED | Unbalanced braces in JSON")
+                
+                # Log error with detailed info
+                if LLM_LOGGER_ENABLED and original_prompt:
+                    llm_logger = get_llm_decision_logger()
+                    llm_logger.log_error(
+                        symbol=symbol,
+                        prompt=original_prompt,
+                        error_message="Unbalanced braces in JSON",
+                        llm_response=response_text
+                    )
+                
                 return None
             
             json_str = cleaned[start_idx:end_idx]
@@ -385,6 +415,17 @@ Now analyze {symbol} and respond with ONLY valid JSON (no text, no markdown, no 
                 missing = [f for f in required if f not in decision]
                 if missing:
                     logger.error(f"⚡ ENRICHED | Missing required fields: {missing}")
+                    
+                    # Log error with detailed info
+                    if LLM_LOGGER_ENABLED and original_prompt:
+                        llm_logger = get_llm_decision_logger()
+                        llm_logger.log_error(
+                            symbol=symbol,
+                            prompt=original_prompt,
+                            error_message=f"Missing required fields: {missing}",
+                            llm_response=response_text
+                        )
+                    
                     return None
 
                 # For entry signals, validate additional required fields
@@ -393,26 +434,109 @@ Now analyze {symbol} and respond with ONLY valid JSON (no text, no markdown, no 
                     entry_missing = [f for f in entry_required if f not in decision]
                     if entry_missing:
                         logger.error(f"⚡ ENRICHED | Missing entry fields: {entry_missing}")
+                        
+                        # Log error with detailed info
+                        if LLM_LOGGER_ENABLED and original_prompt:
+                            llm_logger = get_llm_decision_logger()
+                            llm_logger.log_error(
+                                symbol=symbol,
+                                prompt=original_prompt,
+                                error_message=f"Missing entry fields: {entry_missing}",
+                                llm_response=response_text
+                            )
+                        
                         return None
                 
                 # Normalize signal
                 signal = decision["signal"].lower()
                 if signal not in ["entry", "hold", "exit"]:
                     logger.error(f"⚡ ENRICHED | Invalid signal: {signal}")
+                    
+                    # Log error with detailed info
+                    if LLM_LOGGER_ENABLED and original_prompt:
+                        llm_logger = get_llm_decision_logger()
+                        llm_logger.log_error(
+                            symbol=symbol,
+                            prompt=original_prompt,
+                            error_message=f"Invalid signal: {signal}",
+                            llm_response=response_text
+                        )
+                    
                     return None
                 
                 logger.info(f"⚡ ENRICHED | Valid decision for {symbol}: {signal.upper()} @ {decision['confidence']:.0%}")
+                
+                # ========== LOGGING DÉTAILLÉ ==========
+                # Log the complete decision to dedicated files
+                if LLM_LOGGER_ENABLED and original_prompt:
+                    llm_logger = get_llm_decision_logger()
+                    
+                    # Prepare metadata
+                    metadata = {
+                        "confidence": decision.get('confidence'),
+                        "signal": signal,
+                        "entry_price": decision.get('entry_price'),
+                        "stop_loss": decision.get('stop_loss'),
+                        "profit_target": decision.get('profit_target'),
+                        "size_pct": decision.get('size_pct')
+                    }
+                    
+                    llm_logger.log_decision(
+                        symbol=symbol,
+                        prompt=original_prompt,
+                        llm_raw_response=response_text,
+                        parsed_decision=decision,
+                        final_action=signal.upper(),
+                        metadata=metadata
+                    )
+                    
+                    logger.info(f"📝 Decision logged to: logs/llm_decisions/")
+                # ========== FIN LOGGING ==========
+                
                 return decision
             
             logger.error(f"⚡ ENRICHED | Symbol {symbol} not found in response keys: {list(data.keys())}")
+            
+            # Log error with detailed info
+            if LLM_LOGGER_ENABLED and original_prompt:
+                llm_logger = get_llm_decision_logger()
+                llm_logger.log_error(
+                    symbol=symbol,
+                    prompt=original_prompt,
+                    error_message=f"Symbol {symbol} not found in response keys: {list(data.keys())}",
+                    llm_response=response_text
+                )
+            
             return None
             
         except json.JSONDecodeError as e:
             logger.error(f"⚡ ENRICHED | JSON decode error: {e}")
             logger.debug(f"Failed JSON string: {json_str if 'json_str' in locals() else 'N/A'}")
+            
+            # Log error with detailed info
+            if LLM_LOGGER_ENABLED and original_prompt:
+                llm_logger = get_llm_decision_logger()
+                llm_logger.log_error(
+                    symbol=symbol,
+                    prompt=original_prompt,
+                    error_message=f"JSON decode error: {e}",
+                    llm_response=response_text
+                )
+            
             return None
         except Exception as e:
             logger.error(f"⚡ ENRICHED | Parse error: {e}")
+            
+            # Log error with detailed info
+            if LLM_LOGGER_ENABLED and original_prompt:
+                llm_logger = get_llm_decision_logger()
+                llm_logger.log_error(
+                    symbol=symbol,
+                    prompt=original_prompt,
+                    error_message=f"Parse error: {e}",
+                    llm_response=response_text
+                )
+            
             return None
     
     def get_simple_decision(
@@ -447,4 +571,3 @@ Now analyze {symbol} and respond with ONLY valid JSON (no text, no markdown, no 
             "symbol": symbol,
             "timestamp": datetime.now().isoformat()
         }
-
