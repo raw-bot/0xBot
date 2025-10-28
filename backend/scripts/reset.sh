@@ -60,10 +60,9 @@ psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c \
 
 echo -e "${YELLOW}💰 Réinitialisation du capital...${NC}"
 psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c \
-    "UPDATE bots 
+    "UPDATE bots
      SET capital = $CAPITAL,
          initial_capital = $CAPITAL,
-         total_pnl = 0,
          updated_at = NOW()
      WHERE id = '$BOT_ID';" > /dev/null
 

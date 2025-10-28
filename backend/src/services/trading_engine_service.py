@@ -278,7 +278,7 @@ class TradingEngine:
                     symbol_positions = [p for p in all_positions if p.symbol == symbol]
                     
                     # Check exits for positions of this symbol
-                    await self._check_position_exits(symbol_positions, market_snapshot['current_price'])
+                    await self._check_position_exits(symbol_positions)  # Plus besoin de passer le prix
                     
                     # Build enriched prompt with complete context (Phase 3D - Expert Roadmap)
                     # Get all coins snapshot for multi-coin context
@@ -507,27 +507,41 @@ class TradingEngine:
             
             return portfolio, bot
     
-    async def _check_position_exits(self, positions: list, current_price: Decimal) -> None:
+    async def _check_position_exits(self, positions: list) -> None:
         """Check if any positions should be closed due to stop loss, take profit, or time-based exit."""
         for position in positions:
             if position.status != PositionStatus.OPEN:
                 continue
-            
+
+            # CRITICAL FIX: Fetch current price for THIS position's symbol
+            try:
+                ticker = await self.market_data_service.fetch_ticker(position.symbol)
+                current_price = ticker.last  # ✅ Prix correct du symbole de la position !
+
+                logger.debug(f"Checking {position.symbol} position: Entry=${position.entry_price:,.2f}, "
+                           f"Current=${current_price:,.2f}, SL=${position.stop_loss:,.2f}, "
+                           f"TP=${position.take_profit:,.2f}")
+            except Exception as e:
+                logger.error(f"Error fetching price for {position.symbol}: {e}")
+                continue
+
             # Check stop loss / take profit
             exit_reason = await self.position_service.check_stop_loss_take_profit(
-                position, current_price
+                position, current_price  # ✅ Prix correct maintenant !
             )
-            
+
             if exit_reason:
-                logger.info(f"🚨 Position {position.id} hit {exit_reason}, executing exit")
-                
+                logger.info(f"🚨 {position.symbol} Position {position.id} hit {exit_reason.upper()}")
+                logger.info(f"   Entry: ${position.entry_price:,.2f} | Current: ${current_price:,.2f} | "
+                          f"SL: ${position.stop_loss:,.2f} | TP: ${position.take_profit:,.2f}")
+
                 await self.trade_executor.execute_exit(
                     position=position,
                     current_price=current_price,
                     reason=exit_reason
                 )
                 continue
-            
+
             # Additional exit conditions for stuck positions
             # If position is more than 2 hours old and PnL is negative beyond -2%, force exit
             position_age = datetime.utcnow() - position.opened_at
