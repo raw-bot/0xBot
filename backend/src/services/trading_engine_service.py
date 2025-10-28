@@ -177,13 +177,14 @@ class TradingEngine:
         """Execute one complete trading cycle for all trading symbols."""
         cycle_start = datetime.utcnow()
         logger.info("=" * 80)
-        
+
         try:
             # 0. Update position prices FIRST to get accurate equity
             await self._update_position_prices()
 
-            # 0.1 Check if any positions should be exited (SL/TP/Timeout)
-            await self._check_exit_conditions()
+            # 0.1 MANAGE EXISTING POSITIONS FIRST (PRIORITY ABSOLUTE)
+            logger.info("📍 Step 0.1: Managing existing positions...")
+            position_stats = await self.manage_positions()
             
             # 1. Get portfolio state once (this will reload bot with latest capital)
             portfolio_state, current_bot = await self._get_portfolio_state()
@@ -212,17 +213,18 @@ class TradingEngine:
                     logger.info(f"{pnl_color}   • {pos.symbol} {pos.side.upper()} {pos.quantity:.4f} @ ${pos.entry_price:,.2f} | PnL: ${pos.unrealized_pnl:+,.2f}{RESET}")
             
             # 1.5 Fetch multi-coin context (correlations, regime, breadth, etc.)
-            logger.info("📊 Analyzing multi-coin market context...")
+            logger.info("📊 Step 1.5: Analyzing multi-coin market context...")
             market_context = await self._get_multi_coin_market_context()
-            
+
             if market_context and market_context.get('regime'):
                 regime = market_context['regime']['regime']
                 confidence = market_context['regime']['confidence']
                 breadth = market_context['breadth']
                 logger.info(f"   Market Regime: {regime.upper()} ({confidence:.0%} confidence)")
                 logger.info(f"   Breadth: {breadth.get('advancing', 0)} up / {breadth.get('declining', 0)} down")
-            
+
             # 2. Loop through each trading symbol
+            logger.info("📈 Step 2: Analyzing individual symbols...")
             for symbol in self.trading_symbols:
                 logger.info("─" * 80)
                 logger.info(f"📈 Analyzing {symbol}")
@@ -413,18 +415,19 @@ class TradingEngine:
             
             # 3. Update all position prices at the end
             await self._update_position_prices()
-            
+
             # Increment cycle count
             self.cycle_count += 1
-            
+
             cycle_duration = (datetime.utcnow() - cycle_start).total_seconds()
             logger.info("─" * 80)
             logger.info(f"✅ Cycle completed in {cycle_duration:.1f}s | Next in {self.cycle_interval//60}min")
-            
+            logger.info(f"   Positions: {position_stats['total_positions']} active, {position_stats['positions_closed']} closed")
+
             # Hourly performance summary (every 12 cycles = 1 hour at 5min intervals)
             if self.cycle_count % 12 == 0:
                 await self._log_hourly_summary(current_bot)
-            
+
             logger.info("=" * 80)
             
         except Exception as e:
@@ -683,11 +686,200 @@ class TradingEngine:
             except Exception as e:
                 logger.error(f"Error updating price for position {position.id}: {e}")
     
+    async def check_exit_conditions(self, position, current_price: float) -> bool:
+        """
+        Vérifier si une position doit être fermée automatiquement.
+
+        Args:
+            position: L'objet position à vérifier
+            current_price: Le prix actuel du marché
+
+        Returns:
+            True si la position a été fermée, False sinon
+        """
+
+        # Calculer le temps de détention
+        hold_hours = (datetime.utcnow() - position.opened_at).total_seconds() / 3600
+
+        # Calculer le P&L %
+        if position.side.value == "LONG":
+            pnl_pct = ((current_price - position.entry_price) / position.entry_price) * 100
+        else:  # SHORT
+            pnl_pct = ((position.entry_price - current_price) / position.entry_price) * 100
+
+        # 1. STOP LOSS HIT (avec buffer 0.5% pour éviter les faux déclenchements)
+        sl_threshold = position.stop_loss * Decimal("1.005") if position.side.value == "LONG" else position.stop_loss * Decimal("0.995")
+
+        if position.side.value == "LONG" and current_price <= sl_threshold:
+            logger.warning(f"🛑 SL HIT: {position.symbol} @ ${current_price:,.2f} (SL: ${position.stop_loss:,.2f})")
+            logger.info(f"   Hold time: {hold_hours:.1f}h | P&L: {pnl_pct:.2f}%")
+            await self.execute_exit(position, reason="SL_HIT", price=current_price)
+            return True
+
+        if position.side.value == "SHORT" and current_price >= sl_threshold:
+            logger.warning(f"🛑 SL HIT: {position.symbol} @ ${current_price:,.2f} (SL: ${position.stop_loss:,.2f})")
+            logger.info(f"   Hold time: {hold_hours:.1f}h | P&L: {pnl_pct:.2f}%")
+            await self.execute_exit(position, reason="SL_HIT", price=current_price)
+            return True
+
+        # 2. TAKE PROFIT HIT (avec buffer 0.5%)
+        tp_threshold = position.take_profit * Decimal("0.995") if position.side.value == "LONG" else position.take_profit * Decimal("1.005")
+
+        if position.side.value == "LONG" and current_price >= tp_threshold:
+            logger.info(f"🎯 TP HIT: {position.symbol} @ ${current_price:,.2f} (TP: ${position.take_profit:,.2f})")
+            logger.info(f"   Hold time: {hold_hours:.1f}h | P&L: {pnl_pct:.2f}%")
+            await self.execute_exit(position, reason="TP_HIT", price=current_price)
+            return True
+
+        if position.side.value == "SHORT" and current_price <= tp_threshold:
+            logger.info(f"🎯 TP HIT: {position.symbol} @ ${current_price:,.2f} (TP: ${position.take_profit:,.2f})")
+            logger.info(f"   Hold time: {hold_hours:.1f}h | P&L: {pnl_pct:.2f}%")
+            await self.execute_exit(position, reason="TP_HIT", price=current_price)
+            return True
+
+        # 3. TIMEOUT - Position trop longue en perte
+        if hold_hours > 24 and pnl_pct < -1.0:
+            logger.warning(f"⏱️ TIMEOUT: {position.symbol} - Position trop longue en perte")
+            logger.info(f"   Hold time: {hold_hours:.1f}h | P&L: {pnl_pct:.2f}%")
+            await self.execute_exit(position, reason="TIMEOUT_LOSS", price=current_price)
+            return True
+
+        # 4. GRANDE PERTE - Protection contre les pertes importantes
+        if pnl_pct < -2.5:
+            logger.error(f"⚠️ LARGE LOSS: {position.symbol} - Perte importante détectée")
+            logger.info(f"   Hold time: {hold_hours:.1f}h | P&L: {pnl_pct:.2f}%")
+            await self.execute_exit(position, reason="LARGE_LOSS", price=current_price)
+            return True
+
+        # 5. STAGNATION PROLONGÉE - Position breakeven > 12h
+        if hold_hours > 12 and abs(pnl_pct) < 0.5:
+            logger.info(f"💤 STAGNATION: {position.symbol} - Aucun mouvement significatif")
+            logger.info(f"   Hold time: {hold_hours:.1f}h | P&L: {pnl_pct:.2f}%")
+            await self.execute_exit(position, reason="STAGNATION", price=current_price)
+            return True
+
+        # Position OK, pas de sortie nécessaire
+        logger.debug(f"✓ {position.symbol}: Hold time {hold_hours:.1f}h | P&L {pnl_pct:.2f}% | No exit conditions met")
+        return False
+
+
+    async def manage_positions(self) -> dict:
+        """
+        Gérer toutes les positions actives et vérifier les conditions de sortie.
+        Cette fonction doit être appelée au début de chaque cycle de trading.
+
+        Returns:
+            dict: Statistiques sur les positions gérées
+        """
+        stats = {
+            "total_positions": 0,
+            "positions_checked": 0,
+            "positions_closed": 0,
+            "reasons": {}
+        }
+
+        try:
+            # Récupérer toutes les positions actives
+            positions = await self.position_service.get_open_positions(self.bot_id)
+            stats["total_positions"] = len(positions)
+
+            if not positions:
+                logger.debug("📍 No active positions to manage")
+                return stats
+
+            logger.info(f"📍 Managing {len(positions)} active position(s)")
+
+            for position in positions:
+                stats["positions_checked"] += 1
+
+                try:
+                    # Récupérer le prix actuel
+                    current_price = await self.market_data_service.get_current_price(position.symbol)
+
+                    # Vérifier les conditions de sortie
+                    should_exit = await self.check_exit_conditions(position, current_price)
+
+                    if should_exit:
+                        stats["positions_closed"] += 1
+                        # Incrémenter le compteur de raison (si disponible)
+                        reason = getattr(position, 'exit_reason', 'UNKNOWN')
+                        stats["reasons"][reason] = stats["reasons"].get(reason, 0) + 1
+
+                except Exception as e:
+                    logger.error(f"❌ Error checking position {position.symbol}: {e}")
+                    continue
+
+            # Résumé
+            if stats["positions_closed"] > 0:
+                logger.info(f"✅ Position management: {stats['positions_closed']}/{stats['positions_checked']} closed")
+                for reason, count in stats["reasons"].items():
+                    logger.info(f"   • {reason}: {count}")
+            else:
+                logger.debug(f"✓ All {stats['positions_checked']} positions are within normal parameters")
+
+        except Exception as e:
+            logger.error(f"❌ Error in manage_positions: {e}")
+
+        return stats
+
+
+    async def execute_exit(self, position, reason: str, price: Optional[float] = None) -> bool:
+        """
+        Exécuter la fermeture d'une position.
+
+        Args:
+            position: La position à fermer
+            reason: La raison de la fermeture (SL_HIT, TP_HIT, TIMEOUT, etc.)
+            price: Le prix de sortie (optionnel, sera récupéré si None)
+
+        Returns:
+            bool: True si la fermeture a réussi, False sinon
+        """
+        try:
+            # Récupérer le prix actuel si non fourni
+            if price is None:
+                price = await self.market_data_service.get_current_price(position.symbol)
+
+            # Calculer le P&L
+            if position.side.value == "LONG":
+                pnl = (price - position.entry_price) * position.quantity
+                pnl_pct = ((price - position.entry_price) / position.entry_price) * 100
+            else:
+                pnl = (position.entry_price - price) * position.quantity
+                pnl_pct = ((position.entry_price - price) / position.entry_price) * 100
+
+            # Log détaillé
+            logger.info(f"🚪 CLOSING POSITION: {position.symbol}")
+            logger.info(f"   Entry: ${position.entry_price:,.2f} → Exit: ${price:,.2f}")
+            logger.info(f"   Quantity: {position.quantity} | Side: {position.side.value}")
+            logger.info(f"   P&L: ${pnl:+,.2f} ({pnl_pct:+.2f}%)")
+            logger.info(f"   Reason: {reason}")
+
+            # Exécuter l'ordre de fermeture via l'exchange
+            # NOTE: Adapter cette partie selon votre API d'exchange
+            result = await self.trade_executor.execute_exit(
+                position=position,
+                current_price=Decimal(str(price)),
+                reason=reason
+            )
+
+            if result:
+                logger.info(f"✅ Position {position.symbol} closed successfully")
+                return True
+            else:
+                logger.error(f"❌ Failed to close position {position.symbol}")
+                return False
+
+        except Exception as e:
+            logger.error(f"❌ Error executing exit for {position.symbol}: {e}")
+            return False
+
+
     async def _check_exit_conditions(self) -> None:
         """
         Check if any open positions should be exited based on SL/TP.
         This function is CRITICAL - without it, positions stay open forever.
-        
+
         Checks for:
         1. Stop Loss hit (price <= SL + 0.5% buffer)
         2. Take Profit hit (price >= TP - 0.5% buffer)
@@ -695,70 +887,70 @@ class TradingEngine:
         4. Large loss (PnL < -2.5%)
         """
         positions = await self.position_service.get_open_positions(self.bot_id)
-        
+
         if not positions:
             return
-        
+
         logger.debug(f"🔍 Checking exit conditions for {len(positions)} positions")
-        
+
         for position in positions:
             try:
                 # Get current price
                 current_price = await self.market_data_service.get_current_price(position.symbol)
-                
+
                 # Calculate current PnL
                 pnl_pct = ((current_price - position.entry_price) / position.entry_price) * 100
                 if position.side.value == 'short':
                     pnl_pct = -pnl_pct
-                
+
                 # Calculate hold time in hours
                 hold_time = datetime.utcnow() - position.opened_at
                 hold_hours = hold_time.total_seconds() / 3600
-                
+
                 exit_reason = None
-                
+
                 # 1. CHECK STOP LOSS (with 0.5% buffer to avoid edge cases)
                 sl_threshold = position.stop_loss * Decimal("1.005")
                 if current_price <= sl_threshold:
                     exit_reason = f"SL_HIT (Price: ${current_price:,.2f} <= SL: ${position.stop_loss:,.2f})"
                     logger.warning(f"🛑 {position.symbol} {exit_reason}")
-                
+
                 # 2. CHECK TAKE PROFIT (with 0.5% buffer)
                 elif current_price >= position.take_profit * Decimal("0.995"):
                     exit_reason = f"TP_HIT (Price: ${current_price:,.2f} >= TP: ${position.take_profit:,.2f})"
                     logger.info(f"🎯 {position.symbol} {exit_reason}")
-                
+
                 # 3. CHECK TIMEOUT (position > 24h in loss > 1%)
                 elif hold_hours > 24 and pnl_pct < -1.0:
                     exit_reason = f"TIMEOUT_LOSS (Hold: {hold_hours:.1f}h, PnL: {pnl_pct:.2f}%)"
                     logger.warning(f"⏱️ {position.symbol} {exit_reason}")
-                
+
                 # 4. CHECK LARGE LOSS (> 2.5% even if not at SL yet)
                 elif pnl_pct < -2.5:
                     exit_reason = f"LARGE_LOSS (PnL: {pnl_pct:.2f}%)"
                     logger.warning(f"⚠️ {position.symbol} {exit_reason}")
-                
+
                 # If any exit condition met, execute exit
                 if exit_reason:
                     logger.info(f"💥 Executing automatic exit for {position.symbol}: {exit_reason}")
-                    
+
                     trade = await self.trade_executor.execute_exit(
                         position=position,
                         current_price=current_price,
                         reason=exit_reason.split()[0]  # Extract reason code (SL_HIT, TP_HIT, etc.)
                     )
-                    
+
                     if trade:
                         # Color PnL
                         pnl_color = GREEN if trade.realized_pnl >= 0 else RED
                         logger.info(f"{pnl_color}   ✅ EXIT {position.quantity:.4f} {position.symbol.split('/')[0]} @ ${current_price:,.2f} | PnL: ${trade.realized_pnl:+,.2f} ({pnl_pct:+.2f}%){RESET}")
                     else:
                         logger.error(f"   ❌ Exit execution failed for {position.symbol}")
-                
+
                 else:
                     # Position is safe, log status
                     logger.debug(f"   ✓ {position.symbol}: Price ${current_price:,.2f} | PnL {pnl_pct:+.2f}% | Hold {hold_hours:.1f}h | Status: OK")
-                
+
             except Exception as e:
                 logger.error(f"Error checking exit conditions for position {position.id}: {e}")
                 continue
