@@ -539,6 +539,13 @@ class TradingEngine:
     
     async def _check_position_exits(self, positions: list) -> None:
         """Check if any positions should be closed due to stop loss, take profit, or time-based exit."""
+
+        if not positions:
+            logger.debug("✓ No positions to check for exits")
+            return
+
+        logger.info(f"🔍 Checking exit conditions for {len(positions)} position(s):")
+
         for position in positions:
             if position.status != PositionStatus.OPEN:
                 continue
