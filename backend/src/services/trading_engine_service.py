@@ -553,11 +553,26 @@ class TradingEngine:
             # CRITICAL FIX: Fetch current price for THIS position's symbol
             try:
                 ticker = await self.market_data_service.fetch_ticker(position.symbol)
-                current_price = ticker.last  # ✅ Prix correct du symbole de la position !
+                current_price = ticker.last
 
-                logger.debug(f"Checking {position.symbol} position: Entry=${position.entry_price:,.2f}, "
-                           f"Current=${current_price:,.2f}, SL=${position.stop_loss:,.2f}, "
-                           f"TP=${position.take_profit:,.2f}")
+                # Calculate metrics for logging
+                position_age = datetime.utcnow() - position.opened_at
+                hold_hours = position_age.total_seconds() / 3600
+                pnl_pct = float(position.unrealized_pnl_pct)
+
+                # Calculate distances to SL/TP
+                sl_distance_pct = ((float(position.stop_loss) - current_price) / current_price) * 100
+                tp_distance_pct = ((float(position.take_profit) - current_price) / current_price) * 100
+
+                # ✅ DETAILED LOGGING
+                logger.info(f"")
+                logger.info(f"  [{position.symbol}] Position Status:")
+                logger.info(f"    Entry: ${position.entry_price:,.2f} @ {position.opened_at.strftime('%Y-%m-%d %H:%M:%S')}")
+                logger.info(f"    Current: ${current_price:,.2f} | PnL: {pnl_pct:+.2f}%")
+                logger.info(f"    Hold: {hold_hours:.1f}h (warn at 2h)")
+                logger.info(f"    SL: ${position.stop_loss:,.2f} (distance: {sl_distance_pct:+.2f}%)")
+                logger.info(f"    TP: ${position.take_profit:,.2f} (distance: {tp_distance_pct:+.2f}%)")
+
             except Exception as e:
                 logger.error(f"Error fetching price for {position.symbol}: {e}")
                 continue
