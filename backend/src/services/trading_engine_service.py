@@ -201,7 +201,32 @@ class TradingEngine:
             market_context = await self._get_multi_coin_market_context()
 
             # 2. Loop through each trading symbol (minimal logging)
-            for symbol in self.trading_symbols:
+            # CRITICAL FIX: Separate symbols with positions from symbols for new entries
+            symbols_with_positions = list(set([p.symbol for p in all_positions]))
+            symbols_for_new_entries = [s for s in self.trading_symbols if s not in symbols_with_positions]
+
+            # Log analysis plan
+            logger.info(f"📊 Step 1.5: Analyzing multi-coin market context...")
+            if symbols_with_positions:
+                logger.info(f"   Active positions: {', '.join(symbols_with_positions)}")
+            if symbols_for_new_entries:
+                logger.debug(f"   Scanning for entries: {', '.join(symbols_for_new_entries)}")
+
+            logger.info(f"📈 Step 2: Analyzing individual symbols...")
+
+            # Priority: Handle existing positions FIRST, then look for new entries
+            for symbol in symbols_with_positions + symbols_for_new_entries:
+                logger.info("─" * 80)
+
+                # Flag if this symbol has an open position
+                symbol_positions = [p for p in all_positions if p.symbol == symbol]
+                has_position = len(symbol_positions) > 0
+
+                if has_position:
+                    logger.info(f"📈 Analyzing {symbol} (HAS POSITION)")
+                else:
+                    logger.debug(f"📈 Analyzing {symbol} (looking for entry)")
+
                 try:
                     # Fetch market data for this symbol
                     market_data = await self._fetch_market_data(symbol)
