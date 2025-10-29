@@ -11,7 +11,7 @@ logger = get_logger(__name__)
 
 class LLMPromptService:
     """Service for building prompts for LLM market analysis - V2.1 Compatible."""
-    
+
     @staticmethod
     def build_market_prompt(
         symbol: str,
@@ -24,13 +24,13 @@ class LLMPromptService:
     ) -> str:
         """
         Build an optimized market analysis prompt (V2.1 - Compatible format).
-        
+
         Changes from V1:
         - Added multi-timeframe analysis (3min + 4h)
         - Added invalidation_condition requirement
         - Structured decision framework
         - COMPATIBLE with existing JSON parser
-        
+
         Args:
             symbol: Trading pair (e.g., 'BTC/USDT')
             market_data: Current market data (price, volume, etc.)
@@ -39,28 +39,28 @@ class LLMPromptService:
             portfolio: Portfolio state (cash, total_value, etc.)
             risk_params: Risk management parameters
             indicators_4h: Technical indicators for 4h timeframe (optional)
-            
+
         Returns:
             Formatted prompt string
         """
         # Extract current market data
         current_price = market_data.get('current_price', 0)
         funding_rate = market_data.get('funding_rate', 0)
-        
+
         # Build market data section (with multi-timeframe if available)
         market_section = LLMPromptService._build_market_section_v2(
             symbol, current_price, funding_rate, indicators, indicators_4h
         )
-        
+
         # Build positions section
         positions_section = LLMPromptService._build_positions_section(positions)
-        
+
         # Build portfolio section
         portfolio_section = LLMPromptService._build_portfolio_section(portfolio)
-        
+
         # Build risk parameters section
         risk_section = LLMPromptService._build_risk_section(risk_params)
-        
+
         # Build complete prompt
         prompt = f"""You are an expert crypto trading AI with a proven track record. Your goal is to identify high-probability setups and execute with discipline.
 
@@ -99,7 +99,7 @@ STEP 1: TREND ANALYSIS (Multi-Timeframe) - MOST IMPORTANT STEP!
 🎯 PRIMARY: 1H TREND DIRECTION (This is your MAIN filter)
 • 1H trend DICTATES your bias:
   - Bullish 1H (EMA 20 > 50, MACD positive) → ONLY look for LONG entries
-  - Bearish 1H (EMA 20 < 50, MACD negative) → ONLY look for SHORT entries  
+  - Bearish 1H (EMA 20 < 50, MACD negative) → ONLY look for SHORT entries
   - Neutral 1H → Be highly selective, wait for clearer 1H breakout
 • DO NOT fight the 1H trend! This is the #1 mistake to avoid.
 
@@ -158,7 +158,7 @@ Provide your decision as a JSON object with this EXACT structure:
   "reasoning": "Comprehensive explanation covering: (1) Multi-timeframe analysis (what 4H and 3min are telling you), (2) Confluence factors (3+ confirming signals), (3) Why this specific entry/exit makes sense, (4) What would make you wrong (invalidation), (5) Why these parameters (size, stops, targets) are optimal for THIS setup.",
   "key_factors": [
     "Primary signal from 4H timeframe",
-    "Confirming signal from 3min timeframe", 
+    "Confirming signal from 3min timeframe",
     "Additional confluence factor"
   ]
 }}
@@ -170,7 +170,7 @@ PARAMETER GUIDELINES
 • size_pct: Default 0.10 (10%). Range: 0.06-0.15 based on conviction
 • stop_loss_pct: Default 0.035 (3.5%). Range: 0.03-0.05 based on volatility
 • take_profit_pct: Default 0.07 (7%). Range: 0.06-0.10 for optimal R/R
-• confidence: 
+• confidence:
   - 0-0.35: NO TRADE - setup not clear enough
   - 0.35-0.50: SMALL POSITION (6-8%) - marginal setup
   - 0.50-0.70: STANDARD POSITION (10%) - good setup with confluence
@@ -185,7 +185,7 @@ ACTION RULES
   - Confidence below 0.35 (weak setup)
   - Conflicting signals between 1H and 5min timeframes
   - Already at maximum position limit (3+ positions)
-  - BUT REMEMBER: If you see a setup with 0.5+ confidence and 3+ confluence factors, 
+  - BUT REMEMBER: If you see a setup with 0.5+ confidence and 3+ confluence factors,
     you SHOULD take it! Trading is about taking calculated risks, not avoiding all risk.
     A 50-60% confidence trade with proper risk management is VALID.
   - If you have an open position, ALWAYS evaluate if it should be exited!
@@ -261,10 +261,10 @@ If you currently have an open position, you MUST actively decide between:
 Do NOT passively "hold" without actively checking exit conditions!
 
 Respond ONLY with the JSON object, no additional text."""
-        
+
         logger.debug(f"Built V2.1 compatible prompt for {symbol}")
         return prompt
-    
+
     @staticmethod
     def _build_market_section_v2(
         symbol: str,
@@ -274,19 +274,19 @@ Respond ONLY with the JSON object, no additional text."""
         indicators_4h: Optional[dict] = None
     ) -> str:
         """Build enhanced market section with multi-timeframe data."""
-        
+
         # 3-MINUTE TIMEFRAME (Entry Timing)
         ema_20_3m = indicators.get('ema_20')
         ema_50_3m = indicators.get('ema_50')
         rsi_3m = indicators.get('rsi_14')
         macd_3m = indicators.get('macd', {})
         bb_3m = indicators.get('bb', {})
-        
+
         # Determine 3min trend
         trend_3m = "N/A"
         if ema_20_3m and ema_50_3m:
             trend_3m = "Bullish" if ema_20_3m > ema_50_3m else "Bearish"
-        
+
         # RSI state 3min
         rsi_state_3m = "N/A"
         if rsi_3m:
@@ -296,14 +296,14 @@ Respond ONLY with the JSON object, no additional text."""
                 rsi_state_3m = "Overbought"
             else:
                 rsi_state_3m = "Neutral"
-        
+
         # MACD signal 3min
         macd_val_3m = macd_3m.get('macd')
         signal_val_3m = macd_3m.get('signal')
         macd_signal_3m = "N/A"
         if macd_val_3m is not None and signal_val_3m is not None:
             macd_signal_3m = "Bullish" if macd_val_3m > signal_val_3m else "Bearish"
-        
+
         # Build base section
         section = f"""
 📊 {symbol} - Current Price: ${current_price:,.2f}
@@ -330,19 +330,19 @@ Price Levels:
 • Bollinger Upper: {f'${bb_3m.get("upper"):,.2f}' if bb_3m.get("upper") else 'N/A'}
 • Bollinger Middle: {f'${bb_3m.get("middle"):,.2f}' if bb_3m.get("middle") else 'N/A'}
 • Bollinger Lower: {f'${bb_3m.get("lower"):,.2f}' if bb_3m.get("lower") else 'N/A'}"""
-        
+
         # Add 1H timeframe if available
         if indicators_4h:
             ema_20_1h = indicators_4h.get('ema_20')
             ema_50_1h = indicators_4h.get('ema_50')
             rsi_1h = indicators_4h.get('rsi_14')
             macd_1h = indicators_4h.get('macd', {})
-            
+
             # Determine 1h trend
             trend_1h = "N/A"
             if ema_20_1h and ema_50_1h:
                 trend_1h = "Bullish" if ema_20_1h > ema_50_1h else "Bearish"
-            
+
             # RSI state 1h
             rsi_state_1h = "N/A"
             if rsi_1h:
@@ -352,17 +352,17 @@ Price Levels:
                     rsi_state_1h = "Overbought"
                 else:
                     rsi_state_1h = "Neutral"
-            
+
             # MACD signal 1h
             macd_val_1h = macd_1h.get('macd')
             signal_val_1h = macd_1h.get('signal')
             macd_signal_1h = "N/A"
             if macd_val_1h is not None and signal_val_1h is not None:
                 macd_signal_1h = "Bullish" if macd_val_1h > signal_val_1h else "Bearish"
-            
+
             # Confluence check
             alignment = "✓ ALIGNED" if trend_3m == trend_1h else "✗ CONFLICTING"
-            
+
             section += f"""
 
 ┌─────────────────────────────────────────────────────────────┐
@@ -397,9 +397,9 @@ Oscillators:
 
 ⚠️ 1-hour timeframe data not available - using 5min data only.
 Consider: Use 5min trend as proxy but be more conservative with entries."""
-        
+
         return section
-    
+
     @staticmethod
     def _build_positions_section(positions: list[Position]) -> str:
         """Build the open positions section of the prompt."""
@@ -407,14 +407,14 @@ Consider: Use 5min trend as proxy but be more conservative with entries."""
             return """OPEN POSITIONS:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 No open positions"""
-        
+
         section = "OPEN POSITIONS:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        
+
         for i, pos in enumerate(positions, 1):
             pnl = pos.unrealized_pnl
             pnl_pct = pos.unrealized_pnl_pct
             pnl_sign = "+" if pnl >= 0 else ""
-            
+
             section += f"""
 Position {i}:
 - Symbol: {pos.symbol}
@@ -425,9 +425,9 @@ Position {i}:
 - Unrealized PnL: {pnl_sign}${pnl:,.2f} ({pnl_sign}{pnl_pct:.2f}%)
 - Stop Loss: {f'${pos.stop_loss:,.2f}' if pos.stop_loss else 'Not set'}
 - Take Profit: {f'${pos.take_profit:,.2f}' if pos.take_profit else 'Not set'}"""
-        
+
         return section
-    
+
     @staticmethod
     def _build_portfolio_section(portfolio: dict) -> str:
         """Build the portfolio section of the prompt."""
@@ -436,9 +436,9 @@ Position {i}:
         total_pnl = portfolio.get('total_pnl', 0)
         realized_pnl = portfolio.get('realized_pnl', 0)
         unrealized_pnl = portfolio.get('unrealized_pnl', 0)
-        
+
         pnl_sign = "+" if total_pnl >= 0 else ""
-        
+
         section = f"""PORTFOLIO STATE:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Total Value: ${total_value:,.2f}
@@ -446,16 +446,16 @@ Available Cash: ${cash:,.2f}
 Total PnL: {pnl_sign}${total_pnl:,.2f}
 - Realized PnL: {pnl_sign if realized_pnl >= 0 else ""}${realized_pnl:,.2f}
 - Unrealized PnL: {pnl_sign if unrealized_pnl >= 0 else ""}${unrealized_pnl:,.2f}"""
-        
+
         return section
-    
+
     @staticmethod
     def _build_risk_section(risk_params: dict) -> str:
         """Build the risk management section of the prompt."""
-        max_position = risk_params.get('max_position_pct', 0.10)
+        max_position = risk_params.get('max_position_pct', 0.08)  # Harmonized to 8%
         max_drawdown = risk_params.get('max_drawdown_pct', 0.20)
         max_trades = risk_params.get('max_trades_per_day', 10)
-        
+
         section = f"""RISK PARAMETERS:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Max Position Size: {max_position:.1%} of capital
@@ -463,9 +463,9 @@ Max Drawdown: {max_drawdown:.1%}
 Max Trades Per Day: {max_trades}
 
 You MUST respect these constraints in all decisions."""
-        
+
         return section
-    
+
     @staticmethod
     def build_emergency_close_prompt(
         positions: list[Position],
@@ -473,11 +473,11 @@ You MUST respect these constraints in all decisions."""
     ) -> str:
         """
         Build a prompt for emergency position closing.
-        
+
         Args:
             positions: List of positions to close
             reason: Reason for emergency close
-            
+
         Returns:
             Emergency close prompt
         """
@@ -485,7 +485,7 @@ You MUST respect these constraints in all decisions."""
             f"- {pos.symbol} {pos.side.upper()}: {pos.quantity} @ ${pos.entry_price}"
             for pos in positions
         ])
-        
+
         prompt = f"""EMERGENCY POSITION CLOSURE REQUIRED
 
 Reason: {reason}
@@ -505,47 +505,47 @@ Provide a JSON response with close orders for all positions:
   ],
   "reasoning": "Emergency closure due to {reason}"
 }}"""
-        
+
         return prompt
-    
+
     @staticmethod
     def build_multi_coin_context_section(
         market_context: Dict[str, Any]
     ) -> str:
         """
         Build a section describing multi-coin market context.
-        
+
         Args:
             market_context: Output from MarketAnalysisService.get_comprehensive_market_context()
-            
+
         Returns:
             Formatted string with multi-coin analysis
         """
         if not market_context or not market_context.get('regime'):
             return ""
-        
+
         regime_info = market_context.get('regime', {})
         breadth_info = market_context.get('breadth', {})
         flow_info = market_context.get('capital_flows', {})
         btc_dominance = market_context.get('btc_dominance', 0)
         correlations = market_context.get('correlations', {})
-        
+
         # Format regime
         regime = regime_info.get('regime', 'unknown')
         confidence = regime_info.get('confidence', 0)
         signals = regime_info.get('signals', {})
-        
+
         # Format breadth
         ad_ratio = breadth_info.get('advance_decline_ratio', 0)
         advancing = breadth_info.get('advancing', 0)
         declining = breadth_info.get('declining', 0)
         breadth_strong = breadth_info.get('breadth_strong', False)
-        
+
         # Format flows
         dominant_flow = flow_info.get('dominant_flow', 'unknown')
         btc_inflow = flow_info.get('btc_inflow', False)
         alt_inflow = flow_info.get('alt_inflow', False)
-        
+
         # Build correlation summary
         corr_summary = ""
         if correlations:
@@ -556,7 +556,7 @@ Provide a JSON response with close orders for all positions:
                     if symbol1 != symbol2:
                         all_corrs.append(corr_val)
             avg_corr = sum(all_corrs) / len(all_corrs) if all_corrs else 0
-            
+
             corr_summary = f"""
 Average Cross-Asset Correlation: {avg_corr:.2f} {"(High - assets moving together)" if avg_corr > 0.7 else "(Low - assets independent)" if avg_corr < 0.3 else "(Moderate)"}
 """
@@ -567,7 +567,7 @@ Average Cross-Asset Correlation: {avg_corr:.2f} {"(High - assets moving together
                 for symbol, corr_val in correlations[btc_key].items():
                     if 'BTC' not in symbol:
                         corr_summary += f"  • {symbol}: {corr_val:.2f}\n"
-        
+
         section = f"""
 ┌─────────────────────────────────────────────────────────────┐
 │ MULTI-COIN MARKET CONTEXT                                    │
@@ -578,7 +578,7 @@ Average Cross-Asset Correlation: {avg_corr:.2f} {"(High - assets moving together
   • Avg Volatility: {signals.get('avg_volatility', 0):.2%}
   • BTC Performance: {signals.get('btc_performance', 0):+.2%}
   • Alt Performance: {signals.get('alt_performance', 0):+.2%}
-  
+
 💹 Market Breadth:
   • Advance/Decline Ratio: {ad_ratio:.2f} ({advancing} up / {declining} down)
   • Breadth: {"STRONG" if breadth_strong else "WEAK"}
@@ -601,9 +601,9 @@ KEY INSIGHTS:
 • {"Capital rotating into alts" if dominant_flow == 'into_alts' else ""}
 • {"Capital leaving crypto" if dominant_flow == 'out_of_crypto' else ""}
 """
-        
+
         return section
-    
+
     @staticmethod
     def build_enhanced_market_prompt(
         symbol: str,
@@ -617,7 +617,7 @@ KEY INSIGHTS:
     ) -> str:
         """
         Build enhanced prompt with multi-coin market context.
-        
+
         Args:
             symbol: Trading pair
             market_data: Market data for this symbol
@@ -627,7 +627,7 @@ KEY INSIGHTS:
             risk_params: Risk parameters
             indicators_4h: 4H timeframe indicators
             market_context: Multi-coin market analysis from MarketAnalysisService
-            
+
         Returns:
             Enhanced prompt with market context
         """
@@ -641,18 +641,18 @@ KEY INSIGHTS:
             risk_params=risk_params,
             indicators_4h=indicators_4h
         )
-        
+
         # If no market context, return base prompt
         if not market_context:
             return base_prompt
-        
+
         # Build multi-coin context section
         multi_coin_section = LLMPromptService.build_multi_coin_context_section(market_context)
-        
+
         # Insert multi-coin context after market data section
         # Find the position after "MARKET DATA" section
         market_section_end = base_prompt.find("═══════════════════════════════════════════════════════\nCURRENT POSITIONS")
-        
+
         if market_section_end != -1:
             enhanced_prompt = (
                 base_prompt[:market_section_end] +
@@ -665,6 +665,6 @@ KEY INSIGHTS:
                 "Respond ONLY with the JSON object, no additional text.",
                 f"{multi_coin_section}\n\nRespond ONLY with the JSON object, no additional text."
             )
-        
+
         logger.debug(f"Built enhanced prompt with multi-coin context for {symbol}")
         return enhanced_prompt
