@@ -400,9 +400,22 @@ class TradingEngine:
                         # Ensure the decision includes the correct symbol
                         llm_decision['symbol'] = symbol
                         await self._handle_entry_decision(llm_decision, market_snapshot['current_price'], portfolio_state, current_bot)
+
                     elif action == 'EXIT':
+                        # CRITICAL: Only process EXIT if there's actually a position
+                        if not symbol_positions:
+                            logger.warning(f"⚠️  {symbol} LLM decided EXIT but NO POSITION exists!")
+                            logger.warning(f"   This symbol should NOT have been analyzed for EXIT.")
+                            logger.warning(f"   Active positions: {[p.symbol for p in all_positions]}")
+                            continue  # Skip this decision
+
                         await self._handle_exit_decision(llm_decision, symbol_positions, market_snapshot['current_price'])
+
                     elif action == 'CLOSE_POSITION':
+                        if not symbol_positions:
+                            logger.warning(f"⚠️  {symbol} LLM decided CLOSE_POSITION but NO POSITION exists!")
+                            continue
+
                         await self._handle_close_position(llm_decision, symbol_positions, market_snapshot['current_price'])
                     
                 except Exception as e:
