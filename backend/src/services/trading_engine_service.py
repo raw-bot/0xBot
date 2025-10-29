@@ -176,59 +176,32 @@ class TradingEngine:
     async def _trading_cycle(self) -> None:
         """Execute one complete trading cycle for all trading symbols."""
         cycle_start = datetime.utcnow()
-        logger.info("=" * 80)
 
         try:
             # 0. Update position prices FIRST to get accurate equity
             await self._update_position_prices()
 
             # 0.1 MANAGE EXISTING POSITIONS FIRST (PRIORITY ABSOLUTE)
-            logger.info("📍 Step 0.1: Managing existing positions...")
             position_stats = await self.manage_positions()
-            
+
             # 1. Get portfolio state once (this will reload bot with latest capital)
             portfolio_state, current_bot = await self._get_portfolio_state()
-            
-            # Log general bot info
-            logger.info(f"🤖 {current_bot.name} | {cycle_start.strftime('%H:%M:%S')}")
-            
-            # Calculate returns based on total equity (not just cash)
-            equity = portfolio_state['total_value']
-            cash = portfolio_state['cash']
-            invested = portfolio_state['invested']
-            return_pct = ((equity - current_bot.initial_capital) / current_bot.initial_capital) * 100
-            
-            # Color capital based on performance
-            capital_color = GREEN if return_pct >= 0 else YELLOW
-            logger.info(f"{capital_color}💰 Equity: ${equity:,.2f} (Cash: ${cash:,.2f} + Invested: ${invested:,.2f}) | Initial: ${current_bot.initial_capital:,.2f} | Return: {return_pct:+.2f}%{RESET}")
-            
+
             # Get all positions across all symbols
             all_positions = await self.position_service.get_open_positions(self.bot_id)
-            logger.info(f"📍 Total Positions: {len(all_positions)}")
-            
-            if all_positions:
-                for pos in all_positions:
-                    # Color position based on PnL
-                    pnl_color = GREEN if pos.unrealized_pnl >= 0 else YELLOW
-                    logger.info(f"{pnl_color}   • {pos.symbol} {pos.side.upper()} {pos.quantity:.4f} @ ${pos.entry_price:,.2f} | PnL: ${pos.unrealized_pnl:+,.2f}{RESET}")
-            
+
+            # Calculate returns based on total equity (not just cash)
+            equity = portfolio_state['total_value']
+            return_pct = ((equity - current_bot.initial_capital) / current_bot.initial_capital) * 100
+
+            # Log essential info only (no verbose portfolio details)
+            logger.info(f"🤖 {current_bot.name} | {cycle_start.strftime('%H:%M:%S')} | Equity: ${equity:,.2f} ({return_pct:+.2f}%) | Positions: {len(all_positions)}")
+
             # 1.5 Fetch multi-coin context (correlations, regime, breadth, etc.)
-            logger.info("📊 Step 1.5: Analyzing multi-coin market context...")
             market_context = await self._get_multi_coin_market_context()
 
-            if market_context and market_context.get('regime'):
-                regime = market_context['regime']['regime']
-                confidence = market_context['regime']['confidence']
-                breadth = market_context['breadth']
-                logger.info(f"   Market Regime: {regime.upper()} ({confidence:.0%} confidence)")
-                logger.info(f"   Breadth: {breadth.get('advancing', 0)} up / {breadth.get('declining', 0)} down")
-
-            # 2. Loop through each trading symbol
-            logger.info("📈 Step 2: Analyzing individual symbols...")
+            # 2. Loop through each trading symbol (minimal logging)
             for symbol in self.trading_symbols:
-                logger.info("─" * 80)
-                logger.info(f"📈 Analyzing {symbol}")
-                
                 try:
                     # Fetch market data for this symbol
                     market_data = await self._fetch_market_data(symbol)
@@ -277,7 +250,8 @@ class TradingEngine:
                     else:
                         rsi_str = f"{rsi:.1f}"
                     
-                    logger.info(f"📊 ${market_snapshot['current_price']:,.2f} | RSI: {rsi_str}")
+                    # Minimal price logging for debugging
+                    logger.debug(f"📊 {symbol}: ${market_snapshot['current_price']:,.2f} | RSI: {rsi_str}")
                     
                     # Get positions for this specific symbol
                     symbol_positions = [p for p in all_positions if p.symbol == symbol]
@@ -389,15 +363,12 @@ class TradingEngine:
                     reasoning = llm_decision.get('reasoning', 'No reasoning provided')
                     confidence = llm_decision.get('confidence', 0)
                     
-                    # Color decision based on action
-                    if action == 'ENTRY':
-                        decision_color = GREEN
-                    elif action == 'EXIT':
-                        decision_color = YELLOW
-                    else:  # HOLD
-                        decision_color = CYAN
-                    logger.info(f"{decision_color}🧠 {symbol} Decision: {action} (Confidence: {confidence:.0%}){RESET}")
-                    logger.info(f"   Reasoning: {reasoning[:100]}...")  # Shortened for multi-symbol
+                    # Log decisions only when they change (ENTRY/EXIT), not HOLD
+                    if action in ['ENTRY', 'EXIT']:
+                        decision_color = GREEN if action == 'ENTRY' else YELLOW
+                        logger.info(f"{decision_color}🧠 {symbol}: {action} ({confidence:.0%}){RESET}")
+                    else:
+                        logger.debug(f"🧠 {symbol}: HOLD ({confidence:.0%})")
                     
                     # Execute decision for this symbol
                     if action == 'ENTRY':
@@ -420,15 +391,16 @@ class TradingEngine:
             self.cycle_count += 1
 
             cycle_duration = (datetime.utcnow() - cycle_start).total_seconds()
-            logger.info("─" * 80)
-            logger.info(f"✅ Cycle completed in {cycle_duration:.1f}s | Next in {self.cycle_interval//60}min")
-            logger.info(f"   Positions: {position_stats['total_positions']} active, {position_stats['positions_closed']} closed")
+
+            # Log essential completion info only
+            if position_stats['positions_closed'] > 0:
+                logger.info(f"✅ Cycle {cycle_duration:.1f}s | Closed: {position_stats['positions_closed']} positions")
+            else:
+                logger.info(f"✅ Cycle {cycle_duration:.1f}s | No exits")
 
             # Hourly performance summary (every 12 cycles = 1 hour at 5min intervals)
             if self.cycle_count % 12 == 0:
                 await self._log_hourly_summary(current_bot)
-
-            logger.info("=" * 80)
             
         except Exception as e:
             logger.error(f"❌ Cycle error: {e}", exc_info=True)
@@ -619,20 +591,20 @@ class TradingEngine:
         )
         
         if not is_valid:
-            logger.warning(f"   ⛔ Entry rejected: {message}")
+            logger.warning(f"⛔ {symbol} Entry rejected: {message}")
             return
-        
+
         # Execute entry
         position, trade = await self.trade_executor.execute_entry(
             bot=current_bot,
             decision=decision,
             current_price=current_price
         )
-        
+
         if position and trade:
-            logger.info(f"{GREEN}   ✅ BUY {position.quantity:.4f} {position.symbol.split('/')[0]} @ ${position.entry_price:,.2f} (${position.position_value:,.2f}){RESET}")
+            logger.info(f"{GREEN}✅ BUY {position.quantity:.4f} {position.symbol.split('/')[0]} @ ${position.entry_price:,.2f}{RESET}")
         else:
-            logger.error("   ❌ Trade execution failed")
+            logger.error(f"❌ {symbol} Trade execution failed")
     
     async def _handle_exit_decision(
         self,
@@ -645,18 +617,18 @@ class TradingEngine:
         
         # Find position to close (first open position for now)
         if not positions:
-            logger.warning("Exit requested but no open positions")
+            logger.warning(f"Exit requested for {symbol} but no open positions")
             return
-        
+
         position = positions[0]  # Close first position
-        
+
         await self.trade_executor.execute_exit(
             position=position,
             current_price=current_price,
             reason="llm_decision"
         )
-        
-        logger.info(f"Exit executed for position {position.id}")
+
+        logger.info(f"✅ EXIT {position.symbol.split('/')[0]} @ ${current_price:,.2f}")
     
     async def _handle_close_position(
         self,
@@ -674,6 +646,7 @@ class TradingEngine:
                 current_price=current_price,
                 reason="emergency_close"
             )
+            logger.info(f"🚨 EMERGENCY CLOSE {position.symbol.split('/')[0]} @ ${current_price:,.2f}")
     
     async def _update_position_prices(self) -> None:
         """Update current prices for all open positions."""
@@ -809,13 +782,11 @@ class TradingEngine:
                     logger.error(f"❌ Error checking position {position.symbol}: {e}")
                     continue
 
-            # Résumé
+            # Résumé concis
             if stats["positions_closed"] > 0:
-                logger.info(f"✅ Position management: {stats['positions_closed']}/{stats['positions_checked']} closed")
-                for reason, count in stats["reasons"].items():
-                    logger.info(f"   • {reason}: {count}")
+                logger.info(f"✅ Closed {stats['positions_closed']}/{stats['positions_checked']} positions")
             else:
-                logger.debug(f"✓ All {stats['positions_checked']} positions are within normal parameters")
+                logger.debug(f"✓ {stats['positions_checked']} positions OK")
 
         except Exception as e:
             logger.error(f"❌ Error in manage_positions: {e}")
