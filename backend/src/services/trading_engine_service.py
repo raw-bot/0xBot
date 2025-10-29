@@ -441,10 +441,14 @@ class TradingEngine:
             cycle_duration = (datetime.utcnow() - cycle_start).total_seconds()
 
             # Log essential completion info only
-            if position_stats['positions_closed'] > 0:
-                logger.info(f"✅ Cycle {cycle_duration:.1f}s | Closed: {position_stats['positions_closed']} positions")
+            if positions_closed_count > 0:
+                logger.info(f"✅ Cycle {cycle_duration:.1f}s | Closed: {positions_closed_count} position(s)")
             else:
-                logger.info(f"✅ Cycle {cycle_duration:.1f}s | No exits")
+                logger.debug(f"✅ Cycle {cycle_duration:.1f}s | No exits")
+
+            # Get final position count
+            final_positions = await self.position_service.get_open_positions(self.bot_id)
+            logger.info(f"   Positions: {len(final_positions)} active, {positions_closed_count} closed")
 
             # Hourly performance summary (every 12 cycles = 1 hour at 5min intervals)
             if self.cycle_count % 12 == 0:
