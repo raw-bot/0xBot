@@ -182,7 +182,17 @@ class TradingEngine:
             await self._update_position_prices()
 
             # 0.1 MANAGE EXISTING POSITIONS FIRST (PRIORITY ABSOLUTE)
-            position_stats = await self.manage_positions()
+            logger.info(f"📍 Step 0.1: Managing existing positions...")
+            positions_to_manage = await self.position_service.get_open_positions(self.bot_id)
+
+            if positions_to_manage:
+                logger.info(f"📍 Managing {len(positions_to_manage)} active position(s)")
+                # Use the better method with 2h timeout conditions
+                await self._check_position_exits(positions_to_manage)
+                positions_closed_count = len(positions_to_manage) - len(await self.position_service.get_open_positions(self.bot_id))
+            else:
+                logger.debug("📍 No active positions to manage")
+                positions_closed_count = 0
 
             # 1. Get portfolio state once (this will reload bot with latest capital)
             portfolio_state, current_bot = await self._get_portfolio_state()
