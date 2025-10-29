@@ -1,0 +1,60 @@
+{
+  "timestamp": "2025-10-29T12:31:58.513294",
+  "period_analyzed": "24h",
+  "metrics": {
+    "cycles_completed": 412,
+    "positions_opened": 0,
+    "positions_closed": 0,
+    "capital_drift_alerts": 0,
+    "errors_count": 350,
+    "llm_decisions": 0,
+    "trades_executed": 0,
+    "max_positions_held": 3,
+    "capital_drift_max": "0",
+    "session_duration_hours": 0,
+    "sl_tp_triggers": 0,
+    "emergency_closes": 0,
+    "sl_tp_success_rate": 0
+  },
+  "success_criteria": {
+    "no_crashes_24h": {
+      "target": "0 crashes in 30min",
+      "actual": 350,
+      "status": "\u274c FAIL"
+    },
+    "sl_tp_triggers_active": {
+      "target": "> 0 SL/TP triggers",
+      "actual": 0,
+      "status": "\u274c FAIL"
+    },
+    "capital_drift_controlled": {
+      "target": "< $0.01 max drift",
+      "actual": "$0",
+      "status": "\u2705 PASS"
+    },
+    "positions_closed_timely": {
+      "target": "All positions closed < 4h",
+      "actual": "Max 3 positions",
+      "status": "\u2705 PASS"
+    },
+    "trading_cycles_active": {
+      "target": "> 6 cycles in 30min",
+      "actual": 412,
+      "status": "\u2705 PASS"
+    },
+    "overall_score": {
+      "score": "60.0%",
+      "passed": 3,
+      "total": 5,
+      "status": "\u26a0\ufe0f NEEDS ATTENTION"
+    }
+  },
+  "recommendations": [
+    "Investiguer les erreurs dans les logs pour am\u00e9liorer la stabilit\u00e9",
+    "S'assurer que les stop-loss et take-profit sont correctement configur\u00e9s"
+  ],
+  "alerts": [
+    "\ud83d\udd34 HIGH ERROR COUNT: 350 errors detected"
+  ],
+  "test_type": "quick_test_30min"
+}

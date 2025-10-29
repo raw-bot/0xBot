@@ -24,6 +24,10 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# ANSI color codes for terminal output (same as trading_engine_service.py)
+CYAN = '\033[96m'    # Bright cyan
+RESET = '\033[0m'    # Reset color
+
 
 class EnrichedLLMPromptService:
     """
@@ -581,7 +585,7 @@ Now analyze {symbol} and output ONLY the JSON object.
             return None
         except Exception as e:
             logger.error(f"⚡ ENRICHED | Parse error: {e}")
-            
+
             # Log error with detailed info
             if LLM_LOGGER_ENABLED and original_prompt:
                 llm_logger = get_llm_decision_logger()
@@ -591,7 +595,7 @@ Now analyze {symbol} and output ONLY the JSON object.
                     error_message=f"Parse error: {e}",
                     llm_response=response_text
                 )
-            
+
             return None
     
     def get_simple_decision(

@@ -110,7 +110,7 @@ class ExchangeClient:
         try:
             normalized_symbol = self._normalize_symbol(symbol)
             ohlcv = await self.exchange.fetch_ohlcv(normalized_symbol, timeframe, limit=limit)
-            logger.info(f"Fetched {len(ohlcv)} candles for {normalized_symbol} ({timeframe})")
+            # Removed verbose logging for cleaner output
             return ohlcv
         except Exception as e:
             logger.error(f"Error fetching OHLCV for {symbol}: {e}")

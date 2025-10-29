@@ -124,7 +124,7 @@ class MarketDataService:
                 for candle in raw_ohlcv
             ]
             
-            logger.debug(f"Fetched {len(ohlcv_list)} candles for {symbol} ({timeframe})")
+            # Removed verbose logging for cleaner output
             return ohlcv_list
             
         except Exception as e:
@@ -355,7 +355,7 @@ class MarketDataService:
                 }
             }
             
-            logger.info(f"Created market snapshot for {symbol}")
+            # Removed verbose logging for cleaner output
             return snapshot
             
         except Exception as e:

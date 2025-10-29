@@ -134,7 +134,7 @@ class RiskManagerService:
             return True, "Validation passed"
 
         except Exception as e:
-            logger.error(f"Error validating entry: {e}")
+            logger.error(f"⚠️  RISK | Error validating entry: {e}")
             return False, f"Validation error: {str(e)}"
     
     @staticmethod

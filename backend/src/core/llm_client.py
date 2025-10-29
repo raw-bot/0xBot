@@ -259,7 +259,7 @@ Your response must be parseable JSON starting with { and ending with }."""
             else:
                 total_cost = 0.0
             
-            logger.info(f"Qwen response: {tokens_used} tokens, ${total_cost:.6f}")
+            # Removed verbose logging for cleaner output
             
             return {
                 "response": raw_response,
