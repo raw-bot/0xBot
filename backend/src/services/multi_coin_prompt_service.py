@@ -7,6 +7,7 @@ import json
 import logging
 from datetime import datetime
 from typing import Dict, List, Optional
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -96,26 +97,26 @@ class MultiCoinPromptService:
                     symbol_name = coin_mapping.get(pos.symbol, pos.symbol)
                     side = pos.side.upper() if hasattr(pos, 'side') else 'UNKNOWN'
                     quantity = float(pos.quantity) if hasattr(pos, 'quantity') else 0
-                    position_entry_price = float(pos.position_entry_price) if hasattr(pos, 'position_entry_price') else 0
-                    current_market_price = float(pos.current_market_price) if hasattr(pos, 'current_market_price') else 0
+                    entry_price = float(pos.entry_price) if hasattr(pos, 'entry_price') else 0
+                    current_market_price = float(pos.current_price) if hasattr(pos, 'current_price') else 0
 
                     # Calculate PnL
                     if hasattr(pos, 'side') and pos.side.lower() == "long":
-                        pnl = (current_market_price - position_entry_price) * quantity
+                        pnl = (current_market_price - entry_price) * quantity
                     elif hasattr(pos, 'side'):
-                        pnl = (position_entry_price - current_market_price) * quantity
+                        pnl = (entry_price - current_market_price) * quantity
                     else:
                         pnl = 0
 
-                    prompt_parts.append(f"  {symbol_name}: {side} {quantity:.4f} @ ${position_entry_price:.2f} (Current: ${current_market_price:.2f})")
+                    prompt_parts.append(f"  {symbol_name}: {side} {quantity:.4f} @ ${entry_price:.2f} (Current: ${current_market_price:.2f})")
                 else:  # Dict fallback
                     symbol_name = coin_mapping.get(pos.get('symbol', 'UNKNOWN'), pos.get('symbol', 'UNKNOWN'))
                     side = pos.get('side', 'unknown').upper()
                     size = pos.get('size', 0)
-                    position_entry_price = pos.get('position_entry_price', 0)
-                    current_market_price = pos.get('current_market_price', 0)
+                    entry_price = pos.get('entry_price', 0)
+                    current_market_price = pos.get('current_price', 0)
                     pnl = pos.get('pnl', 0)
-                    prompt_parts.append(f"  {symbol_name}: {side} {size:.4f} @ ${position_entry_price:.2f} (Current: ${current_market_price:.2f}, PnL: ${pnl:+.2f})")
+                    prompt_parts.append(f"  {symbol_name}: {side} {size:.4f} @ ${entry_price:.2f} (Current: ${current_market_price:.2f}, PnL: ${pnl:+.2f})")
         else:
             prompt_parts.append("PORTFOLIO STATUS:")
             prompt_parts.append("  No active positions")
@@ -139,20 +140,20 @@ class MultiCoinPromptService:
                     # Format position details using object attributes instead of dict access
                     if hasattr(position, 'symbol'):  # Position is an object
                         prompt_parts.append(f"Symbol: {position.symbol} | Side: {position.side.upper()} | Size: {float(position.quantity):.4f}")
-                        prompt_parts.append(f"Entry Price: ${float(position.position_entry_price):,.2f} | Current: ${float(position.current_market_price):,.2f}")
+                        prompt_parts.append(f"Entry Price: ${float(position.entry_price):,.2f} | Current: ${float(position.current_price):,.2f}")
 
                         # Calculate PnL
                         if position.side.lower() == "long":
-                            pnl = (Decimal(str(position.current_market_price)) - Decimal(str(position.position_entry_price))) * Decimal(str(position.quantity))
+                            pnl = (Decimal(str(position.current_price)) - Decimal(str(position.entry_price))) * Decimal(str(position.quantity))
                         else:
-                            pnl = (Decimal(str(position.position_entry_price)) - Decimal(str(position.current_market_price))) * Decimal(str(position.quantity))
+                            pnl = (Decimal(str(position.entry_price)) - Decimal(str(position.current_price))) * Decimal(str(position.quantity))
 
-                        pnl_pct = (pnl / (float(position.position_entry_price) * float(position.quantity))) * 100 if position.quantity > 0 else 0
+                        pnl_pct = (float(pnl) / (float(position.entry_price) * float(position.quantity))) * 100 if position.quantity > 0 else 0
 
                         prompt_parts.append(f"PnL: ${pnl:+,.2f} ({pnl_pct:+.2f}%)")
                     else:  # Position is a dict (fallback)
                         prompt_parts.append(f"Symbol: {position.get('symbol', 'N/A')} | Side: {position.get('side', 'long')} | Size: {position.get('size', 0):.4f}")
-                        prompt_parts.append(f"Entry Price: ${position.get('position_entry_price', 0):,.2f} | Current: ${position.get('current_market_price', 0):,.2f}")
+                        prompt_parts.append(f"Entry Price: ${position.get('entry_price', 0):,.2f} | Current: ${position.get('current_price', 0):,.2f}")
                         prompt_parts.append(f"PnL: ${position.get('pnl', 0):+,.2f} ({position.get('pnl_pct', 0):+.2f}%)")
                     prompt_parts.append("DECISION: Evaluate HOLD vs EXIT based on invalidation conditions")
                 else:
@@ -215,15 +216,42 @@ class MultiCoinPromptService:
                 return data
             else:
                 logger.error(f"Could not find JSON in response: {response_text[:100]}...")
-                return {}
+                # Fallback: create default response for all symbols
+            default_response = {}
+            for symbol in ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT"]:
+                default_response[symbol] = {
+                    "signal": "HOLD", 
+                    "confidence": 0.50, 
+                    "reasoning": "JSON parse error fallback - default HOLD"
+                }
+            logger.warning(f"Using fallback response due to JSON parse error: {e}")
+            return default_response
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse multi-coin JSON response: {e}")
             logger.error(f"Response text: {response_text[:200]}...")
-            return {}
+            # Fallback: create default response for all symbols
+            default_response = {}
+            for symbol in ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT"]:
+                default_response[symbol] = {
+                    "signal": "HOLD", 
+                    "confidence": 0.50, 
+                    "reasoning": "JSON parse error fallback - default HOLD"
+                }
+            logger.warning(f"Using fallback response due to JSON parse error: {e}")
+            return default_response
         except Exception as e:
             logger.error(f"Unexpected error parsing multi-coin response: {e}")
-            return {}
+            # Fallback: create default response for all symbols
+            default_response = {}
+            for symbol in ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT"]:
+                default_response[symbol] = {
+                    "signal": "HOLD", 
+                    "confidence": 0.50, 
+                    "reasoning": "JSON parse error fallback - default HOLD"
+                }
+            logger.warning(f"Using fallback response due to JSON parse error: {e}")
+            return default_response
 
     def get_decision_for_symbol(self, symbol, response_text):
         """

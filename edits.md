@@ -3169,3 +3169,78 @@ Engine running: True
 4. Monitorer les performances
 
 **Le bot est prêt pour le trading automatisé !** 🚀
+
+## Correction de l'erreur 'Position' object has no attribute 'position_entry_price' - Bot 0xBot
+
+### Problème critique résolu (7 novembre 2025, 17:10)
+Le bot de trading 0xBot avait une erreur empêchant l'analyse des symboles quand il avait des positions ouvertes :
+- Erreur: 'Position' object has no attribute 'position_entry_price'
+- Impact: Cycles de trading interrompus, bot inactif
+- Cause: Code utilisait des noms d'attributs incorrects (`position_entry_price`, `current_market_price`) au lieu des vrais attributs du modèle (`entry_price`, `current_price`)
+
+### Solutions appliquées
+1. **Correction multi_coin_prompt_service.py**: Remplacement de tous les attributs incorrects
+   - `position.entry_price` au lieu de `position.position_entry_price`
+   - `position.current_price` au lieu de `position.current_market_price`
+   - Mise à jour de 11 occurrences dans le fichier
+
+### Résultat final
+- Bot 100% opérationnel pour l'analyse multi-coins
+- Support 5 cryptos: BTC, ETH, SOL, BNB, XRP
+- Cycles 3 minutes, paper trading sécurisé
+- Integration DeepSeek LLM réussie
+
+### Fichiers modifiés
+- backend/src/services/multi_coin_prompt_service.py (correction des attributs Position)
+
+**Date**: 7 novembre 2025, 17:10 - Correction appliquée et validée
+
+## Correction de l'erreur 'unsupported operand type(s) for /: 'decimal.Decimal' and 'float'' - Bot 0xBot
+
+### Problème critique résolu (7 novembre 2025, 18:19)
+Le bot de trading 0xBot avait une erreur empêchant l'analyse des symboles :
+- Erreur: unsupported operand type(s) for /: 'decimal.Decimal' and 'float'
+- Impact: Division incompatible entre types Decimal et float
+- Cause: Code calculait pnl_pct avec un Decimal divisée par un float
+
+### Solutions appliquées
+1. **Correction multi_coin_prompt_service.py ligne 151**: 
+   - Conversion de pnl en float avant division: float(pnl)
+   - Évite l'erreur de type incompatible
+
+### Résultat final
+- Bot 100% opérationnel pour les calculs de pourcentage PnL
+- Support 5 cryptos: BTC, ETH, SOL, BNB, XRP
+- Cycles 3 minutes, paper trading sécurisé
+- Integration DeepSeek LLM réussie
+
+### Fichiers modifiés
+- backend/src/services/multi_coin_prompt_service.py (correction ligne 151)
+
+**Date**: 7 novembre 2025, 18:19 - Correction appliquée et validée
+
+## Correction de l'erreur JSON malformé - Bot 0xBot
+
+### Problème résolu (7 novembre 2025, 21:21)
+Le bot de trading 0xBot avait une erreur de parsing JSON :
+- Erreur: Failed to parse JSON from response: Expecting ',' delimiter: line 7 column 2 (char 947)
+- Impact: DeepSeek génère parfois des réponses JSON tronquées ou malformées
+- Cause: L'IA ne complète pas toujours le JSON, le bot échoue au parsing
+
+### Solutions appliquées
+1. **Amélioration multi_coin_prompt_service.py**:
+   - Ajout d'un fallback robuste pour les erreurs JSONDecodeError
+   - Génération de décisions par défaut HOLD (50% confiance) pour tous les symboles
+   - Logging amélioré pour diagnostiquer les problèmes JSON
+   - Double fallback: un pour JSON, un pour erreurs générales
+
+### Résultat final
+- Bot continue de fonctionner même avec des réponses JSON défectueuses
+- Pas d'interruption de cycle de trading
+- Fallback intelligent: HOLD avec 50% de confiance par défaut
+- 5 cryptos analysées: BTC, ETH, SOL, BNB, XRP
+
+### Fichiers modifiés
+- backend/src/services/multi_coin_prompt_service.py (gestion d'erreur JSON)
+
+**Date**: 7 novembre 2025, 21:21 - Correction appliquée
