@@ -1,6 +1,13 @@
+"""
+Fichier TradingEngine temporaire avec ancien système désactivé
+Généré par le script de nettoyage automatique
+"""
 """Trading engine service - orchestrates the complete trading cycle."""
 
 import asyncio
+
+# === PATCH DEEPSEEK - FORCER LE MODÈLE ===
+import os
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -9,22 +16,26 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.logger import get_logger
-from ..core.llm_client import LLMClient, get_llm_client
+from ..core.config import config
 from ..core.database import AsyncSessionLocal
+from ..core.llm_client import LLMClient, get_llm_client
+from ..core.logger import get_logger
 from ..models.bot import Bot, BotStatus
 from ..models.llm_decision import LLMDecision
 from ..models.position import PositionStatus
 from ..models.trade import Trade
-from .market_data_service import MarketDataService
 from .indicator_service import IndicatorService
-from .position_service import PositionService
-from .llm_prompt_service import LLMPromptService
-from .trade_executor_service import TradeExecutorService
-from .risk_manager_service import RiskManagerService
+from .multi_coin_prompt_service import MultiCoinPromptService
 from .market_analysis_service import MarketAnalysisService
-from .enriched_llm_prompt_service import EnrichedLLMPromptService
+from .market_data_service import MarketDataService
+from .position_service import PositionService
+from .risk_manager_service import RiskManagerService
+from .trade_executor_service import TradeExecutorService
 from .trading_memory_service import get_trading_memory
+
+FORCED_MODEL_DEEPSEEK = os.getenv("FORCE_DEEPSEEK_MODEL", "deepseek-chat")
+# === FIN PATCH ===
+
 
 logger = get_logger(__name__)
 
@@ -84,8 +95,15 @@ class TradingEngine:
         self.trade_executor = TradeExecutorService(db)
         self.llm_client = llm_client or get_llm_client()
 
-        # Initialize enriched LLM services (Phase 3B - Expert Roadmap)
-        self.enriched_prompt_service = EnrichedLLMPromptService(db)
+        # Initialize LLM service - nouveau système multi-coins activé temporairement
+
+        # 🚨 TEMPORAIRE: Activation du nouveau système multi-coins
+        try:
+            from .multi_coin_prompt_service import MultiCoinPromptService
+            self.simple_prompt_service = MultiCoinPromptService()  # MultiCoinPromptService ne prend pas de paramètres
+            print("🔧 Nouveau système MultiCoinPromptService activé temporairement")
+        except ImportError:
+            print("⚠️ MultiCoinPromptService non disponible, bot inactif temporairement")
         self.trading_memory = get_trading_memory(db, bot.id)
 
         # Trading parameters - ALIGNED timeframe with cycle
@@ -296,12 +314,12 @@ class TradingEngine:
                     # Check exits for positions of this symbol
                     await self._check_position_exits(symbol_positions)  # Plus besoin de passer le prix
 
-                    # Build enriched prompt with complete context (Phase 3D - Expert Roadmap)
+                    # Build simple prompt - style bot +78% example
                     # Get all coins snapshot for multi-coin context
                     all_coins_data = await self._get_all_coins_quick_snapshot()
 
-                    # Build enriched prompt (pass all_positions to avoid async DB queries)
-                    prompt_data = self.enriched_prompt_service.get_simple_decision(
+                    # Build simple prompt (pass all_positions to avoid async DB queries)
+                    prompt_data = self.simple_prompt_service.get_simple_decision(
                         bot=current_bot,
                         symbol=symbol,
                         market_snapshot=market_snapshot,
@@ -312,7 +330,7 @@ class TradingEngine:
 
                     # Get LLM decision with enriched context
                     llm_response = await self.llm_client.analyze_market(
-                        model=current_bot.model_name,
+                        model=FORCED_MODEL_DEEPSEEK,
                         prompt=prompt_data["prompt"],
                         max_tokens=1024,
                         temperature=0.9  # Increased for more creative variability
@@ -326,12 +344,11 @@ class TradingEngine:
                         logger.error(f"🤖 BOT | Empty response from LLM for {symbol}")
                         logger.error(f"🤖 BOT | LLM response keys: {list(llm_response.keys())}")
 
-                    # Parse (with prompt for logging and current_price for fallback)
-                    parsed_decision = self.enriched_prompt_service.parse_llm_response(
+                    # Parse with simple service (faster parsing)
+                    parsed_decision = self.simple_prompt_service.parse_simple_response(
                         response_text,
                         symbol,
-                        original_prompt=prompt_data["prompt"],  # Pass prompt for logging
-                        current_price=float(market_snapshot['current_price'])  # Pass price for fallback parser
+                        current_market_price=float(market_snapshot['current_price'])
                     )
 
                     if not parsed_decision:
@@ -350,8 +367,8 @@ class TradingEngine:
                         current_price_decimal = Decimal(str(current_price))
 
                         # Get SL/TP from bot's risk_params with fallback values
-                        stop_loss_pct = current_bot.risk_params.get("stop_loss_pct", 0.035)  # 3.5% default
-                        take_profit_pct = current_bot.risk_params.get("take_profit_pct", 0.07)  # 7% default
+                        stop_loss_pct = current_bot.risk_params.get("stop_loss_pct", config.DEFAULT_STOP_LOSS_PCT)  # 3.5% default
+                        take_profit_pct = current_bot.risk_params.get("take_profit_pct", config.DEFAULT_TAKE_PROFIT_PCT)  # 7% default
 
                         # Calculate default stop loss and take profit prices
                         default_sl = current_price_decimal * (Decimal("1") - Decimal(str(stop_loss_pct)))
@@ -370,9 +387,9 @@ class TradingEngine:
                         size_pct = parsed_decision.get("size_pct") or parsed_decision.get("risk_pct") or 0.05
 
                         llm_decision = {
-                            "action": parsed_decision["signal"],
+                            "action": parsed_decision["action"],  # ✅ Corrigé: "action" au lieu de "signal"
                             "confidence": float(parsed_decision["confidence"]),
-                            "reasoning": parsed_decision["justification"],
+                            "reasoning": parsed_decision.get("reasoning", "Pas de justification"),  # ✅ Corrigé: "reasoning" au lieu de "justification"
                             "entry_price": float(entry_price),
                             "stop_loss": float(stop_loss),
                             "take_profit": float(take_profit),
@@ -410,14 +427,14 @@ class TradingEngine:
 
                     # Execute decision for this symbol
                     if action == 'ENTRY':
-                        # ✅ STRICT FILTER: Only enter on HIGH confidence (75%+)
-                        if confidence < 0.75:
-                            logger.warning(f"⛔ {symbol} ENTRY rejected: Low confidence {confidence:.0%} < 75% threshold")
-                            logger.info(f"   💡 Tip: LLM needs to be MORE certain before entering trades")
+                        # ✅ SIMPLE FILTER: Like example bot - 55%+ confidence for entries
+                        if confidence < config.MIN_CONFIDENCE_ENTRY:
+                            logger.warning(f"⛔ {symbol} ENTRY rejected: Low confidence {confidence:.0%} < 55% threshold")
+                            logger.info(f"   💡 Tip: Simple approach - need moderate certainty")
                             continue  # Skip this weak decision
 
-                        # ✅ PASSED: High confidence entry
-                        logger.info(f"✅ {symbol} ENTRY accepted: High confidence {confidence:.0%} ≥ 75%")
+                        # ✅ PASSED: Moderate confidence entry
+                        logger.info(f"✅ {symbol} ENTRY accepted: Confidence {confidence:.0%} ≥ 55%")
 
                         # Ensure the decision includes the correct symbol
                         llm_decision['symbol'] = symbol
@@ -444,24 +461,24 @@ class TradingEngine:
                             logger.info(f"   💡 Let the trade develop before exiting")
                             continue
 
-                        # ✅ FILTER 2: Require higher confidence for early exits (< 1 hour)
+                        # ✅ FILTER 2: Like example - moderate confidence for exits
                         if position_age_hours < 1.0:
-                            if confidence < 0.85:
-                                logger.warning(f"⛔ {symbol} EXIT rejected: Early exit needs high confidence")
-                                logger.info(f"   Age: {position_age_hours:.1f}h (< 1h) → Needs 85%+ confidence")
-                                logger.info(f"   Got: {confidence:.0%} < 85% threshold")
+                            if confidence < config.MIN_CONFIDENCE_EXIT_EARLY:
+                                logger.warning(f"⛔ {symbol} EXIT rejected: Early exit needs moderate confidence")
+                                logger.info(f"   Age: {position_age_hours:.1f}h (< 1h) → Needs 60%+ confidence")
+                                logger.info(f"   Got: {confidence:.0%} < 60% threshold")
                                 continue
                             else:
-                                logger.info(f"✅ {symbol} EARLY EXIT accepted: {confidence:.0%} ≥ 85% (age: {position_age_hours:.1f}h)")
+                                logger.info(f"✅ {symbol} EARLY EXIT accepted: {confidence:.0%} ≥ 60% (age: {position_age_hours:.1f}h)")
 
-                        # ✅ FILTER 3: Normal exits (> 1 hour) still need decent confidence (75%+)
+                        # ✅ FILTER 3: Normal exits (> 1 hour) - like example style
                         else:
-                            if confidence < 0.75:
+                            if confidence < config.MIN_CONFIDENCE_EXIT_NORMAL:
                                 logger.warning(f"⛔ {symbol} EXIT rejected: Low confidence {confidence:.0%}")
-                                logger.info(f"   Age: {position_age_hours:.1f}h → Needs 75%+ confidence")
+                                logger.info(f"   Age: {position_age_hours:.1f}h → Needs 50%+ confidence")
                                 continue
                             else:
-                                logger.info(f"✅ {symbol} EXIT accepted: {confidence:.0%} ≥ 75% (age: {position_age_hours:.1f}h)")
+                                logger.info(f"✅ {symbol} EXIT accepted: {confidence:.0%} ≥ 50% (age: {position_age_hours:.1f}h)")
 
                         await self._handle_exit_decision(llm_decision, symbol_positions, market_snapshot['current_price'])
 
@@ -644,7 +661,7 @@ class TradingEngine:
                 continue
 
             # Additional exit conditions for stuck positions
-            if position_age.total_seconds() > 7200:  # 2 hours
+            if position_age.total_seconds() > config.MAX_POSITION_AGE_SECONDS:  # 2 hours
                 if pnl_pct < -2.0:
                     logger.info(f"    → ⏰ EXIT TRIGGERED: TIMEOUT_LOSS (2h+ with {pnl_pct:.2f}% loss)")
                     logger.warning(f"⏰ {position.symbol} Position aged {hold_hours:.1f}h with {pnl_pct:.2f}% loss - force closing")
@@ -993,3 +1010,6 @@ class TradingEngine:
             ema = (price - ema) * multiplier + ema
 
         return round(ema, 2)
+
+# 🚨 SÉCURITÉ: Ancien système désactivé par nettoyage automatique
+# ⚠️ NE PAS RÉACTIVER sans validation complète du nouveau système
