@@ -1,12 +1,12 @@
 # 🤖 0xBot - AI-Powered Crypto Trading Bot
 
-Bot de trading automatisé utilisant l'intelligence artificielle **Qwen-max** pour trader les cryptomonnaies sur **OKX**.
+Bot de trading automatisé utilisant l'intelligence artificielle **DeepSeek** pour trader les cryptomonnaies sur **OKX**.
 
 ---
 
 ## ✨ Caractéristiques
 
-- 🧠 **IA Qwen-max** - Décisions de trading intelligentes basées sur l'analyse technique
+- 🧠 **IA DeepSeek** - Décisions de trading intelligentes basées sur l'analyse technique
 - 📊 **5 Cryptos** - BTC, ETH, SOL, BNB, XRP (configurable)
 - 💰 **Paper Trading** - Testez sans risque avec de l'argent virtuel
 - 🔄 **Auto-Trading** - Cycles automatiques toutes les 3 minutes
@@ -22,7 +22,7 @@ Bot de trading automatisé utilisant l'intelligence artificielle **Qwen-max** po
 
 - **Docker Desktop** installé et lancé
 - **Python 3.11+** installé
-- **Clé API Alibaba Cloud** (Qwen-max) : [Obtenir ici](https://modelstudio.console.alibabacloud.com/?tab=globalset#/efm/api_key)
+- **Clé API DeepSeek** : [Obtenir ici](https://platform.deepseek.com/)
 
 ### 2. Installation Rapide
 
@@ -36,7 +36,7 @@ cd docker && docker-compose up -d && cd ..
 
 # Configurer les variables d'environnement
 cp .env.example .env
-nano .env  # Ajouter votre DASHSCOPE_API_KEY
+nano .env  # Ajouter votre DEEPSEEK_API_KEY
 
 # Installer les dépendances
 cd backend
@@ -67,6 +67,7 @@ Pour une **installation pas à pas détaillée** avec explications :
 👉 **[Guide d'Installation Complet](docs/INSTALLATION_GUIDE.md)**
 
 Autres guides :
+
 - 📖 [Quick Start](docs/QUICK_START.md)
 - 🔧 [Gestion du Bot](corrections/guide-gestion-bot.md)
 - 📊 [Scripts Utiles](backend/scripts/README.md)
@@ -75,39 +76,43 @@ Autres guides :
 
 ## 🎯 Configuration par Défaut
 
-| Paramètre | Valeur | Description |
-|-----------|--------|-------------|
-| **Capital Initial** | $10,000 | Montant de départ (virtuel) |
-| **Cryptos** | BTC, ETH, SOL, BNB, XRP | Top 5 cryptomonnaies |
-| **Modèle IA** | qwen-max | LLM d'Alibaba Cloud |
-| **Mode** | Paper Trading | Trades simulés (sans risque) |
-| **Cycles** | 3 minutes | Fréquence d'analyse |
-| **Max Position** | 15% | Maximum par crypto |
-| **Max Exposure** | 85% | Capital total utilisé |
-| **Stop Loss** | 3.5% | Protection contre les pertes |
-| **Take Profit** | 7% | Objectif de gains |
+| Paramètre           | Valeur                  | Description                  |
+| ------------------- | ----------------------- | ---------------------------- |
+| **Capital Initial** | $10,000                 | Montant de départ (virtuel)  |
+| **Cryptos**         | BTC, ETH, SOL, BNB, XRP | Top 5 cryptomonnaies         |
+| **Modèle IA**       | deepseek-chat           | LLM DeepSeek                 |
+| **Mode**            | Paper Trading           | Trades simulés (sans risque) |
+| **Cycles**          | 3 minutes               | Fréquence d'analyse          |
+| **Max Position**    | 15%                     | Maximum par crypto           |
+| **Max Exposure**    | 85%                     | Capital total utilisé        |
+| **Stop Loss**       | 3.5%                    | Protection contre les pertes |
+| **Take Profit**     | 7%                      | Objectif de gains            |
 
 ---
 
 ## 🔧 Gestion Quotidienne
 
 ### Lancer le bot
+
 ```bash
 ./dev.sh
 ```
 
 ### Arrêter le bot
+
 ```bash
 Ctrl+C
 ```
 
 ### Reset rapide (tests)
+
 ```bash
 cd backend/scripts
 ./reset.sh <bot-id>
 ```
 
 ### Créer un nouveau bot
+
 ```bash
 cd backend
 source venv/bin/activate
@@ -116,6 +121,7 @@ python scripts/create_test_bot.py
 ```
 
 ### Voir les logs
+
 ```bash
 tail -f backend.log
 ```
@@ -125,11 +131,13 @@ tail -f backend.log
 ## 📊 API et Interfaces
 
 ### Backend API
+
 - **URL** : http://localhost:8020
 - **Documentation** : http://localhost:8020/docs
 - **Health Check** : http://localhost:8020/health
 
 ### Base de Données
+
 - **PostgreSQL** : `localhost:5432`
 - **Redis** : `localhost:6379`
 
@@ -139,14 +147,16 @@ tail -f backend.log
 
 ### Obligatoire
 
-**Alibaba Cloud (Qwen-max LLM)**
-- 🔗 [Obtenir la clé API](https://modelstudio.console.alibabacloud.com/?tab=globalset#/efm/api_key)
-- Variable : `DASHSCOPE_API_KEY=sk-...`
+**DeepSeek LLM**
+
+- 🔗 [Obtenir la clé API](https://platform.deepseek.com/)
+- Variable : `DEEPSEEK_API_KEY=sk-...`
 - Utilisation : Prise de décisions IA
 
 ### Optionnel (pour trading réel)
 
 **OKX Exchange**
+
 - 🔗 [Obtenir les clés](https://www.okx.com/account/my-api)
 - Variables : `OKX_API_KEY`, `OKX_SECRET_KEY`, `OKX_PASSPHRASE`
 - Utilisation : Trading réel (laisser vide pour paper trading)
@@ -156,6 +166,7 @@ tail -f backend.log
 ## 💡 Modes de Trading
 
 ### Paper Trading (Par défaut) ✅
+
 - ✅ **Pas besoin de clés OKX**
 - ✅ Trades simulés
 - ✅ Données réelles de marché
@@ -163,6 +174,7 @@ tail -f backend.log
 - ✅ Parfait pour tester
 
 ### Trading Réel ⚠️
+
 - ⚠️ Nécessite clés API OKX
 - ⚠️ Argent réel en jeu
 - ⚠️ **Testez d'abord en paper trading !**
@@ -173,6 +185,7 @@ tail -f backend.log
 ## 🛠️ Technologies
 
 ### Backend
+
 - **Python 3.11+** - Langage principal
 - **FastAPI** - API REST async
 - **SQLAlchemy** - ORM async
@@ -182,11 +195,13 @@ tail -f backend.log
 - **CCXT** - Connexion exchanges crypto
 
 ### IA & Analyse
-- **Qwen-max (Alibaba Cloud)** - Décisions de trading
+
+- **DeepSeek Chat** - Décisions de trading
 - **TA-Lib** - Indicateurs techniques (RSI, MACD, EMA, etc.)
 - **Pandas/NumPy** - Analyse de données
 
 ### Infrastructure
+
 - **Docker** - PostgreSQL & Redis
 - **Uvicorn** - Serveur ASGI
 
@@ -195,6 +210,7 @@ tail -f backend.log
 ## 📈 Performance
 
 Le bot analyse en temps réel :
+
 - 📊 Prix et volumes
 - 📉 Indicateurs techniques (RSI, MACD, Bollinger, EMA, etc.)
 - 🔄 Corrélations entre cryptos
@@ -202,6 +218,7 @@ Le bot analyse en temps réel :
 - 🧠 Sentiment de marché (risk-on/risk-off)
 
 L'IA Qwen-max prend ensuite des décisions de :
+
 - 📍 **ENTRY** - Ouvrir une position (LONG/SHORT)
 - 🚪 **EXIT** - Fermer une position
 - ⏸️ **HOLD** - Maintenir les positions actuelles
@@ -224,6 +241,7 @@ L'IA Qwen-max prend ensuite des décisions de :
 ## 📝 Logs et Monitoring
 
 Le bot log toutes ses actions :
+
 - 📊 Analyses de marché
 - 🧠 Décisions de l'IA
 - 💰 Entrées/sorties de positions
@@ -231,6 +249,7 @@ Le bot log toutes ses actions :
 - ⚠️ Erreurs et warnings
 
 Format optimisé pour la lisibilité :
+
 ```
 13:35:22 | ✅ 0xBot | qwen-max | $10,000.00 | 3min cycles
 13:35:22 | 📊 Analyzing BTC/USDT
@@ -243,6 +262,7 @@ Format optimisé pour la lisibilité :
 ## 🐛 Dépannage
 
 ### PostgreSQL ne démarre pas
+
 ```bash
 cd docker
 docker-compose down
@@ -250,6 +270,7 @@ docker-compose up -d
 ```
 
 ### Module manquant
+
 ```bash
 cd backend
 source venv/bin/activate
@@ -257,6 +278,7 @@ pip install -r requirements.txt
 ```
 
 ### Erreur "Not authorized"
+
 ```bash
 # Transférer le bot au bon utilisateur
 docker exec -i trading_agent_postgres psql -U postgres -d trading_agent -c \
@@ -264,6 +286,7 @@ docker exec -i trading_agent_postgres psql -U postgres -d trading_agent -c \
 ```
 
 ### Plus de détails
+
 👉 Voir le [Guide d'Installation Complet](docs/INSTALLATION_GUIDE.md) section Dépannage
 
 ---
@@ -271,6 +294,7 @@ docker exec -i trading_agent_postgres psql -U postgres -d trading_agent -c \
 ## 🎯 Exemples d'Utilisation
 
 ### Ajouter des cryptos
+
 ```bash
 # Via SQL
 docker exec -i trading_agent_postgres psql -U postgres -d trading_agent -c \
@@ -281,12 +305,14 @@ docker exec -i trading_agent_postgres psql -U postgres -d trading_agent -c \
 ```
 
 ### Changer le capital
+
 ```bash
 cd backend/scripts
 ./reset.sh <bot-id> 5000  # Reset à $5,000
 ```
 
 ### Modifier les paramètres de risque
+
 Éditer `backend/scripts/create_test_bot.py` avant de créer le bot.
 
 ---
@@ -355,4 +381,4 @@ python scripts/create_test_bot.py && cd .. && ./dev.sh
 
 ---
 
-*Bot de trading alimenté par IA - Utilisez-le de manière responsable*
+_Bot de trading alimenté par IA - Utilisez-le de manière responsable_

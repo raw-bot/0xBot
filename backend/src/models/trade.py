@@ -1,14 +1,16 @@
 """Trade model for tracking executed trades."""
 
+import enum
 import uuid
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import DateTime, String, Numeric, ForeignKey, Enum as SQLEnum
+from sqlalchemy import DateTime
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import ForeignKey, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-import enum
 
 from .base import Base, generate_uuid
 

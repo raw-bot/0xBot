@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Text, JSON, Integer, Numeric, ForeignKey
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, Numeric, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 

@@ -11,8 +11,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base, generate_uuid
 
 if TYPE_CHECKING:
-    from .bot import Bot
     from .alert import Alert
+    from .bot import Bot
 
 
 class User(Base):

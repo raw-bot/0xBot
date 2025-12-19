@@ -22,7 +22,8 @@ class PositionOpen:
         quantity: Decimal,
         entry_price: Decimal,
         stop_loss: Optional[Decimal] = None,
-        take_profit: Optional[Decimal] = None
+        take_profit: Optional[Decimal] = None,
+        leverage: Decimal = Decimal("10.0"),
     ):
         self.symbol = symbol
         self.side = side
@@ -30,16 +31,14 @@ class PositionOpen:
         self.entry_price = entry_price
         self.stop_loss = stop_loss
         self.take_profit = take_profit
-
-
+        self.leverage = leverage
 
     async def get_open_positions_with_relations(self, bot_id):
         """Récupère les positions avec toutes les relations chargées."""
-        query = select(Position).options(
-            selectinload(Position.bot)
-        ).where(
-            Position.bot_id == bot_id,
-            Position.status == PositionStatus.OPEN
+        query = (
+            select(Position)
+            .options(selectinload(Position.bot))
+            .where(Position.bot_id == bot_id, Position.status == PositionStatus.OPEN)
         )
         result = await self.db.execute(query)
         return result.scalars().all()
@@ -68,24 +67,24 @@ class PositionOpen:
         from datetime import datetime, timedelta
 
         cutoff_time = datetime.utcnow() - timedelta(hours=hours)
-        query = select(Trade).where(
-            Trade.bot_id == bot_id,
-            Trade.executed_at >= cutoff_time
-        ).order_by(Trade.executed_at.desc()).limit(100)
+        query = (
+            select(Trade)
+            .where(Trade.bot_id == bot_id, Trade.executed_at >= cutoff_time)
+            .order_by(Trade.executed_at.desc())
+            .limit(100)
+        )
 
         result = await self.db.execute(query)
         return result.scalars().all()
+
+
 class PositionService:
     """Service for managing trading positions."""
 
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def open_position(
-        self,
-        bot_id: uuid.UUID,
-        data: PositionOpen
-    ) -> Position:
+    async def open_position(self, bot_id: uuid.UUID, data: PositionOpen) -> Position:
         """
         Open a new trading position.
 
@@ -127,8 +126,9 @@ class PositionService:
             current_price=data.entry_price,  # Initially same as entry
             stop_loss=data.stop_loss,
             take_profit=data.take_profit,
+            leverage=data.leverage,
             status=PositionStatus.OPEN,
-            opened_at=datetime.utcnow()
+            opened_at=datetime.utcnow(),
         )
 
         self.db.add(position)
@@ -138,10 +138,7 @@ class PositionService:
         return position
 
     async def close_position(
-        self,
-        position_id: uuid.UUID,
-        exit_price: Decimal,
-        reason: str = "manual_close"
+        self, position_id: uuid.UUID, exit_price: Decimal, reason: str = "manual_close"
     ) -> Optional[Position]:
         """
         Close a trading position.
@@ -178,9 +175,7 @@ class PositionService:
         return position
 
     async def update_current_price(
-        self,
-        position_id: uuid.UUID,
-        price: Decimal
+        self, position_id: uuid.UUID, price: Decimal
     ) -> Optional[Position]:
         """
         Update the current price of an open position.
@@ -227,9 +222,7 @@ class PositionService:
         return result.scalar_one_or_none()
 
     async def get_open_positions(
-        self,
-        bot_id: uuid.UUID,
-        symbol: Optional[str] = None
+        self, bot_id: uuid.UUID, symbol: Optional[str] = None
     ) -> list[Position]:
         """
         Get all open positions for a bot.
@@ -242,8 +235,7 @@ class PositionService:
             List of open positions
         """
         query = select(Position).where(
-            Position.bot_id == bot_id,
-            Position.status == PositionStatus.OPEN
+            Position.bot_id == bot_id, Position.status == PositionStatus.OPEN
         )
 
         if symbol:
@@ -255,10 +247,7 @@ class PositionService:
         return list(result.scalars().all())
 
     async def get_all_positions(
-        self,
-        bot_id: uuid.UUID,
-        limit: int = 100,
-        offset: int = 0
+        self, bot_id: uuid.UUID, limit: int = 100, offset: int = 0
     ) -> tuple[list[Position], int]:
         """
         Get all positions for a bot with pagination.
@@ -291,9 +280,7 @@ class PositionService:
         return positions, total
 
     async def check_stop_loss_take_profit(
-        self,
-        position: Position,
-        current_price: Decimal
+        self, position: Position, current_price: Decimal
     ) -> Optional[str]:
         """
         Check if stop loss or take profit is hit.

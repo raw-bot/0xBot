@@ -1,19 +1,21 @@
 """Alert model for user notifications."""
 
+import enum
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import DateTime, String, Boolean, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Boolean, DateTime
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-import enum
 
 from .base import Base, generate_uuid
 
 if TYPE_CHECKING:
-    from .user import User
     from .bot import Bot
+    from .user import User
 
 
 class AlertType(str, enum.Enum):

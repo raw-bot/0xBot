@@ -153,7 +153,7 @@ Format automatique:
 - **PostgreSQL**: Base de données
 - **Redis**: Cache et rate limiting
 - **CCXT**: API exchange crypto
-- **OpenAI/Anthropic/Qwen**: LLM providers
+- **OpenAI/Anthropic/DeepSeek**: LLM providers
 - **Alembic**: Migrations DB
 
 ## 🐛 Debugging

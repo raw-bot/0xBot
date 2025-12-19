@@ -7,6 +7,7 @@ from typing import Optional, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..core.config import config
 from ..core.exchange_client import ExchangeClient, get_exchange_client
 from ..core.logger import get_logger
 from ..models.bot import Bot
@@ -21,11 +22,7 @@ logger = get_logger(__name__)
 class TradeExecutorService:
     """Service for executing trades and managing positions."""
 
-    def __init__(
-        self,
-        db: AsyncSession,
-        exchange_client: Optional[ExchangeClient] = None
-    ):
+    def __init__(self, db: AsyncSession, exchange_client: Optional[ExchangeClient] = None):
         """
         Initialize trade executor service.
 
@@ -38,10 +35,7 @@ class TradeExecutorService:
         self.position_service = PositionService(db)
 
     async def execute_entry(
-        self,
-        bot: Bot,
-        decision: dict,
-        current_price: Decimal
+        self, bot: Bot, decision: dict, current_price: Decimal
     ) -> Tuple[Optional[Position], Optional[Trade]]:
         """
         Execute an entry order (open new position).
@@ -56,14 +50,14 @@ class TradeExecutorService:
         """
         try:
             # Extract decision details
-            symbol = decision.get('symbol', '')
-            side = decision.get('side', 'long')
-            size_pct = Decimal(str(decision.get('size_pct', 0.05)))  # Default to 5% if not provided
+            symbol = decision.get("symbol", "")
+            side = decision.get("side", "long")
+            size_pct = Decimal(str(decision.get("size_pct", 0.05)))  # Default to 5% if not provided
 
             # Use absolute prices provided by LLM (not percentages)
-            stop_loss_price = Decimal(str(decision.get('stop_loss', 0)))
-            take_profit_price = Decimal(str(decision.get('take_profit', 0)))
-            entry_price = Decimal(str(decision.get('entry_price', current_price)))
+            stop_loss_price = Decimal(str(decision.get("stop_loss", 0)))
+            take_profit_price = Decimal(str(decision.get("take_profit", 0)))
+            entry_price = Decimal(str(decision.get("entry_price", current_price)))
 
             # Validate prices are provided and reasonable
             if stop_loss_price <= 0 or take_profit_price <= 0:
@@ -71,33 +65,38 @@ class TradeExecutorService:
                 return None, None
 
             # Calculate position size with confidence-based adjustment
-            confidence = decision.get('confidence', 0.5)
+            confidence = decision.get("confidence", 0.5)
             quantity = RiskManagerService.calculate_position_size(
                 capital=bot.capital,
                 size_pct=size_pct,
                 current_price=current_price,
                 confidence=Decimal(str(confidence)),
-                leverage=Decimal("1.0")  # No leverage for v1 (use Decimal)
+                leverage=Decimal(str(config.DEFAULT_LEVERAGE)),  # Use configured leverage (10x)
             )
 
+            if quantity <= 0:
+                logger.warning(
+                    f"⚠️  Skipping trade for {symbol}: Calculated quantity is {quantity} (likely due to negative capital)"
+                )
+                return None, None
+
             # Determine order side (buy for long, sell for short)
-            order_side = 'buy' if side.lower() == 'long' else 'sell'
+            order_side = "buy" if side.lower() == "long" else "sell"
 
             # Execute market order (if not paper trading)
             if not bot.paper_trading:
                 try:
                     order = await self.exchange.create_order(
-                        symbol=symbol,
-                        side=order_side,
-                        amount=float(quantity),
-                        order_type='market'
+                        symbol=symbol, side=order_side, amount=float(quantity), order_type="market"
                     )
 
                     # Get actual execution price and fees from order
-                    actual_price = Decimal(str(order.get('price', current_price)))
-                    fees = Decimal(str(order.get('fee', {}).get('cost', 0)))
+                    actual_price = Decimal(str(order.get("price", current_price)))
+                    fees = Decimal(str(order.get("fee", {}).get("cost", 0)))
 
-                    logger.info(f"Market order executed: {order_side} {quantity} {symbol} @ {actual_price} (planned: {entry_price})")
+                    logger.info(
+                        f"Market order executed: {order_side} {quantity} {symbol} @ {actual_price} (planned: {entry_price})"
+                    )
 
                 except ValueError as e:
                     logger.error(f"Valeur invalide dans l'exécution du trade: {e}")
@@ -114,7 +113,9 @@ class TradeExecutorService:
                 # Paper trading mode - use current market price for consistency
                 actual_price = Decimal(str(current_price))  # Ensure actual_price is Decimal
                 fees = actual_price * quantity * Decimal("0.001")  # Estimate 0.1% fee
-                logger.info(f"PAPER: {order_side} {quantity} {symbol} @ {actual_price} (planned entry)")
+                logger.info(
+                    f"PAPER: {order_side} {quantity} {symbol} @ {actual_price} (planned entry)"
+                )
 
             # Create position record with prices from LLM decision
             position_data = PositionOpen(
@@ -123,10 +124,13 @@ class TradeExecutorService:
                 quantity=quantity,
                 entry_price=actual_price,
                 stop_loss=stop_loss_price,
-                take_profit=take_profit_price
+                take_profit=take_profit_price,
+                leverage=Decimal(str(config.DEFAULT_LEVERAGE)),
             )
 
-            logger.info(f"Position created: Entry @ {actual_price:,.2f}, SL @ {stop_loss_price:,.2f}, TP @ {take_profit_price:,.2f}")
+            logger.info(
+                f"Position created: Entry @ {actual_price:,.2f}, SL @ {stop_loss_price:,.2f}, TP @ {take_profit_price:,.2f}"
+            )
 
             position = await self.position_service.open_position(bot.id, position_data)
 
@@ -135,25 +139,29 @@ class TradeExecutorService:
                 bot_id=bot.id,
                 position_id=position.id,
                 symbol=symbol,
-                side=TradeSide.BUY if order_side == 'buy' else TradeSide.SELL,
+                side=TradeSide.BUY if order_side == "buy" else TradeSide.SELL,
                 quantity=quantity,
                 price=actual_price,
                 fees=fees,
                 realized_pnl=Decimal("0"),  # Entry trade has no PnL
-                executed_at=datetime.utcnow()
+                executed_at=datetime.utcnow(),
             )
 
             self.db.add(trade)
 
             # CRITICAL: Reload bot from DB to get latest capital BEFORE modifying
             from sqlalchemy import select
+
             query = select(Bot).where(Bot.id == bot.id)
             result = await self.db.execute(query)
             bot = result.scalar_one()
 
-            # Update bot capital: deduct the cost of the position
-            cost = actual_price * quantity + fees
-            bot.capital -= cost
+            # Update bot capital: deduct the cost of the position (Margin + Fees)
+            # Cost = (Price * Quantity / Leverage) + Fees
+            leverage = Decimal(str(config.DEFAULT_LEVERAGE))
+            margin_cost = (actual_price * quantity) / leverage
+            total_cost = margin_cost + fees
+            bot.capital -= total_cost
 
             await self.db.commit()
             await self.db.refresh(trade)
@@ -161,9 +169,13 @@ class TradeExecutorService:
 
             # Set stop loss and take profit orders (if not paper trading)
             if not bot.paper_trading:
-                await self._set_stop_orders(symbol, side, quantity, stop_loss_price, take_profit_price)
+                await self._set_stop_orders(
+                    symbol, side, quantity, stop_loss_price, take_profit_price
+                )
 
-            logger.info(f"Entry executed: Position {position.id}, Trade {trade.id}, Capital: ${bot.capital:,.2f}")
+            logger.info(
+                f"Entry executed: Position {position.id}, Trade {trade.id}, Capital: ${bot.capital:,.2f}"
+            )
             return position, trade
 
         except ValueError as e:
@@ -178,10 +190,7 @@ class TradeExecutorService:
             return None, None
 
     async def execute_exit(
-        self,
-        position: Position,
-        current_price: Decimal,
-        reason: str = "manual_close"
+        self, position: Position, current_price: Decimal, reason: str = "manual_close"
     ) -> Optional[Trade]:
         """
         Execute an exit order (close position).
@@ -196,7 +205,7 @@ class TradeExecutorService:
         """
         try:
             # Determine order side (opposite of position side)
-            order_side = 'sell' if position.side == PositionSide.LONG else 'buy'
+            order_side = "sell" if position.side == PositionSide.LONG else "buy"
 
             # Execute market order (if not paper trading)
             bot = await self._get_bot(position.bot_id)
@@ -206,13 +215,15 @@ class TradeExecutorService:
                         symbol=position.symbol,
                         side=order_side,
                         amount=float(position.quantity),
-                        order_type='market'
+                        order_type="market",
                     )
 
-                    actual_price = Decimal(str(order.get('price', current_price)))
-                    fees = Decimal(str(order.get('fee', {}).get('cost', 0)))
+                    actual_price = Decimal(str(order.get("price", current_price)))
+                    fees = Decimal(str(order.get("fee", {}).get("cost", 0)))
 
-                    logger.info(f"Exit order executed: {order_side} {position.quantity} {position.symbol} @ {actual_price}")
+                    logger.info(
+                        f"Exit order executed: {order_side} {position.quantity} {position.symbol} @ {actual_price}"
+                    )
 
                 except ValueError as e:
                     logger.error(f"Valeur invalide dans l'exécution du trade: {e}")
@@ -226,9 +237,15 @@ class TradeExecutorService:
                     fees = Decimal("0")
             else:
                 # Paper trading mode - ensure Decimal types for all calculations
-                actual_price = Decimal(str(current_price)) if not isinstance(current_price, Decimal) else current_price
+                actual_price = (
+                    Decimal(str(current_price))
+                    if not isinstance(current_price, Decimal)
+                    else current_price
+                )
                 fees = actual_price * position.quantity * Decimal("0.001")
-                logger.info(f"PAPER EXIT: {order_side} {position.quantity} {position.symbol} @ {actual_price}")
+                logger.info(
+                    f"PAPER EXIT: {order_side} {position.quantity} {position.symbol} @ {actual_price}"
+                )
 
             # Calculate realized PnL
             realized_pnl = position.calculate_realized_pnl(actual_price, position.quantity)
@@ -242,31 +259,42 @@ class TradeExecutorService:
                 bot_id=position.bot_id,
                 position_id=position.id,
                 symbol=position.symbol,
-                side=TradeSide.SELL if order_side == 'sell' else TradeSide.BUY,
+                side=TradeSide.SELL if order_side == "sell" else TradeSide.BUY,
                 quantity=position.quantity,
                 price=actual_price,
                 fees=fees,
                 realized_pnl=realized_pnl,
-                executed_at=datetime.utcnow()
+                executed_at=datetime.utcnow(),
             )
 
             self.db.add(trade)
 
             # CRITICAL: Reload bot from DB to get latest capital BEFORE modifying
             from sqlalchemy import select
+
             query = select(Bot).where(Bot.id == position.bot_id)
             result = await self.db.execute(query)
             bot = result.scalar_one()
 
-            # Update bot capital: add back the proceeds from selling
-            proceeds = actual_price * position.quantity - fees
-            bot.capital += proceeds
+            # Update bot capital: add back the Margin + Realized PnL
+            # Proceeds = (Entry Price * Quantity / Leverage) + Realized PnL
+            # Note: realized_pnl already includes fee deduction
+            # Use stored leverage if available, otherwise fallback to config (for migration safety)
+            leverage = (
+                position.leverage
+                if hasattr(position, "leverage") and position.leverage
+                else Decimal(str(config.DEFAULT_LEVERAGE))
+            )
+            margin_released = (position.entry_price * position.quantity) / leverage
+            bot.capital += margin_released + realized_pnl
 
             await self.db.commit()
             await self.db.refresh(trade)
             await self.db.refresh(bot)
 
-            logger.info(f"Exit executed: Position {position.id}, PnL: {realized_pnl:,.2f}, Capital: ${bot.capital:,.2f}")
+            logger.info(
+                f"Exit executed: Position {position.id}, PnL: {realized_pnl:,.2f}, Capital: ${bot.capital:,.2f}"
+            )
             return trade
 
         except ValueError as e:
@@ -286,7 +314,7 @@ class TradeExecutorService:
         side: str,
         quantity: Decimal,
         stop_loss_price: Decimal,
-        take_profit_price: Decimal
+        take_profit_price: Decimal,
     ) -> None:
         """
         Set stop loss and take profit orders on exchange.
@@ -300,14 +328,14 @@ class TradeExecutorService:
         """
         try:
             # Determine order side for stop orders (opposite of position)
-            stop_side = 'sell' if side.lower() == 'long' else 'buy'
+            stop_side = "sell" if side.lower() == "long" else "buy"
 
             # Create stop loss order
             await self.exchange.create_stop_loss_order(
                 symbol=symbol,
                 side=stop_side,
                 amount=float(quantity),
-                stop_price=float(stop_loss_price)
+                stop_price=float(stop_loss_price),
             )
 
             # Create take profit order
@@ -315,7 +343,7 @@ class TradeExecutorService:
                 symbol=symbol,
                 side=stop_side,
                 amount=float(quantity),
-                take_profit_price=float(take_profit_price)
+                take_profit_price=float(take_profit_price),
             )
 
             logger.info(f"Stop orders set: SL @ {stop_loss_price}, TP @ {take_profit_price}")
@@ -333,6 +361,7 @@ class TradeExecutorService:
     async def _get_bot(self, bot_id: uuid.UUID) -> Optional[Bot]:
         """Get bot by ID."""
         from sqlalchemy import select
+
         query = select(Bot).where(Bot.id == bot_id)
         result = await self.db.execute(query)
         return result.scalar_one_or_none()

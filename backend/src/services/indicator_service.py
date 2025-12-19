@@ -1,8 +1,9 @@
 """Technical indicator service using TA-Lib."""
 
+from typing import Optional
+
 import numpy as np
 import talib
-from typing import Optional
 
 from ..core.logger import get_logger
 

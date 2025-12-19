@@ -1,5 +1,6 @@
 """Bot service for managing AI trading agents."""
 
+import os
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -10,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..models.bot import Bot, BotStatus, ModelName
+
+FORCED_MODEL_DEEPSEEK = 'deepseek-chat'
 
 
 class BotCreate:

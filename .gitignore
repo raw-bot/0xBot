@@ -51,3 +51,6 @@ dump.rdb
 # Alembic
 __pycache__/
 
+# External tools
+cognee-tools
+

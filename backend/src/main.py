@@ -9,10 +9,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .core.database import close_db
-from .core.redis_client import init_redis, close_redis
+from .core.redis_client import close_redis, init_redis
 from .core.scheduler import start_scheduler, stop_scheduler
 from .middleware.error_handler import ErrorHandlerMiddleware
-from .middleware.security import SecurityHeadersMiddleware, RequestIDMiddleware
+from .middleware.security import RequestIDMiddleware, SecurityHeadersMiddleware
 from .routes import auth_router, bots_router
 
 # Load environment variables from .env file

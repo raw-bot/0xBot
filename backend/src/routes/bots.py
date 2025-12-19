@@ -9,13 +9,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
-from ..middleware.auth import get_current_user
-from ..models.user import User
-from ..models.bot import Bot, BotStatus
-from ..services.bot_service import BotService, BotCreate, BotUpdate
-from ..services.position_service import PositionService
 from ..core.logger import get_logger
 from ..core.scheduler import get_scheduler
+from ..middleware.auth import get_current_user
+from ..models.bot import Bot, BotStatus
+from ..models.user import User
+from ..services.bot_service import BotCreate, BotService, BotUpdate
+from ..services.position_service import PositionService
 
 logger = get_logger(__name__)
 
@@ -554,7 +554,8 @@ async def get_bot_trades(
     - **offset**: Number of trades to skip (default: 0)
     """
     try:
-        from sqlalchemy import select, desc
+        from sqlalchemy import desc, select
+
         from ..models.trade import Trade
         
         bot_service = BotService(db)

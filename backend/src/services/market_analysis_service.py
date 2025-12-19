@@ -1,9 +1,10 @@
 """Market analysis service for multi-coin analysis, correlations, and regime detection."""
 
-import numpy as np
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
+
+import numpy as np
 
 from ..core.logger import get_logger
 

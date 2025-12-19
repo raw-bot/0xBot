@@ -2,6 +2,7 @@
 Fichier TradingEngine temporaire avec ancien système désactivé
 Généré par le script de nettoyage automatique
 """
+
 """Trading engine service - orchestrates the complete trading cycle."""
 
 import asyncio
@@ -11,7 +12,7 @@ import os
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Optional
+from typing import Dict, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,9 +26,10 @@ from ..models.llm_decision import LLMDecision
 from ..models.position import PositionStatus
 from ..models.trade import Trade
 from .indicator_service import IndicatorService
-from .multi_coin_prompt_service import MultiCoinPromptService
+from .llm_decision_validator import LLMDecisionValidator
 from .market_analysis_service import MarketAnalysisService
 from .market_data_service import MarketDataService
+from .news_service import NewsService
 from .position_service import PositionService
 from .risk_manager_service import RiskManagerService
 from .trade_executor_service import TradeExecutorService
@@ -40,11 +42,11 @@ FORCED_MODEL_DEEPSEEK = os.getenv("FORCE_DEEPSEEK_MODEL", "deepseek-chat")
 logger = get_logger(__name__)
 
 # ANSI color codes for terminal output
-GREEN = '\033[92m'   # Bright green
-YELLOW = '\033[93m'  # Bright yellow (orange-ish)
-CYAN = '\033[96m'    # Bright cyan
-RED = '\033[91m'     # Bright red
-RESET = '\033[0m'    # Reset color
+GREEN = "\033[92m"  # Bright green
+YELLOW = "\033[93m"  # Bright yellow (orange-ish)
+CYAN = "\033[96m"  # Bright cyan
+RED = "\033[91m"  # Bright red
+RESET = "\033[0m"  # Reset color
 
 
 class TradingEngine:
@@ -68,7 +70,7 @@ class TradingEngine:
         bot: Bot,
         db: AsyncSession,
         cycle_interval: int = 300,  # 5 minutes in seconds (ALIGNED with timeframe)
-        llm_client: Optional[LLMClient] = None
+        llm_client: Optional[LLMClient] = None,
     ):
         """
         Initialize trading engine.
@@ -95,15 +97,15 @@ class TradingEngine:
         self.trade_executor = TradeExecutorService(db)
         self.llm_client = llm_client or get_llm_client()
 
-        # Initialize LLM service - nouveau système multi-coins activé temporairement
-
-        # 🚨 TEMPORAIRE: Activation du nouveau système multi-coins
+        # Initialize multi-coin prompt service
         try:
             from .multi_coin_prompt_service import MultiCoinPromptService
-            self.simple_prompt_service = MultiCoinPromptService()  # MultiCoinPromptService ne prend pas de paramètres
-            print("🔧 Nouveau système MultiCoinPromptService activé temporairement")
-        except ImportError:
-            print("⚠️ MultiCoinPromptService non disponible, bot inactif temporairement")
+
+            self.prompt_service = MultiCoinPromptService()
+            self.news_service = NewsService()
+        except ImportError as e:
+            logger.error(f"MultiCoinPromptService not available: {e}")
+            raise
         self.trading_memory = get_trading_memory(db, bot.id)
 
         # Trading parameters - ALIGNED timeframe with cycle
@@ -165,9 +167,7 @@ class TradingEngine:
 
                 # Execute exit
                 await self.trade_executor.execute_exit(
-                    position=position,
-                    current_price=current_price,
-                    reason="engine_stopped"
+                    position=position, current_price=current_price, reason="engine_stopped"
                 )
 
                 logger.info(f"Closed position {position.id} on engine stop")
@@ -192,339 +192,199 @@ class TradingEngine:
             return bot.status
 
     async def _trading_cycle(self) -> None:
-        """Execute one complete trading cycle for all trading symbols."""
+        """Execute one complete trading cycle for all trading symbols using optimized Multi-Coin analysis."""
         cycle_start = datetime.utcnow()
+        self.cycle_count += 1
 
         try:
-            # 0. Update position prices FIRST to get accurate equity
-            await self._update_position_prices()
-
-            # 0.1 MANAGE EXISTING POSITIONS FIRST (PRIORITY ABSOLUTE)
-            logger.info(f"📍 Step 0.1: Managing existing positions...")
-            positions_to_manage = await self.position_service.get_open_positions(self.bot_id)
-
-            if positions_to_manage:
-                logger.info(f"📍 Managing {len(positions_to_manage)} active position(s)")
-                # Use the better method with 2h timeout conditions
-                await self._check_position_exits(positions_to_manage)
-                positions_closed_count = len(positions_to_manage) - len(await self.position_service.get_open_positions(self.bot_id))
-            else:
-                logger.debug("📍 No active positions to manage")
-                positions_closed_count = 0
-
-            # 1. Get portfolio state once (this will reload bot with latest capital)
-            portfolio_state, current_bot = await self._get_portfolio_state()
-
-            # Get all positions across all symbols
+            # 1. Get all market data and positions efficiently
+            all_coins_data = await self._get_all_coins_quick_snapshot()
             all_positions = await self.position_service.get_open_positions(self.bot_id)
 
-            # Calculate returns based on total equity (not just cash)
-            equity = portfolio_state['total_value']
-            return_pct = ((equity - current_bot.initial_capital) / current_bot.initial_capital) * 100
+            # Convert positions to dict format for prompt service
+            all_positions_dict = [
+                {
+                    "symbol": p.symbol,
+                    "entry_price": float(p.entry_price),
+                    "size": float(p.quantity),
+                    "pnl_pct": float(p.unrealized_pnl_pct),
+                    "status": "OPEN",
+                }
+                for p in all_positions
+            ]
 
-            # Log essential info only (no verbose portfolio details)
-            logger.info(f"{GREEN}🤖 {current_bot.name} | {cycle_start.strftime('%H:%M:%S')} | Equity: ${equity:,.2f} ({return_pct:+.2f}%) | Positions: {len(all_positions)} | Cash: ${portfolio_state['cash']:,.2f} | Invested: ${portfolio_state['invested']:,.2f}{RESET}")
+            if not all_coins_data:
+                logger.warning("⚠️  No market data available")
+                return
 
-            # 1.5 Fetch multi-coin context (correlations, regime, breadth, etc.)
-            market_context = await self._get_multi_coin_market_context()
+            # 2. Generate Monk Mode Prompt
+            # Using the new MonkModePromptService
+            portfolio_state_tuple = await self._get_portfolio_state()
+            portfolio_state = portfolio_state_tuple[0] if portfolio_state_tuple else {}
 
-            # 2. Loop through each trading symbol (minimal logging)
-            # CRITICAL FIX: Separate symbols with positions from symbols for new entries
-            symbols_with_positions = list(set([p.symbol for p in all_positions]))
-            symbols_for_new_entries = [s for s in self.trading_symbols if s not in symbols_with_positions]
+            # Fetch News (Concurrent with market data if possible, but here sequential is fine for now)
+            news_data = await self.news_service.get_latest_news(self.trading_symbols)
 
-            # Log analysis plan
-            logger.info(f"📊 Step 1.5: Analyzing multi-coin market context...")
-            if symbols_with_positions:
-                logger.info(f"   Active positions: {', '.join(symbols_with_positions)}")
-            if symbols_for_new_entries:
-                logger.debug(f"   Scanning for entries: {', '.join(symbols_for_new_entries)}")
+            prompt_data = self.prompt_service.get_multi_coin_decision(
+                bot=self.bot,
+                all_coins_data=all_coins_data,
+                all_positions=all_positions_dict,
+            )
 
-            logger.info(f"📈 Step 2: Analyzing individual symbols...")
+            logger.info(f"📊 Step 1: Analyzing {len(all_coins_data)} coins in one batch...")
 
-            # Priority: Handle existing positions FIRST, then look for new entries
-            for symbol in symbols_with_positions + symbols_for_new_entries:
-                # Removed separator line for cleaner output
+            # 3. Call LLM ONCE for all coins
+            llm_response = await self.llm_client.analyze_market(
+                model=FORCED_MODEL_DEEPSEEK,
+                prompt=prompt_data["prompt"],
+                max_tokens=4096,  # Increased to prevent JSON truncation
+                temperature=0.7,
+            )
 
-                # Flag if this symbol has an open position
-                symbol_positions = [p for p in all_positions if p.symbol == symbol]
-                has_position = len(symbol_positions) > 0
+            response_text = llm_response.get("response", "")
 
-                if has_position:
-                    logger.info(f"📈 Analyzing {symbol} (HAS POSITION)")
-                else:
-                    logger.debug(f"📈 Analyzing {symbol} (looking for entry)")
+            if not response_text:
+                logger.error("🤖 Empty LLM response")
+                return
 
-                try:
-                    # Fetch market data for this symbol
-                    market_data = await self._fetch_market_data(symbol)
-                    market_snapshot = market_data['snapshot']
-                    indicators_4h = market_data['indicators_4h']
+            # 4. Parse response for ALL coins
+            all_symbols = list(all_coins_data.keys())
+            decisions = self.prompt_service.parse_multi_coin_response(response_text, all_symbols)
 
-                    # Enrich market_snapshot with time series (Phase 3E - Expert Roadmap)
-                    try:
-                        candles_5m = await self.market_data_service.fetch_ohlcv(
-                            symbol=symbol,
-                            timeframe="5m",
-                            limit=100
-                        )
-                        if len(candles_5m) >= 20:
-                            closes = self.market_data_service.extract_closes(candles_5m)
+            logger.info(f"📈 Step 2: Executing decisions for {len(decisions)} symbols...")
 
-                            # Add price series (last 10 points)
-                            market_snapshot["price_series"] = [float(c) for c in closes[-10:]]
+            # 5. Execute decisions
+            await self._execute_all_decisions(all_coins_data, decisions, all_positions)
 
-                            # Add EMA series (last 10 points)
-                            ema_series = []
-                            for i in range(len(closes) - 10, len(closes)):
-                                ema = self._calculate_ema(closes[:i+1], 20)
-                                ema_series.append(ema)
-                            market_snapshot["ema_series"] = ema_series
-
-                            # Add RSI series (last 10 points)
-                            rsi_series = []
-                            for i in range(len(closes) - 10, len(closes)):
-                                rsi = self._calculate_rsi(closes[:i+1], 7)
-                                rsi_series.append(rsi)
-                            market_snapshot["rsi_series"] = rsi_series
-                    except Exception as e:
-                        # Removed verbose warning for cleaner output
-                        pass
-
-                    # Calculate indicators
-                    indicators = await self._calculate_indicators(market_snapshot)
-                    latest_indicators = IndicatorService.get_latest_values(indicators)
-
-                    # Better RSI handling - calculate from more data if needed
-                    rsi = latest_indicators.get('rsi_14')
-                    # Check if RSI is None or default value (50.0 from _calculate_rsi)
-                    if rsi is None or (isinstance(rsi, float) and (rsi == 0 or rsi == 50.0)):
-                        # RSI needs at least 14 candles, log warning
-                        logger.warning(f"⚠️ RSI not available for {symbol} (need at least 14 candles)")
-                        rsi_str = "N/A (insufficient data)"
-                    else:
-                        rsi_str = f"{rsi:.1f}"
-
-                    # Minimal price logging for debugging
-                    logger.debug(f"📊 {symbol}: ${market_snapshot['current_price']:,.2f} | RSI: {rsi_str}")
-
-                    # Get positions for this specific symbol
-                    symbol_positions = [p for p in all_positions if p.symbol == symbol]
-
-                    # Check exits for positions of this symbol
-                    await self._check_position_exits(symbol_positions)  # Plus besoin de passer le prix
-
-                    # Build simple prompt - style bot +78% example
-                    # Get all coins snapshot for multi-coin context
-                    all_coins_data = await self._get_all_coins_quick_snapshot()
-
-                    # Build simple prompt (pass all_positions to avoid async DB queries)
-                    prompt_data = self.simple_prompt_service.get_simple_decision(
-                        bot=current_bot,
-                        symbol=symbol,
-                        market_snapshot=market_snapshot,
-                        market_regime=market_context,
-                        all_coins_data=all_coins_data,
-                        bot_positions=all_positions  # Pass positions to avoid async issues
-                    )
-
-                    # Get LLM decision with enriched context
-                    llm_response = await self.llm_client.analyze_market(
-                        model=FORCED_MODEL_DEEPSEEK,
-                        prompt=prompt_data["prompt"],
-                        max_tokens=1024,
-                        temperature=0.9  # Increased for more creative variability
-                    )
-
-                    # Get response text (LLM client returns "response" key, not "text")
-                    response_text = llm_response.get("response", "")
-
-                    # Debug: log response preview if parsing fails
-                    if not response_text:
-                        logger.error(f"🤖 BOT | Empty response from LLM for {symbol}")
-                        logger.error(f"🤖 BOT | LLM response keys: {list(llm_response.keys())}")
-
-                    # Parse with simple service (faster parsing)
-                    parsed_decision = self.simple_prompt_service.parse_simple_response(
-                        response_text,
-                        symbol,
-                        current_market_price=float(market_snapshot['current_price'])
-                    )
-
-                    if not parsed_decision:
-                        logger.warning(f"Failed to parse LLM decision for {symbol}, using fallback")
-                        llm_decision = {"action": "hold", "confidence": 0.5, "reasoning": "Parse error"}
-                    else:
-                        # Get current price for default SL/TP calculation
-                        current_price = market_snapshot.get("current_price", market_snapshot.get("price", 0))
-
-                        # Validate we have a valid price
-                        if not current_price or current_price <= 0:
-                            logger.error(f"❌ Invalid market price for {symbol}: {current_price}")
-                            continue
-
-                        # Convert to Decimal for calculations
-                        current_price_decimal = Decimal(str(current_price))
-
-                        # Get SL/TP from bot's risk_params with fallback values
-                        stop_loss_pct = current_bot.risk_params.get("stop_loss_pct", config.DEFAULT_STOP_LOSS_PCT)  # 3.5% default
-                        take_profit_pct = current_bot.risk_params.get("take_profit_pct", config.DEFAULT_TAKE_PROFIT_PCT)  # 7% default
-
-                        # Calculate default stop loss and take profit prices
-                        default_sl = current_price_decimal * (Decimal("1") - Decimal(str(stop_loss_pct)))
-                        default_tp = current_price_decimal * (Decimal("1") + Decimal(str(take_profit_pct)))
-
-                        # Parse avec fallback sur defaults - ensure all are Decimal for consistency
-                        stop_loss = Decimal(str(parsed_decision.get("stop_loss"))) if parsed_decision.get("stop_loss") else default_sl
-                        take_profit = Decimal(str(parsed_decision.get("profit_target"))) if parsed_decision.get("profit_target") else default_tp
-
-                        # Ensure entry_price is provided (use current market price if LLM didn't provide it)
-                        entry_price = parsed_decision.get("entry_price") or parsed_decision.get("price") or float(current_price_decimal)
-
-                        logger.info(f"{CYAN}⚡ ENRICHED | Entry: ${entry_price:,.2f} | SL: ${float(stop_loss):,.2f} | TP: ${float(take_profit):,.2f} (market: ${float(current_price_decimal):,.2f}){RESET}")
-
-                        # Get size_pct from LLM or use default (5% of capital)
-                        size_pct = parsed_decision.get("size_pct") or parsed_decision.get("risk_pct") or 0.05
-
-                        llm_decision = {
-                            "action": parsed_decision["action"],  # ✅ Corrigé: "action" au lieu de "signal"
-                            "confidence": float(parsed_decision["confidence"]),
-                            "reasoning": parsed_decision.get("reasoning", "Pas de justification"),  # ✅ Corrigé: "reasoning" au lieu de "justification"
-                            "entry_price": float(entry_price),
-                            "stop_loss": float(stop_loss),
-                            "take_profit": float(take_profit),
-                            "side": parsed_decision.get("side", "long"),  # Default to long if not specified
-                            "size_pct": float(size_pct)  # Position size as percentage
-                        }
-
-                    # Save decision (using enriched prompt)
-                    # Convert Decimal to float for JSON serialization
-                    llm_decision_json = llm_decision.copy()
-                    for key in ['entry_price', 'stop_loss', 'take_profit', 'size_pct']:
-                        if key in llm_decision_json and isinstance(llm_decision_json[key], Decimal):
-                            llm_decision_json[key] = float(llm_decision_json[key])
-
-                    llm_result = {
-                        "response": response_text,
-                        "parsed_decisions": llm_decision_json,
-                        "tokens_used": llm_response.get("tokens_used", 0),
-                        "cost": llm_response.get("cost", 0.0)
-                    }
-                    await self._save_llm_decision(prompt=prompt_data["prompt"], llm_result=llm_result, symbol=symbol)
-
-                    # Parse and display decision
-                    action = llm_decision.get('action', 'hold').upper()
-                    reasoning = llm_decision.get('reasoning', 'No reasoning provided')
-                    confidence = llm_decision.get('confidence', 0)
-
-                    # Log all decisions in yellow for visibility
-                    logger.info(f"{YELLOW}🧠 {symbol}: {action} ({confidence:.0%}){RESET}")
-
-                    # ═══════════════════════════════════════════════════════════════════════
-                    # QUALITY FILTER - Only execute high-confidence decisions
-                    # ═══════════════════════════════════════════════════════════════════════
-                    confidence = llm_decision.get('confidence', 0)
-
-                    # Execute decision for this symbol
-                    if action == 'ENTRY':
-                        # ✅ SIMPLE FILTER: Like example bot - 55%+ confidence for entries
-                        if confidence < config.MIN_CONFIDENCE_ENTRY:
-                            logger.warning(f"⛔ {symbol} ENTRY rejected: Low confidence {confidence:.0%} < 55% threshold")
-                            logger.info(f"   💡 Tip: Simple approach - need moderate certainty")
-                            continue  # Skip this weak decision
-
-                        # ✅ PASSED: Moderate confidence entry
-                        logger.info(f"✅ {symbol} ENTRY accepted: Confidence {confidence:.0%} ≥ 55%")
-
-                        # Ensure the decision includes the correct symbol
-                        llm_decision['symbol'] = symbol
-                        await self._handle_entry_decision(llm_decision, market_snapshot['current_price'], portfolio_state, current_bot)
-
-                    elif action == 'EXIT':
-                        # CRITICAL: Only process EXIT if there's actually a position
-                        if not symbol_positions:
-                            logger.warning(f"⚠️  {symbol} LLM decided EXIT but NO POSITION exists!")
-                            logger.warning(f"   This symbol should NOT have been analyzed for EXIT.")
-                            logger.warning(f"   Active positions: {[p.symbol for p in all_positions]}")
-                            continue  # Skip this decision
-
-                        # Get position age for exit quality filters
-                        position = symbol_positions[0]
-                        position_age = datetime.utcnow() - position.opened_at
-                        position_age_minutes = position_age.total_seconds() / 60
-                        position_age_hours = position_age.total_seconds() / 3600
-
-                        # ✅ FILTER 1: Block exits on very young positions (< 30 minutes)
-                        if position_age_minutes < 30:
-                            logger.warning(f"⛔ {symbol} EXIT rejected: Position too young")
-                            logger.info(f"   Age: {position_age_minutes:.1f} min (need 30+ min)")
-                            logger.info(f"   💡 Let the trade develop before exiting")
-                            continue
-
-                        # ✅ FILTER 2: Like example - moderate confidence for exits
-                        if position_age_hours < 1.0:
-                            if confidence < config.MIN_CONFIDENCE_EXIT_EARLY:
-                                logger.warning(f"⛔ {symbol} EXIT rejected: Early exit needs moderate confidence")
-                                logger.info(f"   Age: {position_age_hours:.1f}h (< 1h) → Needs 60%+ confidence")
-                                logger.info(f"   Got: {confidence:.0%} < 60% threshold")
-                                continue
-                            else:
-                                logger.info(f"✅ {symbol} EARLY EXIT accepted: {confidence:.0%} ≥ 60% (age: {position_age_hours:.1f}h)")
-
-                        # ✅ FILTER 3: Normal exits (> 1 hour) - like example style
-                        else:
-                            if confidence < config.MIN_CONFIDENCE_EXIT_NORMAL:
-                                logger.warning(f"⛔ {symbol} EXIT rejected: Low confidence {confidence:.0%}")
-                                logger.info(f"   Age: {position_age_hours:.1f}h → Needs 50%+ confidence")
-                                continue
-                            else:
-                                logger.info(f"✅ {symbol} EXIT accepted: {confidence:.0%} ≥ 50% (age: {position_age_hours:.1f}h)")
-
-                        await self._handle_exit_decision(llm_decision, symbol_positions, market_snapshot['current_price'])
-
-                    elif action == 'CLOSE_POSITION':
-                        if not symbol_positions:
-                            logger.warning(f"⚠️  {symbol} LLM decided CLOSE_POSITION but NO POSITION exists!")
-                            continue
-
-                        # Emergency close always allowed (no confidence filter)
-                        logger.warning(f"🚨 {symbol} EMERGENCY CLOSE_POSITION")
-                        await self._handle_close_position(llm_decision, symbol_positions, market_snapshot['current_price'])
-
-                except Exception as e:
-                    logger.error(f"❌ Error analyzing {symbol}: {e}")
-                    continue  # Continue with next symbol even if this one fails
-
-            # 3. Update all position prices at the end
-            await self._update_position_prices()
-
-            # Increment cycle count
-            self.cycle_count += 1
-
+            # Log cycle completion
             cycle_duration = (datetime.utcnow() - cycle_start).total_seconds()
+            logger.info(f"✅ Cycle completed in {cycle_duration:.1f}s")
 
-            # Log essential completion info only
-            if positions_closed_count > 0:
-                logger.info(f"✅ Cycle {cycle_duration:.1f}s | Closed: {positions_closed_count} position(s)")
-            else:
-                logger.debug(f"✅ Cycle {cycle_duration:.1f}s | No exits")
-
-            # Get final position count
-            final_positions = await self.position_service.get_open_positions(self.bot_id)
-            logger.info(f"   Positions: {len(final_positions)} active, {positions_closed_count} closed")
-
-            # Add critical metrics monitoring
-            invested = sum((p.position_value for p in final_positions), Decimal("0"))
-            equity = current_bot.capital + invested
-            drift = abs(equity - (current_bot.capital + invested))
-            logger.info(f"METRICS | Positions: {len(final_positions)} | Capital: ${current_bot.capital} | Equity: ${equity} | Drift: ${drift}")
-
-            # Hourly performance summary (every 12 cycles = 1 hour at 5min intervals)
+            # Hourly performance summary
             if self.cycle_count % 12 == 0:
-                await self._log_hourly_summary(current_bot)
+                await self._log_hourly_summary(self.bot)
 
         except Exception as e:
             logger.error(f"❌ Cycle error: {e}", exc_info=True)
+
+    async def _execute_all_decisions(
+        self,
+        all_coins_data: Dict,
+        decisions: Dict[str, Dict],
+        current_positions: list,
+    ):
+        """Execute decisions for all coins."""
+        position_symbols = {p.symbol for p in current_positions}
+
+        for symbol, decision in decisions.items():
+            try:
+                # Monk Mode fields
+                raw_signal = decision.get("signal", "hold").lower()
+                confidence = float(decision.get("confidence", 0.0))
+                reasoning = decision.get("justification", decision.get("reasoning", "No reasoning"))
+
+                market_data = all_coins_data.get(symbol, {})
+                current_price = market_data.get("current_price", 0)
+
+                logger.info(f"{YELLOW}🧠 {symbol}: {raw_signal} ({confidence:.0%}){RESET}")
+
+                # Map signals to Action/Side
+                action = "HOLD"
+                side = None
+                if raw_signal == "buy_to_enter":
+                    action = "ENTRY"
+                    side = "LONG"
+                elif raw_signal == "sell_to_enter":
+                    action = "ENTRY"
+                    side = "SHORT"
+                elif raw_signal == "close":
+                    action = "EXIT"
+                elif raw_signal == "hold":
+                    action = "HOLD"
+
+                if symbol in position_symbols:
+                    # Handle EXIT or HOLD
+                    if action == "EXIT" and confidence >= config.MIN_CONFIDENCE_EXIT_NORMAL:
+                        # Find the position object
+                        position = next((p for p in current_positions if p.symbol == symbol), None)
+                        if position:
+                            await self.trade_executor.execute_exit(
+                                position=position,
+                                current_price=Decimal(str(current_price)),
+                                reason="llm_decision",
+                            )
+                else:
+                    # Handle ENTRY
+                    if action == "ENTRY" and confidence >= config.MIN_CONFIDENCE_ENTRY:
+                        # Get fresh portfolio state first to calculate size_pct if needed
+                        portfolio_state, current_bot = await self._get_portfolio_state()
+                        total_value = portfolio_state.get("total_value", 1)
+
+                        # Calculate size_pct from quantity (Monk Mode provides quantity)
+                        quantity = float(decision.get("quantity", 0))
+                        size_pct = 0.05  # Default fallback
+
+                        if quantity > 0 and current_price > 0 and total_value > 0:
+                            notional = quantity * current_price
+                            size_pct = notional / total_value
+                            # Cap at reasonable max if calculation goes wild
+                            if size_pct > 0.25:
+                                size_pct = 0.25
+
+                        # Validate and fix LLM decision BEFORE processing
+                        is_valid, reason, fixed_decision = (
+                            LLMDecisionValidator.validate_and_fix_decision(
+                                decision=decision, current_price=current_price, symbol=symbol
+                            )
+                        )
+
+                        if not is_valid and fixed_decision.get("signal", "").lower() == "hold":
+                            logger.warning(f"⚠️ {symbol} Decision invalid and not fixable: {reason}")
+                            continue
+
+                        # Use fixed values (validator applies defaults if needed)
+                        validated_sl = float(fixed_decision.get("stop_loss", current_price * 0.965))
+                        validated_tp = float(
+                            fixed_decision.get(
+                                "take_profit", decision.get("profit_target", current_price * 1.07)
+                            )
+                        )
+                        validated_entry = float(fixed_decision.get("entry_price", current_price))
+
+                        # Prepare decision dict for entry handler
+                        entry_decision = {
+                            "symbol": symbol,
+                            "action": "ENTRY",
+                            "side": side,  # Critical: Added side
+                            "confidence": confidence,
+                            "reasoning": reasoning,
+                            "entry_price": validated_entry,
+                            "stop_loss": validated_sl,
+                            "take_profit": validated_tp,
+                            "size_pct": size_pct,
+                            "leverage": int(decision.get("leverage", 1)),
+                        }
+
+                        # 🚨 CRITICAL FIX: Validate entry with RiskManager BEFORE execution
+                        is_valid, reason = RiskManagerService.validate_entry(
+                            bot=current_bot,
+                            decision=entry_decision,
+                            current_positions=current_positions,  # Fixed variable name
+                            current_price=Decimal(str(current_price)),
+                        )
+
+                        if not is_valid:
+                            logger.warning(f"⚠️  Trade REJECTED by Risk Manager: {reason}")
+                            continue
+
+                        await self._handle_entry_decision(
+                            entry_decision,
+                            Decimal(str(current_price)),
+                            portfolio_state,
+                            current_bot,
+                        )
+            except Exception as e:
+                logger.error(f"Error executing decision for {symbol}: {e}")
 
     async def _fetch_market_data(self, symbol: str) -> dict:
         """Fetch current market data with multi-timeframe support for a specific symbol.
@@ -542,22 +402,19 @@ class TradingEngine:
         snapshot = await self.market_data_service.get_market_data_multi_timeframe(
             symbol=symbol,
             timeframe_short=self.timeframe,  # Current timeframe (5min - ALIGNED with cycle)
-            timeframe_long=self.timeframe_long  # Long-term context (1h)
+            timeframe_long=self.timeframe_long,  # Long-term context (1h)
         )
 
         logger.debug(f"{symbol} current price: ${snapshot['current_price']}")
 
         # Return snapshot (which already contains both timeframes)
-        return {
-            'snapshot': snapshot,
-            'indicators_4h': snapshot['technical_indicators']['1h']
-        }
+        return {"snapshot": snapshot, "indicators_4h": snapshot["technical_indicators"]["1h"]}
 
     async def _calculate_indicators(self, market_snapshot: dict) -> dict:
         """Calculate technical indicators."""
         logger.debug("Calculating technical indicators...")
 
-        ohlcv = market_snapshot['ohlcv']
+        ohlcv = market_snapshot["ohlcv"]
         closes = self.market_data_service.extract_closes(ohlcv)
         highs = self.market_data_service.extract_highs(ohlcv)
         lows = self.market_data_service.extract_lows(ohlcv)
@@ -584,24 +441,26 @@ class TradingEngine:
             # Get open positions
             positions = await temp_position_service.get_open_positions(self.bot_id)
 
-            # Calculate value locked in positions
-            invested_in_positions = sum((p.position_value for p in positions), Decimal("0"))
+            # Calculate value locked in positions (Margin)
+            # Invested = Entry Value / Leverage (Margin is based on cost basis)
+            leverage = Decimal(str(config.DEFAULT_LEVERAGE))
+            invested_in_positions = sum((p.entry_value / leverage for p in positions), Decimal("0"))
 
             # Get unrealized PnL from open positions
             unrealized_pnl = sum((p.unrealized_pnl for p in positions), Decimal("0"))
 
-            # Total portfolio value = available cash + value in positions
-            total_value = bot.capital + invested_in_positions
+            # Total portfolio value = available cash + margin locked + unrealized PnL
+            total_value = bot.capital + invested_in_positions + unrealized_pnl
 
             # Calculate total PnL from initial capital
             total_pnl = total_value - bot.initial_capital
 
             portfolio = {
-                'total_value': total_value,
-                'cash': bot.capital,  # Available cash
-                'invested': invested_in_positions,  # Value in open positions
-                'total_pnl': total_pnl,
-                'unrealized_pnl': unrealized_pnl
+                "total_value": total_value,
+                "cash": bot.capital,  # Available cash
+                "invested": invested_in_positions,  # Value in open positions
+                "total_pnl": total_pnl,
+                "unrealized_pnl": unrealized_pnl,
             }
 
             return portfolio, bot
@@ -630,12 +489,18 @@ class TradingEngine:
                 pnl_pct = float(position.unrealized_pnl_pct)
 
                 # Calculate distances to SL/TP
-                sl_distance_pct = ((float(position.stop_loss) - current_price) / current_price) * 100
-                tp_distance_pct = ((float(position.take_profit) - current_price) / current_price) * 100
+                sl_distance_pct = (
+                    (float(position.stop_loss) - current_price) / current_price
+                ) * 100
+                tp_distance_pct = (
+                    (float(position.take_profit) - current_price) / current_price
+                ) * 100
 
                 # ✅ MINIMAL ESSENTIAL LOGGING
                 logger.info(f"")
-                logger.info(f"  [{position.symbol}] Hold: {hold_hours:.1f}h | PnL: {pnl_pct:+.2f}% | SL: {sl_distance_pct:+.1f}% | TP: {tp_distance_pct:+.1f}%")
+                logger.info(
+                    f"  [{position.symbol}] Hold: {hold_hours:.1f}h | PnL: {pnl_pct:+.2f}% | SL: {sl_distance_pct:+.1f}% | TP: {tp_distance_pct:+.1f}%"
+                )
 
             except Exception as e:
                 logger.error(f"Error fetching price for {position.symbol}: {e}")
@@ -649,43 +514,53 @@ class TradingEngine:
             if exit_reason:
                 logger.info(f"    → 🚨 EXIT TRIGGERED: {exit_reason.upper()}")
                 logger.info(f"")
-                logger.info(f"🚨 {position.symbol} Position {position.id} closing due to {exit_reason.upper()}")
+                logger.info(
+                    f"🚨 {position.symbol} Position {position.id} closing due to {exit_reason.upper()}"
+                )
                 logger.info(f"   Entry: ${position.entry_price:,.2f} → Exit: ${current_price:,.2f}")
                 logger.info(f"   Hold time: {hold_hours:.1f}h | PnL: {pnl_pct:+.2f}%")
 
                 await self.trade_executor.execute_exit(
-                    position=position,
-                    current_price=current_price,
-                    reason=exit_reason
+                    position=position, current_price=current_price, reason=exit_reason
                 )
                 continue
 
             # Additional exit conditions for stuck positions
             if position_age.total_seconds() > config.MAX_POSITION_AGE_SECONDS:  # 2 hours
                 if pnl_pct < -2.0:
-                    logger.info(f"    → ⏰ EXIT TRIGGERED: TIMEOUT_LOSS (2h+ with {pnl_pct:.2f}% loss)")
-                    logger.warning(f"⏰ {position.symbol} Position aged {hold_hours:.1f}h with {pnl_pct:.2f}% loss - force closing")
+                    logger.info(
+                        f"    → ⏰ EXIT TRIGGERED: TIMEOUT_LOSS (2h+ with {pnl_pct:.2f}% loss)"
+                    )
+                    logger.warning(
+                        f"⏰ {position.symbol} Position aged {hold_hours:.1f}h with {pnl_pct:.2f}% loss - force closing"
+                    )
                     await self.trade_executor.execute_exit(
                         position=position,
                         current_price=current_price,
-                        reason="time_based_loss_limit"
+                        reason="time_based_loss_limit",
                     )
                     continue
 
                 elif pnl_pct > 1.0:
-                    logger.info(f"    → ⏰ EXIT TRIGGERED: PROFIT_TAKING (2h+ with {pnl_pct:.2f}% profit)")
-                    logger.info(f"⏰ {position.symbol} Position aged {hold_hours:.1f}h with {pnl_pct:.2f}% profit - taking profit")
+                    logger.info(
+                        f"    → ⏰ EXIT TRIGGERED: PROFIT_TAKING (2h+ with {pnl_pct:.2f}% profit)"
+                    )
+                    logger.info(
+                        f"⏰ {position.symbol} Position aged {hold_hours:.1f}h with {pnl_pct:.2f}% profit - taking profit"
+                    )
                     await self.trade_executor.execute_exit(
                         position=position,
                         current_price=current_price,
-                        reason="time_based_profit_taking"
+                        reason="time_based_profit_taking",
                     )
                     continue
 
             # No exit conditions met
             logger.info(f"    → ✓ HOLD (no exit conditions met)")
 
-    async def _save_llm_decision(self, prompt: str, llm_result: dict, symbol: str = None) -> LLMDecision:
+    async def _save_llm_decision(
+        self, prompt: str, llm_result: dict, symbol: str = None
+    ) -> LLMDecision:
         """Save LLM decision to database.
 
         Args:
@@ -694,20 +569,20 @@ class TradingEngine:
             symbol: Optional symbol this decision is for
         """
         # Add symbol to parsed decisions if provided
-        parsed_decisions = llm_result['parsed_decisions'].copy()
-        if symbol and 'symbol' not in parsed_decisions:
-            parsed_decisions['symbol'] = symbol
+        parsed_decisions = llm_result["parsed_decisions"].copy()
+        if symbol and "symbol" not in parsed_decisions:
+            parsed_decisions["symbol"] = symbol
 
         # Create a fresh session for this operation
         async with AsyncSessionLocal() as fresh_db:
             decision = LLMDecision(
                 bot_id=self.bot_id,
                 prompt=prompt,
-                response=llm_result['response'],
+                response=llm_result["response"],
                 parsed_decisions=parsed_decisions,
-                tokens_used=llm_result['tokens_used'],
-                cost=Decimal(str(llm_result['cost'])),
-                timestamp=datetime.utcnow()
+                tokens_used=llm_result["tokens_used"],
+                cost=Decimal(str(llm_result["cost"])),
+                timestamp=datetime.utcnow(),
             )
 
             fresh_db.add(decision)
@@ -716,10 +591,12 @@ class TradingEngine:
 
             return decision
 
-    async def _handle_entry_decision(self, decision: dict, current_price: Decimal, portfolio_state: dict, current_bot: Bot) -> None:
+    async def _handle_entry_decision(
+        self, decision: dict, current_price: Decimal, portfolio_state: dict, current_bot: Bot
+    ) -> None:
         """Handle entry decision from LLM."""
         # Extract symbol from decision
-        symbol = decision.get('symbol', 'UNKNOWN')
+        symbol = decision.get("symbol", "UNKNOWN")
 
         # Get current positions and trades count
         positions = await self.position_service.get_open_positions(self.bot_id)
@@ -729,21 +606,18 @@ class TradingEngine:
 
         # Execute entry directly (confidence filter already applied above)
         position, trade = await self.trade_executor.execute_entry(
-            bot=current_bot,
-            decision=decision,
-            current_price=current_price
+            bot=current_bot, decision=decision, current_price=current_price
         )
 
         if position and trade:
-            logger.info(f"{GREEN}✅ BUY {position.quantity:.4f} {position.symbol.split('/')[0]} @ ${position.entry_price:,.2f}{RESET}")
+            logger.info(
+                f"{GREEN}✅ BUY {position.quantity:.4f} {position.symbol.split('/')[0]} @ ${position.entry_price:,.2f}{RESET}"
+            )
         else:
             logger.error(f"❌ {symbol} Trade execution failed")
 
     async def _handle_exit_decision(
-        self,
-        decision: dict,
-        positions: list,
-        current_price: Decimal
+        self, decision: dict, positions: list, current_price: Decimal
     ) -> None:
         """Handle exit decision from LLM."""
         logger.info("Processing exit decision...")
@@ -751,25 +625,20 @@ class TradingEngine:
         # Find position to close (first open position for now)
         if not positions:
             # Extract symbol from decision or positions
-            symbol = decision.get('symbol', 'UNKNOWN')
+            symbol = decision.get("symbol", "UNKNOWN")
             logger.warning(f"Exit requested for {symbol} but no open positions")
             return
 
         position = positions[0]  # Close first position
 
         await self.trade_executor.execute_exit(
-            position=position,
-            current_price=current_price,
-            reason="llm_decision"
+            position=position, current_price=current_price, reason="llm_decision"
         )
 
         logger.info(f"✅ EXIT {position.symbol.split('/')[0]} @ ${current_price:,.2f}")
 
     async def _handle_close_position(
-        self,
-        decision: dict,
-        positions: list,
-        current_price: Decimal
+        self, decision: dict, positions: list, current_price: Decimal
     ) -> None:
         """Handle emergency close position."""
         logger.warning("Processing emergency close...")
@@ -777,11 +646,11 @@ class TradingEngine:
         # Close all positions
         for position in positions:
             await self.trade_executor.execute_exit(
-                position=position,
-                current_price=current_price,
-                reason="emergency_close"
+                position=position, current_price=current_price, reason="emergency_close"
             )
-            logger.info(f"🚨 EMERGENCY CLOSE {position.symbol.split('/')[0]} @ ${current_price:,.2f}")
+            logger.info(
+                f"🚨 EMERGENCY CLOSE {position.symbol.split('/')[0]} @ ${current_price:,.2f}"
+            )
 
     async def _update_position_prices(self) -> None:
         """Update current prices for all open positions."""
@@ -793,48 +662,6 @@ class TradingEngine:
                 await self.position_service.update_current_price(position.id, current_price)
             except Exception as e:
                 logger.error(f"Error updating price for position {position.id}: {e}")
-
-
-    async def _log_hourly_summary(self, bot: Bot) -> None:
-        """Log hourly performance summary."""
-        # Get current portfolio state
-        portfolio_state, _ = await self._get_portfolio_state()
-
-        # Get positions
-        positions = await self.position_service.get_open_positions(self.bot_id)
-
-        # Get trades count today
-        trades_today = await self._get_trades_today_count()
-
-        # Calculate metrics
-        equity = portfolio_state['total_value']
-        invested = portfolio_state['invested']
-        unrealized_pnl = portfolio_state['unrealized_pnl']
-        return_pct = ((equity - bot.initial_capital) / bot.initial_capital) * 100
-        capital_utilization = (invested / equity * 100) if equity > 0 else 0
-
-        # Calculate session duration
-        session_duration = (datetime.utcnow() - self.session_start).total_seconds() / 3600  # in hours
-
-        # Colors
-        pnl_color = GREEN if unrealized_pnl >= 0 else RED
-        return_color = GREEN if return_pct >= 0 else RED
-
-        logger.info("")
-        logger.info("╔" + "═" * 78 + "╗")
-        logger.info("║" + " " * 25 + "📊 HOURLY SUMMARY" + " " * 36 + "║")
-        logger.info("╠" + "═" * 78 + "╣")
-        logger.info(f"║  ⏱️  Session Time: {session_duration:.1f}h | Cycles: {self.cycle_count}" + " " * (78 - 38 - len(str(self.cycle_count))) + "║")
-        logger.info("╠" + "─" * 78 + "╣")
-        logger.info(f"║  💰 Equity: ${equity:,.2f} | Initial: ${bot.initial_capital:,.2f}" + " " * (78 - 37 - len(f"{equity:,.2f}") - len(f"{bot.initial_capital:,.2f}")) + "║")
-        logger.info(f"║  {return_color}📈 Return: {return_pct:+.2f}%{RESET}" + " " * (78 - 17 - len(f"{return_pct:+.2f}")) + "║")
-        logger.info(f"║  {pnl_color}💵 Unrealized PnL: ${unrealized_pnl:+,.2f}{RESET}" + " " * (78 - 24 - len(f"{unrealized_pnl:+,.2f}")) + "║")
-        logger.info("╠" + "─" * 78 + "╣")
-        logger.info(f"║  📍 Open Positions: {len(positions)}" + " " * (78 - 22 - len(str(len(positions)))) + "║")
-        logger.info(f"║  🎯 Trades Today: {trades_today}" + " " * (78 - 20 - len(str(trades_today))) + "║")
-        logger.info(f"║  📊 Capital Utilization: {capital_utilization:.1f}%" + " " * (78 - 28 - len(f"{capital_utilization:.1f}")) + "║")
-        logger.info("╚" + "═" * 78 + "╝")
-        logger.info("")
 
     async def _get_trades_today_count(self) -> int:
         """
@@ -852,7 +679,7 @@ class TradingEngine:
             query = select(Trade).where(
                 Trade.bot_id == self.bot_id,
                 Trade.executed_at >= today_start,
-                Trade.realized_pnl == Decimal("0")  # Entry trades have no PnL
+                Trade.realized_pnl == Decimal("0"),  # Entry trades have no PnL
             )
 
             result = await fresh_db.execute(query)
@@ -886,9 +713,7 @@ class TradingEngine:
                 try:
                     # Fetch recent OHLCV data (last 50 candles for correlation analysis)
                     ohlcv = await self.market_data_service.fetch_ohlcv(
-                        symbol=symbol,
-                        timeframe=self.timeframe,
-                        limit=50
+                        symbol=symbol, timeframe=self.timeframe, limit=50
                     )
 
                     if not ohlcv or len(ohlcv) < 20:
@@ -901,17 +726,19 @@ class TradingEngine:
                     # Get current price and volume
                     current_price = closes[-1] if closes else 0
                     latest_candle = ohlcv[-1] if ohlcv else None
-                    volume = float(latest_candle.volume) if latest_candle else 0  # Use OHLCV object attribute
+                    volume = (
+                        float(latest_candle.volume) if latest_candle else 0
+                    )  # Use OHLCV object attribute
 
                     # Calculate approximate market cap (price * volume as proxy)
                     # In real scenario, you'd fetch this from API
                     market_cap = float(current_price) * volume
 
                     multi_coin_data[symbol] = {
-                        'prices': [float(p) for p in closes],
-                        'volume': float(volume),
-                        'market_cap': market_cap,
-                        'current_price': float(current_price)
+                        "prices": [float(p) for p in closes],
+                        "volume": float(volume),
+                        "market_cap": market_cap,
+                        "current_price": float(current_price),
                     }
 
                 except Exception as e:
@@ -924,7 +751,9 @@ class TradingEngine:
                 logger.debug(f"Multi-coin context generated for {len(multi_coin_data)} symbols")
                 return context
             else:
-                logger.warning(f"Not enough symbols with data ({len(multi_coin_data)}), skipping multi-coin analysis")
+                logger.warning(
+                    f"Not enough symbols with data ({len(multi_coin_data)}), skipping multi-coin analysis"
+                )
                 return {}
 
         except Exception as e:
@@ -944,7 +773,7 @@ class TradingEngine:
                 snapshot = await self.market_data_service.get_market_data_multi_timeframe(
                     symbol=symbol,
                     timeframe_short=self.timeframe,
-                    timeframe_long=self.timeframe_long
+                    timeframe_long=self.timeframe_long,
                 )
 
                 if snapshot:
@@ -969,7 +798,7 @@ class TradingEngine:
         prices = [float(p) for p in prices]
 
         # Calculate price changes
-        deltas = [prices[i] - prices[i-1] for i in range(1, len(prices))]
+        deltas = [prices[i] - prices[i - 1] for i in range(1, len(prices))]
 
         # Separate gains and losses
         gains = [d if d > 0 else 0 for d in deltas]
@@ -1010,6 +839,7 @@ class TradingEngine:
             ema = (price - ema) * multiplier + ema
 
         return round(ema, 2)
+
 
 # 🚨 SÉCURITÉ: Ancien système désactivé par nettoyage automatique
 # ⚠️ NE PAS RÉACTIVER sans validation complète du nouveau système
