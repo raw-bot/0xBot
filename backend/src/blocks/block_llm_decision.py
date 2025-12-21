@@ -181,14 +181,22 @@ class LLMDecisionBlock:
             # DEBUG: Log each decision
             logger.info(f"   📋 {symbol}: signal={signal}, conf={confidence:.0%}")
 
-            # Skip hold signals
+            # Skip hold signals - nothing to do
             if signal == "hold":
                 return None
 
-            # Skip low confidence
-            if confidence < config.MIN_CONFIDENCE_ENTRY:
-                logger.info(f"   {symbol}: Low conf {confidence:.0%}")
+            # Close signals should be processed (but orchestrator handles them)
+            if signal == "close":
+                logger.info(f"   🔴 {symbol}: Close signal received")
+                # We'll handle closes via exit conditions in orchestrator
                 return None
+
+            # For entry signals, check confidence
+            if signal in ["buy_to_enter", "sell_to_enter"]:
+                if confidence < config.MIN_CONFIDENCE_ENTRY:
+                    logger.info(f"   {symbol}: Low conf {confidence:.0%}")
+                    return None
+                logger.info(f"🧠 {symbol}: {signal} ({confidence:.0%})")
 
             # Get current price
             current_price = None
@@ -227,7 +235,8 @@ class LLMDecisionBlock:
                 side=side,
                 stop_loss=Decimal(str(stop_loss)),
                 take_profit=Decimal(str(take_profit)),
-                size_pct=float(raw.get("size_pct", config.DEFAULT_POSITION_SIZE_PCT)),
+                # Cap size_pct to max 25% to avoid margin errors
+                size_pct=min(0.25, float(raw.get("size_pct", config.DEFAULT_POSITION_SIZE_PCT))),
                 leverage=int(raw.get("leverage", config.DEFAULT_LEVERAGE)),
                 reasoning=raw.get("reasoning", raw.get("justification", "")),
             )

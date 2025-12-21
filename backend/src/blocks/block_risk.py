@@ -84,6 +84,11 @@ class RiskBlock:
         total_margin = current_margin + new_margin
         max_margin = capital * self.max_exposure_pct
 
+        logger.info(
+            f"   💰 {symbol}: capital=${capital:,.0f}, size={size_pct:.0%}, "
+            f"margin=${new_margin:,.0f}, total=${total_margin:,.0f}, max=${max_margin:,.0f}"
+        )
+
         if total_margin > max_margin:
             return ValidationResult(
                 False, f"Margin ${total_margin:,.2f} exceeds max ${max_margin:,.2f}"

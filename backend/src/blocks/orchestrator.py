@@ -214,6 +214,7 @@ class TradingOrchestrator:
         current_price = market_data[decision.symbol].price
 
         # Validate with risk block
+        # Use equity (not cash) as capital base for max exposure calc
         validation = self.risk.validate_entry(
             symbol=decision.symbol,
             side=decision.side,
@@ -221,7 +222,7 @@ class TradingOrchestrator:
             entry_price=current_price,
             stop_loss=decision.stop_loss,
             take_profit=decision.take_profit,
-            capital=portfolio_state.cash,
+            capital=portfolio_state.equity,  # Use equity for max_margin calc
             current_positions=portfolio_state.open_positions,
         )
 
