@@ -80,19 +80,31 @@ class NewsService:
         return data
 
     async def _fetch_from_api(self, params: Dict) -> Dict:
-        """Execute HTTP request to CryptoCompare."""
+        """Execute HTTP request to CryptoCompare with timeout."""
         headers = {"Authorization": f"Apikey {self.api_key}"}
+        timeout = aiohttp.ClientTimeout(total=5)  # 5 second timeout
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(self.BASE_URL, params=params, headers=headers) as response:
-                if response.status == 200:
-                    return await response.json()
-                elif response.status == 429:
-                    logger.warning("⚠️ CryptoCompare Rate Limit Hit")
-                    return {}
-                else:
-                    logger.error(f"CryptoCompare API Error: {response.status}")
-                    return {}
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(self.BASE_URL, params=params, headers=headers) as response:
+                    if response.status == 200:
+                        return await response.json()
+                    elif response.status == 429:
+                        logger.warning("⚠️ CryptoCompare Rate Limit Hit")
+                        return {}
+                    elif response.status >= 500:
+                        # Server errors - silently skip, not critical
+                        logger.debug(f"CryptoCompare server error: {response.status}")
+                        return {}
+                    else:
+                        logger.warning(f"CryptoCompare API Error: {response.status}")
+                        return {}
+        except asyncio.TimeoutError:
+            logger.debug("CryptoCompare API timeout - skipping news")
+            return {}
+        except Exception as e:
+            logger.debug(f"CryptoCompare connection error: {e}")
+            return {}
 
     def _format_news_for_llm(self, raw_news: List[Dict]) -> List[Dict]:
         """Format raw news items into concise summaries for the LLM."""

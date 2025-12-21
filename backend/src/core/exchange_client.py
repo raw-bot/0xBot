@@ -38,21 +38,21 @@ class ExchangeClient:
         if paper_trading:
             # Paper trading: Use public API only (no authentication)
             exchange_options = {
-                'enableRateLimit': True,
-                'options': {
-                    'defaultType': 'swap',  # Use perpetual swaps (equivalent to futures)
-                }
+                "enableRateLimit": True,
+                "options": {
+                    "defaultType": "swap",  # Use perpetual swaps
+                },
             }
         else:
             # Live trading: Use authenticated API
             exchange_options = {
-                'apiKey': api_key,
-                'secret': secret_key,
-                'password': passphrase,  # OKX requires a passphrase
-                'enableRateLimit': True,
-                'options': {
-                    'defaultType': 'swap',
-                }
+                "apiKey": api_key,
+                "secret": secret_key,
+                "password": passphrase,  # OKX requires a passphrase
+                "enableRateLimit": True,
+                "options": {
+                    "defaultType": "swap",
+                },
             }
 
         self.exchange = ccxt.okx(exchange_options)
@@ -60,8 +60,8 @@ class ExchangeClient:
         # In paper trading mode, use real market data but simulate trades
         # The trade_executor_service handles the simulation logic
         if paper_trading:
-            logger.info("📝 Exchange client initialized in PAPER TRADING mode (OKX Demo)")
-            logger.info("📊 Using real market data, trades will be simulated in database")
+            logger.info("📝 Exchange client initialized in PAPER TRADING mode (Local)")
+            logger.info("📊 Using real market data, trades simulated in database")
         else:
             logger.info("🔴 Exchange client initialized in LIVE TRADING mode (OKX)")
             logger.warning("⚠️  LIVE TRADING: Real orders will be placed on OKX!")
@@ -80,21 +80,18 @@ class ExchangeClient:
             Normalized symbol (e.g., 'BTC/USDT:USDT')
         """
         # If symbol already has settle currency, return as is
-        if ':' in symbol:
+        if ":" in symbol:
             return symbol
 
         # For OKX swaps, append :USDT for USDT pairs
-        if '/USDT' in symbol:
+        if "/USDT" in symbol:
             return f"{symbol}:USDT"
 
         # Return original if not USDT pair
         return symbol
 
     async def fetch_ohlcv(
-        self,
-        symbol: str,
-        timeframe: str = '1h',
-        limit: int = 100
+        self, symbol: str, timeframe: str = "1h", limit: int = 100
     ) -> List[List[float]]:
         """
         Fetch OHLCV (candlestick) data.
@@ -141,7 +138,7 @@ class ExchangeClient:
         side: str,
         amount: float,
         price: Optional[float] = None,
-        order_type: str = 'market'
+        order_type: str = "market",
     ) -> Dict[str, Any]:
         """
         Create an order.
@@ -157,25 +154,23 @@ class ExchangeClient:
             Order information
         """
         try:
-            if order_type == 'market':
+            if order_type == "market":
                 order = await self.exchange.create_market_order(symbol, side, amount)
             else:
                 if price is None:
                     raise ValueError("Price required for limit orders")
                 order = await self.exchange.create_limit_order(symbol, side, amount, price)
 
-            logger.info(f"Created {order_type} {side} order: {symbol} {amount} @ {price or 'market'}")
+            logger.info(
+                f"Created {order_type} {side} order: {symbol} {amount} @ {price or 'market'}"
+            )
             return order
         except Exception as e:
             logger.error(f"Error creating order: {e}")
             raise
 
     async def create_stop_loss_order(
-        self,
-        symbol: str,
-        side: str,
-        amount: float,
-        stop_price: float
+        self, symbol: str, side: str, amount: float, stop_price: float
     ) -> Dict[str, Any]:
         """
         Create a stop-loss order (OKX-compatible).
@@ -192,16 +187,12 @@ class ExchangeClient:
         try:
             # OKX uses 'trigger' order type with specific parameters
             params = {
-                'triggerPrice': stop_price,  # OKX uses triggerPrice instead of stopPrice
-                'orderType': 'market',
-                'triggerType': 'last',  # Trigger based on last price
+                "triggerPrice": stop_price,  # OKX uses triggerPrice instead of stopPrice
+                "orderType": "market",
+                "triggerType": "last",  # Trigger based on last price
             }
             order = await self.exchange.create_order(
-                symbol,
-                'trigger',  # OKX trigger order type
-                side,
-                amount,
-                params=params
+                symbol, "trigger", side, amount, params=params  # OKX trigger order type
             )
             logger.info(f"Created stop-loss order: {symbol} {amount} @ {stop_price}")
             return order
@@ -210,11 +201,7 @@ class ExchangeClient:
             raise
 
     async def create_take_profit_order(
-        self,
-        symbol: str,
-        side: str,
-        amount: float,
-        take_profit_price: float
+        self, symbol: str, side: str, amount: float, take_profit_price: float
     ) -> Dict[str, Any]:
         """
         Create a take-profit order (OKX-compatible).
@@ -231,16 +218,12 @@ class ExchangeClient:
         try:
             # OKX uses 'trigger' order type with specific parameters
             params = {
-                'triggerPrice': take_profit_price,  # OKX uses triggerPrice
-                'orderType': 'market',
-                'triggerType': 'last',  # Trigger based on last price
+                "triggerPrice": take_profit_price,  # OKX uses triggerPrice
+                "orderType": "market",
+                "triggerType": "last",  # Trigger based on last price
             }
             order = await self.exchange.create_order(
-                symbol,
-                'trigger',  # OKX trigger order type
-                side,
-                amount,
-                params=params
+                symbol, "trigger", side, amount, params=params  # OKX trigger order type
             )
             logger.info(f"Created take-profit order: {symbol} {amount} @ {take_profit_price}")
             return order
@@ -276,7 +259,7 @@ class ExchangeClient:
         try:
             positions = await self.exchange.fetch_positions(symbol)
             # Filter out positions with zero contracts
-            open_positions = [p for p in positions if float(p.get('contracts', 0)) > 0]
+            open_positions = [p for p in positions if float(p.get("contracts", 0)) > 0]
             logger.info(f"Fetched {len(open_positions)} open positions")
             return open_positions
         except Exception as e:
@@ -298,15 +281,17 @@ class ExchangeClient:
             funding_rate = await self.exchange.fetch_funding_rate(normalized_symbol)
             # OKX may use different field names, try multiple possibilities
             rate = float(
-                funding_rate.get('fundingRate',
-                funding_rate.get('rate',
-                funding_rate.get('fundingRateValue', 0)))
+                funding_rate.get(
+                    "fundingRate", funding_rate.get("rate", funding_rate.get("fundingRateValue", 0))
+                )
             )
             logger.debug(f"Funding rate for {normalized_symbol}: {rate}")
             return rate
         except Exception as e:
             logger.error(f"Error fetching funding rate for {normalized_symbol}: {e}")
-            logger.debug(f"Funding rate response structure: {funding_rate if 'funding_rate' in locals() else 'N/A'}")
+            logger.debug(
+                f"Funding rate response structure: {funding_rate if 'funding_rate' in locals() else 'N/A'}"
+            )
             return 0.0
 
     async def close(self) -> None:

@@ -17,6 +17,7 @@ from typing import Dict, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..core.activity_logger import ActivityLogger
 from ..core.config import config
 from ..core.database import AsyncSessionLocal
 from ..core.llm_client import LLMClient, get_llm_client
@@ -217,31 +218,39 @@ class TradingEngine:
                 logger.warning("⚠️  No market data available")
                 return
 
-            # 2. Generate Monk Mode Prompt
-            # Using the new MonkModePromptService
+            # 2. Generate Enhanced NoF1-Style Prompt
+            # Includes: Raw Data, Narrative Analysis, Pain Trade, Alpha Setups
             portfolio_state_tuple = await self._get_portfolio_state()
             portfolio_state = portfolio_state_tuple[0] if portfolio_state_tuple else {}
 
-            # Fetch News (Concurrent with market data if possible, but here sequential is fine for now)
+            # Fetch News for Narrative Analysis
             news_data = await self.news_service.get_latest_news(self.trading_symbols)
 
+            # Generate comprehensive prompt with all analysis
             prompt_data = self.prompt_service.get_multi_coin_decision(
                 bot=self.bot,
                 all_coins_data=all_coins_data,
                 all_positions=all_positions_dict,
+                news_data=news_data,
+                portfolio_state=portfolio_state,
             )
 
-            logger.info(f"📊 Step 1: Analyzing {len(all_coins_data)} coins in one batch...")
+            logger.info(
+                f"📊 Step 1: Analyzing {len(all_coins_data)} coins with NoF1-style prompt..."
+            )
 
-            # 3. Call LLM ONCE for all coins
+            # 3. Call LLM ONCE for all coins (increased tokens for comprehensive response)
             llm_response = await self.llm_client.analyze_market(
                 model=FORCED_MODEL_DEEPSEEK,
                 prompt=prompt_data["prompt"],
-                max_tokens=4096,  # Increased to prevent JSON truncation
+                max_tokens=6000,  # Increased for NoF1-style Chain of Thought responses
                 temperature=0.7,
             )
 
             response_text = llm_response.get("response", "")
+
+            # Log detailed LLM interaction for analysis
+            self._log_llm_decision(prompt_data["prompt"], response_text)
 
             if not response_text:
                 logger.error("🤖 Empty LLM response")
@@ -260,12 +269,45 @@ class TradingEngine:
             cycle_duration = (datetime.utcnow() - cycle_start).total_seconds()
             logger.info(f"✅ Cycle completed in {cycle_duration:.1f}s")
 
-            # Hourly performance summary
-            if self.cycle_count % 12 == 0:
-                await self._log_hourly_summary(self.bot)
+            # Log to JSON activity file
+            ActivityLogger.log_cycle_end(
+                bot_name=self.bot.name,
+                duration_seconds=cycle_duration,
+                decisions=decisions,
+            )
+
+            # Record equity snapshot every 10 cycles (~30 min)
+            if self.cycle_count % 10 == 0:
+                await self._record_equity_snapshot()
 
         except Exception as e:
             logger.error(f"❌ Cycle error: {e}", exc_info=True)
+
+    def _log_llm_decision(self, prompt: str, response: str) -> None:
+        """Log detailed LLM prompt and response to dedicated file for analysis."""
+        import os
+        from datetime import datetime
+
+        log_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        log_file = os.path.join(log_dir, "llm_decisions.log")
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        separator = "=" * 80
+
+        try:
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(f"\n{separator}\n")
+                f.write(f"TIMESTAMP: {timestamp}\n")
+                f.write(f"{separator}\n\n")
+                f.write("📝 PROMPT SENT TO LLM:\n")
+                f.write("-" * 40 + "\n")
+                f.write(prompt + "\n\n")
+                f.write("🤖 LLM RESPONSE:\n")
+                f.write("-" * 40 + "\n")
+                f.write(response + "\n")
+                f.write(f"\n{separator}\n")
+        except Exception as e:
+            logger.debug(f"Could not write to LLM log: {e}")
 
     async def _execute_all_decisions(
         self,
@@ -293,10 +335,10 @@ class TradingEngine:
                 side = None
                 if raw_signal == "buy_to_enter":
                     action = "ENTRY"
-                    side = "LONG"
+                    side = "long"  # lowercase to match position_service
                 elif raw_signal == "sell_to_enter":
                     action = "ENTRY"
-                    side = "SHORT"
+                    side = "short"  # lowercase to match position_service
                 elif raw_signal == "close":
                     action = "EXIT"
                 elif raw_signal == "hold":
@@ -318,7 +360,7 @@ class TradingEngine:
                     if action == "ENTRY" and confidence >= config.MIN_CONFIDENCE_ENTRY:
                         # Get fresh portfolio state first to calculate size_pct if needed
                         portfolio_state, current_bot = await self._get_portfolio_state()
-                        total_value = portfolio_state.get("total_value", 1)
+                        total_value = float(portfolio_state.get("total_value", 1))
 
                         # Calculate size_pct from quantity (Monk Mode provides quantity)
                         quantity = float(decision.get("quantity", 0))
@@ -375,6 +417,13 @@ class TradingEngine:
 
                         if not is_valid:
                             logger.warning(f"⚠️  Trade REJECTED by Risk Manager: {reason}")
+                            ActivityLogger.log_trade_rejected(
+                                bot_name=current_bot.name,
+                                symbol=symbol,
+                                signal=raw_signal,
+                                confidence=confidence,
+                                reason=reason,
+                            )
                             continue
 
                         await self._handle_entry_decision(
@@ -613,6 +662,17 @@ class TradingEngine:
             logger.info(
                 f"{GREEN}✅ BUY {position.quantity:.4f} {position.symbol.split('/')[0]} @ ${position.entry_price:,.2f}{RESET}"
             )
+            # Log to JSON
+            ActivityLogger.log_trade_entry(
+                bot_name=current_bot.name,
+                symbol=position.symbol,
+                side=position.side,
+                quantity=float(position.quantity),
+                entry_price=float(position.entry_price),
+                stop_loss=float(position.stop_loss),
+                take_profit=float(position.take_profit),
+                confidence=float(decision.get("confidence", 0)),
+            )
         else:
             logger.error(f"❌ {symbol} Trade execution failed")
 
@@ -839,6 +899,46 @@ class TradingEngine:
             ema = (price - ema) * multiplier + ema
 
         return round(ema, 2)
+
+    async def _record_equity_snapshot(self) -> None:
+        """Record current equity for dashboard chart."""
+        try:
+            from decimal import Decimal
+
+            from ..models.equity_snapshot import EquitySnapshot
+
+            # Reload fresh bot capital from database
+            async with AsyncSessionLocal() as fresh_db:
+                query = select(Bot).where(Bot.id == self.bot_id)
+                result = await fresh_db.execute(query)
+                bot = result.scalar_one()
+                cash = Decimal(str(bot.capital))
+
+                # Get open positions and sum unrealized PnL
+                temp_position_service = PositionService(fresh_db)
+                positions = await temp_position_service.get_open_positions(self.bot_id)
+                unrealized_pnl = Decimal("0")
+                for pos in positions:
+                    unrealized_pnl += Decimal(str(pos.unrealized_pnl))
+
+                equity = cash + unrealized_pnl
+
+                # Create snapshot
+                snapshot = EquitySnapshot(
+                    bot_id=self.bot_id,
+                    equity=equity,
+                    cash=cash,
+                    unrealized_pnl=unrealized_pnl,
+                )
+                fresh_db.add(snapshot)
+                await fresh_db.commit()
+
+                logger.info(
+                    f"📊 Equity snapshot: ${float(equity):,.2f} (cash: ${float(cash):,.2f}, unrealized: ${float(unrealized_pnl):,.2f})"
+                )
+
+        except Exception as e:
+            logger.error(f"Error recording equity snapshot: {e}")
 
 
 # 🚨 SÉCURITÉ: Ancien système désactivé par nettoyage automatique

@@ -23,7 +23,7 @@ class TradingConfig:
     NEWS_FETCH_INTERVAL: int = 300  # 5 minutes (aligned with cycle)
 
     # Trading Parameters (replacer les magic numbers)
-    MIN_CONFIDENCE_ENTRY: float = 0.70  # 70% (Monk Mode: High Selectivity)
+    MIN_CONFIDENCE_ENTRY: float = 0.70  # 70% (NoF1 reference threshold)
     MIN_CONFIDENCE_EXIT_EARLY: float = 0.60  # 60%
     MIN_CONFIDENCE_EXIT_NORMAL: float = 0.50  # 50%
 
@@ -31,11 +31,11 @@ class TradingConfig:
     MAX_POSITION_AGE_SECONDS: int = 7200  # 2 hours
     MIN_POSITION_AGE_FOR_EXIT_SECONDS: int = 1800  # 30 minutes
 
-    # Risk Management
-    DEFAULT_STOP_LOSS_PCT: float = 0.035  # 3.5%
-    DEFAULT_TAKE_PROFIT_PCT: float = 0.07  # 7%
-    DEFAULT_POSITION_SIZE_PCT: float = 0.10  # 10% (Conservative sizing)
-    DEFAULT_LEVERAGE: float = 1.0  # 1x Leverage (No Leverage - Conservative Mode)
+    # Risk Management (NoF1 Aggressive Mode)
+    DEFAULT_STOP_LOSS_PCT: float = 0.05  # 5% (wider SL for volatility)
+    DEFAULT_TAKE_PROFIT_PCT: float = 0.10  # 10% TP
+    DEFAULT_POSITION_SIZE_PCT: float = 0.20  # 20% position size (NoF1 style)
+    DEFAULT_LEVERAGE: float = 10.0  # 10x Leverage (NoF1 aggressive mode)
 
     # Security: Allowed trading symbols whitelist
     ALLOWED_SYMBOLS: List[str] = [

@@ -38,24 +38,28 @@ class RiskManagerService:
 
             # 1. Check position size constraint
             max_position_pct = Decimal(
-                str(bot.risk_params.get("max_position_pct", 0.08))
-            )  # 8% max (harmonized)
+                str(bot.risk_params.get("max_position_pct", 0.25))
+            )  # 25% max (NoF1 aggressive mode)
             if size_pct > max_position_pct:
                 return False, f"Position size {size_pct:.1%} exceeds max {max_position_pct:.1%}"
 
-            # 2. Check total exposure
-            total_exposure = sum(
-                pos.position_value for pos in current_positions if pos.status == PositionStatus.OPEN
+            # 2. Check total exposure (margin-based, not notional)
+            # With leverage, exposure = margin locked, not notional value
+            leverage = Decimal(str(config.DEFAULT_LEVERAGE))
+            current_margin = sum(
+                (pos.entry_price * pos.quantity / pos.leverage)
+                for pos in current_positions
+                if pos.status == PositionStatus.OPEN
             )
-            position_value = bot.capital * size_pct
-            new_total_exposure = total_exposure + position_value
+            new_margin = bot.capital * size_pct  # Margin for new position
+            new_total_margin = current_margin + new_margin
 
-            # Max total exposure: 85% of capital (permet plus d'utilisation du capital)
-            max_exposure = bot.capital * Decimal("0.85")
-            if new_total_exposure > max_exposure:
+            # Max margin exposure: 95% of capital (aggressive mode)
+            max_exposure = bot.capital * Decimal("0.95")
+            if new_total_margin > max_exposure:
                 return (
                     False,
-                    f"Total exposure ${new_total_exposure:,.2f} would exceed max ${max_exposure:,.2f}",
+                    f"Total margin ${new_total_margin:,.2f} would exceed max ${max_exposure:,.2f}",
                 )
 
             # 3. Check if already have position in this symbol
@@ -170,8 +174,8 @@ class RiskManagerService:
                 )
 
             # 5. Check minimum position size (at least $50 for meaningful trades)
-            if position_value < Decimal("50"):
-                return False, f"Position size ${position_value:,.2f} below minimum $50"
+            if new_margin < Decimal("50"):
+                return False, f"Position size ${new_margin:,.2f} below minimum $50"
 
             logger.info(f"   ✅ Entry validation passed for {symbol}")
             return True, "Validation passed"

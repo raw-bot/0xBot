@@ -14,6 +14,7 @@ from .core.scheduler import start_scheduler, stop_scheduler
 from .middleware.error_handler import ErrorHandlerMiddleware
 from .middleware.security import RequestIDMiddleware, SecurityHeadersMiddleware
 from .routes import auth_router, bots_router
+from .routes.dashboard import router as dashboard_router
 
 # Load environment variables from .env file
 load_dotenv()
@@ -23,35 +24,35 @@ load_dotenv()
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     Application lifespan manager.
-    
+
     Handles startup and shutdown events.
     """
     # Startup
     print("🚀 Starting AI Trading Agent API...")
-    
+
     # Initialize Redis
     await init_redis()
     print("✅ Redis connected")
-    
+
     # Initialize database
     print("✅ Database connected")
-    
+
     # Start bot scheduler
     await start_scheduler()
     print("✅ Bot scheduler started")
-    
+
     print("✅ Application ready")
     print("📊 Access API docs at http://localhost:8020/docs")
-    
+
     yield
-    
+
     # Shutdown
     print("🛑 Shutting down AI Trading Agent API...")
-    
+
     # Stop scheduler first
     await stop_scheduler()
     print("✅ Bot scheduler stopped")
-    
+
     # Close connections
     await close_db()
     await close_redis()
@@ -66,15 +67,12 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 
-# Configure CORS
-CORS_ORIGINS = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:3000,http://localhost:5173"  # React dev servers
-).split(",")
+# Configure CORS - allow all for file:// dashboard access
+CORS_ORIGINS = ["*"]  # Allow all origins including file://
 
 # Add middlewares (order matters - first added is executed last)
 app.add_middleware(ErrorHandlerMiddleware)
@@ -90,17 +88,12 @@ app.add_middleware(
 
 
 # Include routers
-app.include_router(
-    auth_router,
-    prefix="/auth",
-    tags=["Authentication"]
-)
+app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 
-app.include_router(
-    bots_router,
-    prefix="/api",
-    tags=["Bots"]
-)
+app.include_router(bots_router, prefix="/api", tags=["Bots"])
+
+# Public dashboard API (no auth required)
+app.include_router(dashboard_router, prefix="/api", tags=["Dashboard"])
 
 
 # Health check endpoint
@@ -108,15 +101,11 @@ app.include_router(
 async def health_check() -> dict:
     """
     Health check endpoint.
-    
+
     Returns:
         Status information
     """
-    return {
-        "status": "healthy",
-        "service": "AI Trading Agent API",
-        "version": "1.0.0"
-    }
+    return {"status": "healthy", "service": "AI Trading Agent API", "version": "1.0.0"}
 
 
 # Root endpoint
@@ -124,24 +113,14 @@ async def health_check() -> dict:
 async def root() -> dict:
     """
     Root endpoint.
-    
+
     Returns:
         Welcome message
     """
-    return {
-        "message": "AI Trading Agent API",
-        "docs": "/docs",
-        "health": "/health"
-    }
+    return {"message": "AI Trading Agent API", "docs": "/docs", "health": "/health"}
 
 
 if __name__ == "__main__":
     import uvicorn
-    
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8020,
-        reload=True,
-        log_level="info"
-    )
+
+    uvicorn.run("main:app", host="0.0.0.0", port=8020, reload=True, log_level="info")
