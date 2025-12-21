@@ -12,7 +12,7 @@ from ..models.bot import Bot, BotStatus
 from ..services.bot_service import BotService
 
 # Use modular blocks architecture (set to False to use legacy engine)
-USE_BLOCKS = False  # Temporarily disabled - blocks need more debugging
+USE_BLOCKS = True  # Enabled - blocks architecture is ready!
 
 if USE_BLOCKS:
     from ..blocks.orchestrator import TradingOrchestrator

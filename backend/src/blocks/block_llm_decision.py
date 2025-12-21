@@ -64,19 +64,41 @@ class LLMDecisionBlock:
             Dict of symbol -> TradingDecision
         """
         try:
-            # Build prompt
-            prompt = self.prompt_service.build_multi_coin_prompt(
-                all_coins_data=market_data,
-                portfolio_context=portfolio_context,
-            )
+            # Convert market snapshots to dict format for prompt service
+            all_coins_data = {}
+            for symbol, snap in market_data.items():
+                all_coins_data[symbol] = {
+                    "price": float(snap.price),
+                    "change_24h": snap.change_24h,
+                    "rsi": snap.rsi,
+                    "ema_fast": snap.ema_fast,
+                    "ema_slow": snap.ema_slow,
+                    "atr": snap.atr,
+                    "trend": snap.trend,
+                }
 
-            # Call LLM
+            # Get positions from context
+            positions = portfolio_context.get("positions", [])
+
+            # Build prompt using prompt service
+            prompt_result = self.prompt_service.get_multi_coin_decision(
+                bot=None,  # Not needed for prompt generation
+                all_coins_data=all_coins_data,
+                all_positions=positions,
+                portfolio_state=portfolio_context,
+            )
+            prompt = prompt_result.get("prompt", "")
+
+            # Call LLM using DeepSeek
             logger.info(f"📊 Calling LLM for {len(market_data)} symbols...")
-            response = await self.llm_client.generate(prompt)
-
-            logger.info(
-                f"DeepSeek response: {response.get('usage', {}).get('total_tokens', '?')} tokens"
+            response = await self.llm_client.analyze_market(
+                model=FORCED_MODEL,
+                prompt=prompt,
+                max_tokens=2048,
+                temperature=0.7,
             )
+
+            logger.info(f"DeepSeek response: " f"{response.get('tokens_used', '?')} tokens")
 
             # Parse response
             raw_decisions = self._parse_response(response)
@@ -87,7 +109,9 @@ class LLMDecisionBlock:
                 decision = self._validate_and_fix(symbol, raw, market_data)
                 if decision:
                     decisions[symbol] = decision
-                    logger.info(f"🧠 {symbol}: {decision.signal} ({decision.confidence*100:.0f}%)")
+                    logger.info(
+                        f"🧠 {symbol}: {decision.signal} " f"({decision.confidence*100:.0f}%)"
+                    )
 
             return decisions
 
@@ -97,16 +121,33 @@ class LLMDecisionBlock:
 
     def _parse_response(self, response: dict) -> Dict[str, dict]:
         """Parse LLM response into raw decisions."""
-        content = response.get("content", "")
+        # Get raw response content
+        content = response.get("response", "")
 
-        # Use validator to extract JSON
-        parsed = self.validator.extract_and_validate(content)
-
-        if not parsed or "decisions" not in parsed:
-            logger.warning("No valid decisions in LLM response")
+        if not content:
+            logger.warning("Empty LLM response")
             return {}
 
-        return parsed.get("decisions", {})
+        # Use prompt service to parse the response
+        parsed = self.prompt_service.parse_multi_coin_response(content)
+
+        if not parsed:
+            logger.warning("Empty parsed response")
+            return {}
+
+        # Handle both formats:
+        # 1. {symbol: {signal, ...}} - direct format from fallback
+        # 2. {decisions: {symbol: {...}}} - nested format
+        if "decisions" in parsed:
+            return parsed["decisions"]
+
+        # Check if it looks like direct symbol dict
+        first_key = next(iter(parsed.keys()), "")
+        if "/" in first_key or "USDT" in first_key:
+            return parsed
+
+        logger.warning("Unexpected response format")
+        return {}
 
     def _validate_and_fix(
         self,

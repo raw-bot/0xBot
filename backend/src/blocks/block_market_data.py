@@ -82,21 +82,29 @@ class MarketDataBlock:
             # Calculate indicators
             indicators = {}
             if ohlcv_1h and len(ohlcv_1h) >= 14:
-                closes = [c.close for c in ohlcv_1h]
-                highs = [c.high for c in ohlcv_1h]
-                lows = [c.low for c in ohlcv_1h]
+                closes = [float(c.close) for c in ohlcv_1h]
+                highs = [float(c.high) for c in ohlcv_1h]
+                lows = [float(c.low) for c in ohlcv_1h]
 
-                indicators["rsi"] = self.indicator_service.calculate_rsi(closes)
-                ema_fast, ema_slow = self.indicator_service.calculate_ema_crossover(closes)
-                indicators["ema_fast"] = ema_fast
-                indicators["ema_slow"] = ema_slow
-                indicators["atr"] = self.indicator_service.calculate_atr(highs, lows, closes)
+                # RSI - get last value
+                rsi_values = self.indicator_service.calculate_rsi(closes)
+                indicators["rsi"] = rsi_values[-1] if rsi_values else None
 
-                # Determine trend
-                if ema_fast and ema_slow:
-                    if ema_fast > ema_slow:
+                # EMAs for trend
+                ema_fast = self.indicator_service.calculate_ema(closes, period=9)
+                ema_slow = self.indicator_service.calculate_ema(closes, period=21)
+                indicators["ema_fast"] = ema_fast[-1] if ema_fast else None
+                indicators["ema_slow"] = ema_slow[-1] if ema_slow else None
+
+                # ATR - get last value
+                atr_values = self.indicator_service.calculate_atr(highs, lows, closes)
+                indicators["atr"] = atr_values[-1] if atr_values else None
+
+                # Determine trend from EMAs
+                if indicators["ema_fast"] and indicators["ema_slow"]:
+                    if indicators["ema_fast"] > indicators["ema_slow"]:
                         indicators["trend"] = "bullish"
-                    elif ema_fast < ema_slow:
+                    elif indicators["ema_fast"] < indicators["ema_slow"]:
                         indicators["trend"] = "bearish"
                     else:
                         indicators["trend"] = "neutral"
