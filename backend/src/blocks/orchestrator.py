@@ -147,17 +147,6 @@ class TradingOrchestrator:
             ],
         }
 
-        # Convert market data to dict for LLM
-        market_data_dict = {
-            symbol: {
-                "price": float(snap.price),
-                "change_24h": snap.change_24h,
-                "rsi": snap.rsi,
-                "trend": snap.trend,
-            }
-            for symbol, snap in market_data.items()
-        }
-
         decisions = await self.llm.get_decisions(
             market_data=market_data,
             portfolio_context=portfolio_context,

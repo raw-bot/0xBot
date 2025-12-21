@@ -13,7 +13,7 @@ from typing import List, Tuple
 
 from ..core.config import config
 from ..core.logger import get_logger
-from ..models.position import Position, PositionStatus
+from ..models.position import Position, PositionSide, PositionStatus
 
 logger = get_logger(__name__)
 
@@ -141,7 +141,7 @@ class RiskBlock:
         Returns:
             Tuple of (should_exit, reason)
         """
-        if position.side == "long":
+        if position.side == PositionSide.LONG:
             # Stop loss hit
             if current_price <= position.stop_loss:
                 return True, "stop_loss"

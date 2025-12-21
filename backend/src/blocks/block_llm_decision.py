@@ -65,16 +65,24 @@ class LLMDecisionBlock:
         """
         try:
             # Convert market snapshots to dict format for prompt service
+            # Must match the format expected by _build_comprehensive_prompt
             all_coins_data = {}
             for symbol, snap in market_data.items():
                 all_coins_data[symbol] = {
-                    "price": float(snap.price),
-                    "change_24h": snap.change_24h,
-                    "rsi": snap.rsi,
-                    "ema_fast": snap.ema_fast,
-                    "ema_slow": snap.ema_slow,
-                    "atr": snap.atr,
-                    "trend": snap.trend,
+                    "current_price": float(snap.price),
+                    "funding_rate": 0.0,  # Not available from simple ticker
+                    "open_interest": {"latest": 0},
+                    "technical_indicators": {
+                        "1h": {
+                            "rsi14": snap.rsi or 50,
+                            "ema20": snap.ema_fast or 0,
+                            "ema50": snap.ema_slow or 0,
+                        }
+                    },
+                    "price_series": [],  # Would need historical data
+                    "change_24h": snap.change_24h or 0,
+                    "atr": snap.atr or 0,
+                    "trend": snap.trend or "neutral",
                 }
 
             # Get positions from context
@@ -135,18 +143,24 @@ class LLMDecisionBlock:
             logger.warning("Empty parsed response")
             return {}
 
+        # DEBUG: Log what we received
+        logger.info(f"🔍 Parsed keys: {list(parsed.keys())[:5]}")
+
         # Handle both formats:
         # 1. {symbol: {signal, ...}} - direct format from fallback
         # 2. {decisions: {symbol: {...}}} - nested format
         if "decisions" in parsed:
-            return parsed["decisions"]
+            decisions = parsed["decisions"]
+            logger.info(f"🔍 Found 'decisions' key with {len(decisions)} items")
+            return decisions
 
         # Check if it looks like direct symbol dict
         first_key = next(iter(parsed.keys()), "")
         if "/" in first_key or "USDT" in first_key:
+            logger.info(f"🔍 Direct symbol format, {len(parsed)} symbols")
             return parsed
 
-        logger.warning("Unexpected response format")
+        logger.warning(f"Unexpected response format, first key: {first_key}")
         return {}
 
     def _validate_and_fix(
@@ -157,8 +171,15 @@ class LLMDecisionBlock:
     ) -> Optional[TradingDecision]:
         """Validate and fix a single decision."""
         try:
+            # DEBUG: show raw dict for first symbol
+            if symbol == "BTC/USDT":
+                logger.info(f"🔍 RAW BTC decision: {raw}")
+
             signal = raw.get("signal", "hold").lower()
             confidence = float(raw.get("confidence", 0))
+
+            # DEBUG: Log each decision
+            logger.info(f"   📋 {symbol}: signal={signal}, conf={confidence:.0%}")
 
             # Skip hold signals
             if signal == "hold":
@@ -166,9 +187,7 @@ class LLMDecisionBlock:
 
             # Skip low confidence
             if confidence < config.MIN_CONFIDENCE_ENTRY:
-                logger.info(
-                    f"   {symbol}: Skipped (confidence {confidence:.0%} < {config.MIN_CONFIDENCE_ENTRY:.0%})"
-                )
+                logger.info(f"   {symbol}: Low conf {confidence:.0%}")
                 return None
 
             # Get current price

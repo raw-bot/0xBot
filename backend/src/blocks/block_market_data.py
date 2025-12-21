@@ -73,8 +73,6 @@ class MarketDataBlock:
             if not ticker:
                 return None
 
-            logger.info(f"✅ Ticker {symbol}: {ticker.last}")
-
             # Get OHLCV for indicators
             ohlcv_1h = await self.market_data_service.fetch_ohlcv(symbol, timeframe="1h", limit=50)
             ohlcv_4h = await self.market_data_service.fetch_ohlcv(symbol, timeframe="4h", limit=20)
