@@ -11593,5 +11593,59 @@
         "confidence": 0.0
       }
     }
+  },
+  {
+    "timestamp": "2025-12-21T07:41:15.846158",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot Fresh",
+    "symbol": "XRP/USDT",
+    "side": "long",
+    "quantity": 2829.22956424,
+    "entry_price": 1.92,
+    "stop_loss": 1.91,
+    "take_profit": 1.99,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2025-12-21T07:41:15.857174",
+    "type": "CYCLE_END",
+    "bot": "0xBot Fresh",
+    "duration_seconds": 27.6,
+    "decisions_count": 2,
+    "decisions_summary": {
+      "ETH/USDT": {
+        "signal": "hold",
+        "confidence": 0.75
+      },
+      "XRP/USDT": {
+        "signal": "buy_to_enter",
+        "confidence": 0.7
+      }
+    }
+  },
+  {
+    "timestamp": "2025-12-21T07:54:59.528753",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot Fresh",
+    "symbol": "ETH/USDT",
+    "side": "long",
+    "quantity": 0.3267,
+    "entry_price": 2979.58,
+    "stop_loss": 2830.6,
+    "take_profit": 3277.54,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2025-12-21T07:54:59.540268",
+    "type": "CYCLE_END",
+    "bot": "0xBot Fresh",
+    "duration_seconds": 27.9,
+    "decisions_count": 1,
+    "decisions_summary": {
+      "ETH/USDT": {
+        "signal": "buy_to_enter",
+        "confidence": 0.72
+      }
+    }
   }
 ]
