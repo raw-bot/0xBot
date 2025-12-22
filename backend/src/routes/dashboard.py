@@ -180,7 +180,7 @@ async def get_dashboard_data(
         )
         if start_time:
             trades_query = trades_query.where(Trade.executed_at >= start_time)
-        trades_query = trades_query.order_by(Trade.executed_at)
+        trades_query = trades_query.order_by(Trade.executed_at.desc())
         trades_result = await db.execute(trades_query)
         all_trade_rows = list(trades_result.all())
 
