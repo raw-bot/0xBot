@@ -372,26 +372,49 @@ class MultiCoinPromptService:
             lines.append("- Portfolio state not provided")
         lines.append("")
 
-        # Open Positions
+        # Open Positions - Enhanced for LLM exit analysis
         if all_positions:
-            lines.append("### Open Positions")
+            lines.append("### Open Positions (ANALYZE EACH FOR EXIT)")
+            lines.append("")
             for pos in all_positions:
                 if hasattr(pos, "symbol"):
                     coin = self.coin_mapping.get(pos.symbol, pos.symbol)
                     side = pos.side.upper() if hasattr(pos, "side") else "UNKNOWN"
                     qty = float(pos.quantity) if hasattr(pos, "quantity") else 0
                     entry = float(pos.entry_price) if hasattr(pos, "entry_price") else 0
-                    current = float(pos.current_price) if hasattr(pos, "current_price") else 0
+                    current = float(pos.current_price) if hasattr(pos, "current_price") else entry
+                    sl = float(pos.stop_loss) if hasattr(pos, "stop_loss") else 0
+                    tp = float(pos.take_profit) if hasattr(pos, "take_profit") else 0
 
+                    # Calculate P&L
                     if side == "LONG":
                         pnl = (current - entry) * qty
+                        sl_dist = ((sl - current) / current * 100) if current > 0 else 0
+                        tp_dist = ((tp - current) / current * 100) if current > 0 else 0
                     else:
                         pnl = (entry - current) * qty
+                        sl_dist = ((current - sl) / current * 100) if current > 0 else 0
+                        tp_dist = ((current - tp) / current * 100) if current > 0 else 0
                     pnl_pct = (pnl / (entry * qty) * 100) if entry * qty > 0 else 0
 
+                    # Calculate hold time
+                    hold_hours = 0.0
+                    if hasattr(pos, "opened_at") and pos.opened_at:
+                        from datetime import datetime
+
+                        hold_duration = datetime.utcnow() - pos.opened_at
+                        hold_hours = hold_duration.total_seconds() / 3600
+
+                    lines.append(f"**{coin}** ({pos.symbol}):")
+                    lines.append(f"  - Side: {side} | Qty: {qty:.6f}")
+                    lines.append(f"  - Entry: ${entry:,.2f} → Current: ${current:,.2f}")
+                    lines.append(f"  - **Unrealized P&L: ${pnl:+,.2f} ({pnl_pct:+.2f}%)**")
                     lines.append(
-                        f"- **{coin}**: {side} {qty:.4f} @ ${entry:,.4f} → ${current:,.4f} (PnL: ${pnl:+,.2f} / {pnl_pct:+.2f}%)"
+                        f"  - SL: ${sl:,.2f} ({sl_dist:+.1f}% away) | TP: ${tp:,.2f} ({tp_dist:+.1f}% away)"
                     )
+                    lines.append(f"  - Hold time: {hold_hours:.1f} hours")
+                    lines.append(f"  - **⚠️ DECIDE: HOLD or CLOSE this position?**")
+                    lines.append("")
                 elif isinstance(pos, dict):
                     symbol = pos.get("symbol", "UNKNOWN")
                     coin = self.coin_mapping.get(symbol, symbol)

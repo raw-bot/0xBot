@@ -132,19 +132,12 @@ class TradingOrchestrator:
         logger.info("📊 Step 4: Getting LLM decisions...")
 
         # Build portfolio context for LLM
+        # Pass full Position objects for complete exit analysis
         portfolio_context = {
             "cash": float(portfolio_state.cash),
             "equity": float(portfolio_state.equity),
             "return_pct": portfolio_state.return_pct,
-            "positions": [
-                {
-                    "symbol": p.symbol,
-                    "side": p.side,
-                    "entry_price": float(p.entry_price),
-                    "unrealized_pnl": float(p.unrealized_pnl),
-                }
-                for p in portfolio_state.open_positions
-            ],
+            "positions": portfolio_state.open_positions,  # Full Position objects
         }
 
         decisions = await self.llm.get_decisions(
@@ -218,6 +211,24 @@ class TradingOrchestrator:
         portfolio_state,
     ) -> None:
         """Validate and execute a single decision."""
+
+        # Handle CLOSE signals from LLM
+        if decision.signal == "close":
+            # Find open position for this symbol
+            symbol_positions = [
+                p for p in portfolio_state.open_positions if p.symbol == decision.symbol
+            ]
+            if symbol_positions:
+                position = symbol_positions[0]
+                current_price = market_data.get(decision.symbol)
+                if current_price:
+                    logger.info(f"🔴 LLM EXIT {decision.symbol}: {decision.reasoning[:50]}...")
+                    await self.execution.close_position(
+                        position=position,
+                        current_price=current_price.price,
+                        reason="llm_decision",
+                    )
+            return
 
         # Only process entry signals
         if decision.signal not in ["buy_to_enter", "sell_to_enter"]:
