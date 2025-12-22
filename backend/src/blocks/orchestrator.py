@@ -172,12 +172,16 @@ class TradingOrchestrator:
         await self.portfolio.record_snapshot()
 
     async def _check_exits(self, positions: list, market_data: dict) -> None:
-        """Check if any positions should be closed."""
+        """Check if any positions should be closed and update current prices."""
         for position in positions:
             if position.symbol not in market_data:
                 continue
 
             current_price = market_data[position.symbol].price
+
+            # Update position with current price and unrealized PnL
+            await self._update_position_price(position, current_price)
+
             should_exit, reason = self.risk.check_exit_conditions(position, current_price)
 
             if should_exit:
@@ -187,6 +191,25 @@ class TradingOrchestrator:
                     current_price=current_price,
                     reason=reason,
                 )
+
+    async def _update_position_price(self, position, current_price: float) -> None:
+        """Update position with current market price."""
+        from ..core.database import AsyncSessionLocal
+
+        try:
+            price = float(current_price)
+
+            # Only update current_price - unrealized_pnl is a calculated property
+            from sqlalchemy import text
+
+            async with AsyncSessionLocal() as db:
+                await db.execute(
+                    text("UPDATE positions SET current_price = :price WHERE id = :id"),
+                    {"price": round(price, 8), "id": str(position.id)},
+                )
+                await db.commit()
+        except Exception as e:
+            logger.warning(f"Failed to update position: {e}")
 
     async def _execute_decision(
         self,
