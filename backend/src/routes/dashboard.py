@@ -33,6 +33,7 @@ class DashboardBotResponse(BaseModel):
     capital: float
     initial_capital: float
     total_trades: int
+    winning_trades: int = 0
 
 
 class DashboardPositionResponse(BaseModel):
@@ -62,6 +63,8 @@ class TradeHistoryItem(BaseModel):
     side: str
     pnl: float
     cumulative_pnl: float  # Running total for this symbol
+    entry_price: float = 0.0
+    exit_price: float = 0.0
 
 
 class DashboardResponse(BaseModel):
@@ -195,8 +198,13 @@ async def get_dashboard_data(
                     side=trade.side,
                     pnl=pnl,
                     cumulative_pnl=cumulative_by_symbol[symbol],
+                    entry_price=float(trade.price) if trade.price else 0.0,
+                    exit_price=float(trade.price) if trade.price else 0.0,
                 )
             )
+
+        # Count winning trades
+        winning_trades = sum(1 for t in all_trades if t.realized_pnl and float(t.realized_pnl) > 0)
 
         return DashboardResponse(
             bot=DashboardBotResponse(
@@ -206,6 +214,7 @@ async def get_dashboard_data(
                 capital=float(bot.capital),
                 initial_capital=initial_capital,
                 total_trades=total_trades,
+                winning_trades=winning_trades,
             ),
             positions=[
                 DashboardPositionResponse(
