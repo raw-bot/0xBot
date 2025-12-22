@@ -400,8 +400,6 @@ class MultiCoinPromptService:
                     # Calculate hold time
                     hold_hours = 0.0
                     if hasattr(pos, "opened_at") and pos.opened_at:
-                        from datetime import datetime
-
                         hold_duration = datetime.utcnow() - pos.opened_at
                         hold_hours = hold_duration.total_seconds() / 3600
 
