@@ -555,6 +555,19 @@
             background: rgba(0,0,0,0.015);
         }
 
+        .trades-table th.sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .trades-table th.sortable:hover {
+            background: rgba(0,0,0,0.05);
+            color: var(--accent);
+        }
+
+        .trades-table th.sort-asc::after { content: ' ▲'; }
+        .trades-table th.sort-desc::after { content: ' ▼'; }
+
         .trades-table td {
             padding: 6px 10px;
             font-size: 11px;
@@ -736,14 +749,14 @@
             <table class="trades-table">
                 <thead>
                     <tr>
-                        <th>Symbol</th>
-                        <th>Side</th>
-                        <th>Status</th>
-                        <th>Size</th>
-                        <th>Entry</th>
-                        <th>Exit</th>
-                        <th>PnL</th>
-                        <th>Time</th>
+                        <th data-sort="symbol" class="sortable">Symbol ↕</th>
+                        <th data-sort="side" class="sortable">Side ↕</th>
+                        <th data-sort="status" class="sortable">Status ↕</th>
+                        <th data-sort="size" class="sortable">Size ↕</th>
+                        <th data-sort="entry" class="sortable">Entry ↕</th>
+                        <th data-sort="exit" class="sortable">Exit ↕</th>
+                        <th data-sort="pnl" class="sortable">PnL ↕</th>
+                        <th data-sort="time" class="sortable">Time ↕</th>
                     </tr>
                 </thead>
                 <tbody id="trades-body">
@@ -963,6 +976,61 @@
                 fetchDashboardData(currentPeriod);
             });
         });
+
+        // Sortable columns
+        let currentSort = { column: 'time', direction: 'desc' };
+        let currentTrades = [];
+
+        function sortTrades(column) {
+            // Toggle direction if same column
+            if (currentSort.column === column) {
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.column = column;
+                currentSort.direction = 'desc';
+            }
+
+            // Update header classes
+            document.querySelectorAll('.trades-table th').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                if (th.dataset.sort === column) {
+                    th.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
+                }
+            });
+
+            // Sort the trades
+            const sorted = [...currentTrades].sort((a, b) => {
+                let valA, valB;
+                switch(column) {
+                    case 'symbol': valA = a.symbol; valB = b.symbol; break;
+                    case 'side': valA = a.side; valB = b.side; break;
+                    case 'status': valA = a.pnl === 0 ? 'open' : 'closed'; valB = b.pnl === 0 ? 'open' : 'closed'; break;
+                    case 'size': valA = a.size || 0; valB = b.size || 0; break;
+                    case 'entry': valA = a.entry_price || 0; valB = b.entry_price || 0; break;
+                    case 'exit': valA = a.exit_price || 0; valB = b.exit_price || 0; break;
+                    case 'pnl': valA = a.pnl || 0; valB = b.pnl || 0; break;
+                    case 'time': valA = new Date(a.timestamp); valB = new Date(b.timestamp); break;
+                    default: return 0;
+                }
+                if (valA < valB) return currentSort.direction === 'asc' ? -1 : 1;
+                if (valA > valB) return currentSort.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            renderTrades(sorted);
+        }
+
+        // Add click handlers to sortable headers
+        document.querySelectorAll('.trades-table th.sortable').forEach(th => {
+            th.addEventListener('click', () => sortTrades(th.dataset.sort));
+        });
+
+        // Store trades when fetched
+        const originalRenderTrades = renderTrades;
+        renderTrades = function(trades) {
+            currentTrades = trades;
+            originalRenderTrades(trades);
+        };
 
         fetchDashboardData('24h');
         setInterval(() => fetchDashboardData(currentPeriod), 30000);
