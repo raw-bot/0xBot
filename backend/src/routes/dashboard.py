@@ -170,7 +170,6 @@ async def get_dashboard_data(
             total_return_pct = ((current_equity - initial_capital) / initial_capital) * 100
 
         # Count trades and build trade history for chart
-        from ..models.position import Position
         from ..models.trade import Trade
 
         # Query trades with their positions to get entry_price
