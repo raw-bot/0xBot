@@ -546,8 +546,8 @@
 
         .trades-table th {
             text-align: left;
-            padding: 12px 20px;
-            font-size: 10px;
+            padding: 6px 10px;
+            font-size: 9px;
             font-weight: 500;
             color: var(--text-light);
             text-transform: uppercase;
@@ -556,8 +556,8 @@
         }
 
         .trades-table td {
-            padding: 14px 20px;
-            font-size: 12px;
+            padding: 6px 10px;
+            font-size: 11px;
             color: var(--text-medium);
             border-bottom: 1px solid rgba(0,0,0,0.03);
         }
@@ -918,7 +918,7 @@
                 tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No trades yet</td></tr>';
                 return;
             }
-            tbody.innerHTML = trades.slice().reverse().slice(0, 15).map(t => {
+            tbody.innerHTML = trades.slice().reverse().slice(0, 30).map(t => {
                 const isProfit = t.pnl >= 0;
                 const sym = t.symbol.split('/')[0].toLowerCase();
                 return `
