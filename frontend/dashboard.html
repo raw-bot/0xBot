@@ -741,12 +741,13 @@
                         <th>Status</th>
                         <th>Size</th>
                         <th>Entry</th>
+                        <th>Exit</th>
                         <th>PnL</th>
                         <th>Time</th>
                     </tr>
                 </thead>
                 <tbody id="trades-body">
-                    <tr><td colspan="7" class="empty-state">No trades yet</td></tr>
+                    <tr><td colspan="8" class="empty-state">No trades yet</td></tr>
                 </tbody>
             </table>
         </div>
@@ -944,6 +945,7 @@
                         <td><span class="status-badge ${statusClass}">${status}</span></td>
                         <td>$${(t.size || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</td>
                         <td>$${t.entry_price?.toFixed(2) || '0.00'}</td>
+                        <td>${isEntry ? '-' : '$' + (t.exit_price?.toFixed(2) || '0.00')}</td>
                         <td class="pnl-cell" style="color: ${isEntry ? 'var(--text-light)' : (isProfit ? 'var(--success)' : 'var(--danger)')}">${isEntry ? '-' : (isProfit ? '+' : '') + '$' + pnl.toFixed(2)}</td>
                         <td>${new Date(t.timestamp+'Z').toLocaleTimeString('fr-FR')}</td>
                     </tr>

@@ -170,14 +170,20 @@ async def get_dashboard_data(
             total_return_pct = ((current_equity - initial_capital) / initial_capital) * 100
 
         # Count trades and build trade history for chart
+        from ..models.position import Position
         from ..models.trade import Trade
 
-        trades_query = select(Trade).where(Trade.bot_id == bot.id)
+        # Query trades with their positions to get entry_price
+        trades_query = (
+            select(Trade, Position)
+            .outerjoin(Position, Trade.position_id == Position.id)
+            .where(Trade.bot_id == bot.id)
+        )
         if start_time:
             trades_query = trades_query.where(Trade.executed_at >= start_time)
         trades_query = trades_query.order_by(Trade.executed_at)
         trades_result = await db.execute(trades_query)
-        all_trades = list(trades_result.scalars().all())
+        all_trade_rows = list(trades_result.all())
 
         # Get total trades (unfiltered) for stats
         total_trades_query = select(Trade).where(Trade.bot_id == bot.id)
@@ -187,14 +193,25 @@ async def get_dashboard_data(
         # Calculate cumulative PnL per symbol
         cumulative_by_symbol = {}
         trade_history = []
-        for trade in all_trades:
+        for trade, position in all_trade_rows:
             symbol = trade.symbol
             pnl = float(trade.realized_pnl) if trade.realized_pnl else 0.0
             if symbol not in cumulative_by_symbol:
                 cumulative_by_symbol[symbol] = 0.0
             cumulative_by_symbol[symbol] += pnl
             qty = float(trade.quantity) if trade.quantity else 0.0
-            price = float(trade.price) if trade.price else 0.0
+            trade_price = float(trade.price) if trade.price else 0.0
+
+            # For exit trades (pnl != 0), use position.entry_price as entry
+            # For entry trades (pnl == 0), use trade.price as entry
+            is_exit = pnl != 0
+            if is_exit and position:
+                entry_p = float(position.entry_price)
+                exit_p = trade_price
+            else:
+                entry_p = trade_price
+                exit_p = 0.0
+
             trade_history.append(
                 TradeHistoryItem(
                     timestamp=trade.executed_at.isoformat(),
@@ -202,15 +219,17 @@ async def get_dashboard_data(
                     side=trade.side,
                     pnl=pnl,
                     cumulative_pnl=cumulative_by_symbol[symbol],
-                    entry_price=price,
-                    exit_price=price,
+                    entry_price=entry_p,
+                    exit_price=exit_p,
                     quantity=qty,
-                    size=qty * price,
+                    size=qty * entry_p,  # Size based on entry price
                 )
             )
 
         # Count winning trades
-        winning_trades = sum(1 for t in all_trades if t.realized_pnl and float(t.realized_pnl) > 0)
+        winning_trades = sum(
+            1 for t, _ in all_trade_rows if t.realized_pnl and float(t.realized_pnl) > 0
+        )
 
         return DashboardResponse(
             bot=DashboardBotResponse(
