@@ -65,6 +65,8 @@ class TradeHistoryItem(BaseModel):
     cumulative_pnl: float  # Running total for this symbol
     entry_price: float = 0.0
     exit_price: float = 0.0
+    quantity: float = 0.0
+    size: float = 0.0  # Notional value (qty * price)
 
 
 class DashboardResponse(BaseModel):
@@ -191,6 +193,8 @@ async def get_dashboard_data(
             if symbol not in cumulative_by_symbol:
                 cumulative_by_symbol[symbol] = 0.0
             cumulative_by_symbol[symbol] += pnl
+            qty = float(trade.quantity) if trade.quantity else 0.0
+            price = float(trade.price) if trade.price else 0.0
             trade_history.append(
                 TradeHistoryItem(
                     timestamp=trade.executed_at.isoformat(),
@@ -198,8 +202,10 @@ async def get_dashboard_data(
                     side=trade.side,
                     pnl=pnl,
                     cumulative_pnl=cumulative_by_symbol[symbol],
-                    entry_price=float(trade.price) if trade.price else 0.0,
-                    exit_price=float(trade.price) if trade.price else 0.0,
+                    entry_price=price,
+                    exit_price=price,
+                    quantity=qty,
+                    size=qty * price,
                 )
             )
 
