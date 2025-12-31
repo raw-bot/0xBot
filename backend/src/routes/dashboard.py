@@ -12,7 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.database import get_db
 from ..core.logger import get_logger
 from ..models.bot import Bot, BotStatus
+from ..models.equity_snapshot import EquitySnapshot
 from ..models.position import Position
+from ..models.trade import Trade
+from ..services.market_sentiment_service import get_sentiment_service
 
 logger = get_logger(__name__)
 
@@ -46,6 +49,7 @@ class DashboardPositionResponse(BaseModel):
     current_price: float
     unrealized_pnl: float
     unrealized_pnl_pct: float
+    leverage: float
 
 
 class DashboardEquitySnapshot(BaseModel):
@@ -141,14 +145,17 @@ async def get_dashboard_data(
         )
 
         # Get equity snapshots
-        from ..models.equity_snapshot import EquitySnapshot
 
         now = datetime.utcnow()
         period_map = {
             "1h": timedelta(hours=1),
+            "6h": timedelta(hours=6),
+            "12h": timedelta(hours=12),
             "24h": timedelta(hours=24),
             "7d": timedelta(days=7),
+            "7j": timedelta(days=7),  # French alias
             "30d": timedelta(days=30),
+            "30j": timedelta(days=30),  # French alias
         }
         time_delta = period_map.get(period)
         start_time = now - time_delta if time_delta else None
@@ -170,7 +177,6 @@ async def get_dashboard_data(
             total_return_pct = ((current_equity - initial_capital) / initial_capital) * 100
 
         # Count trades and build trade history for chart
-        from ..models.trade import Trade
 
         # Query trades with their positions to get entry_price
         trades_query = (
@@ -249,6 +255,7 @@ async def get_dashboard_data(
                     current_price=float(p.current_price),
                     unrealized_pnl=float(p.unrealized_pnl),
                     unrealized_pnl_pct=float(p.unrealized_pnl_pct),
+                    leverage=float(p.leverage) if p.leverage else 1.0,
                 )
                 for p in positions
             ],
@@ -304,3 +311,42 @@ async def list_bots_public(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list bots"
         )
+
+
+@router.get("/sentiment")
+async def get_market_sentiment():
+    """
+    Get current market sentiment data (Fear & Greed Index, global market).
+    This endpoint is used by the dashboard widget.
+    """
+    try:
+        sentiment_service = get_sentiment_service()
+        sentiment = await sentiment_service.get_market_sentiment()
+
+        if not sentiment:
+            return {"available": False, "error": "Sentiment data unavailable"}
+
+        return {
+            "available": True,
+            "fear_greed": {
+                "value": sentiment.fear_greed.value,
+                "label": sentiment.fear_greed.label,
+                "yesterday": sentiment.fear_greed.yesterday_value,
+                "last_week": sentiment.fear_greed.last_week_value,
+                "trend": sentiment.fear_greed.trend,
+            },
+            "global_market": {
+                "total_market_cap": sentiment.global_market.total_market_cap_usd,
+                "market_cap_change_24h": sentiment.global_market.market_cap_change_24h,
+                "btc_dominance": sentiment.global_market.btc_dominance,
+                "eth_dominance": sentiment.global_market.eth_dominance,
+                "trending_coins": sentiment.global_market.trending_coins,
+            },
+            "market_phase": sentiment.market_phase.value,
+            "llm_guidance": sentiment.llm_guidance,
+            "timestamp": sentiment.fetched_at.isoformat(),
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching sentiment: {e}")
+        return {"available": False, "error": str(e)}

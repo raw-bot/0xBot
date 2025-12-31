@@ -30,6 +30,7 @@ from .indicator_service import IndicatorService
 from .llm_decision_validator import LLMDecisionValidator
 from .market_analysis_service import MarketAnalysisService
 from .market_data_service import MarketDataService
+from .market_sentiment_service import get_sentiment_service
 from .news_service import NewsService
 from .position_service import PositionService
 from .risk_manager_service import RiskManagerService
@@ -97,6 +98,7 @@ class TradingEngine:
         self.position_service = PositionService(db)
         self.trade_executor = TradeExecutorService(db)
         self.llm_client = llm_client or get_llm_client()
+        self.sentiment_service = get_sentiment_service()
 
         # Initialize multi-coin prompt service
         try:
@@ -226,6 +228,19 @@ class TradingEngine:
             # Fetch News for Narrative Analysis
             news_data = await self.news_service.get_latest_news(self.trading_symbols)
 
+            # Fetch Market Sentiment (Fear & Greed, Global Data)
+            sentiment_data = None
+            try:
+                sentiment_data = await self.sentiment_service.get_market_sentiment()
+                if sentiment_data:
+                    logger.info(
+                        f"📊 F&G: {sentiment_data.fear_greed.value} "
+                        f"({sentiment_data.fear_greed.label}) | "
+                        f"BTC Dom: {sentiment_data.global_market.btc_dominance:.1f}%"
+                    )
+            except Exception as e:
+                logger.warning(f"Could not fetch sentiment: {e}")
+
             # Generate comprehensive prompt with all analysis
             prompt_data = self.prompt_service.get_multi_coin_decision(
                 bot=self.bot,
@@ -233,6 +248,7 @@ class TradingEngine:
                 all_positions=all_positions_dict,
                 news_data=news_data,
                 portfolio_state=portfolio_state,
+                sentiment_data=sentiment_data,
             )
 
             logger.info(
@@ -276,8 +292,9 @@ class TradingEngine:
                 decisions=decisions,
             )
 
-            # Record equity snapshot every 10 cycles (~30 min)
-            if self.cycle_count % 10 == 0:
+            # Record equity snapshot every cycle (5 min) to populate chart
+            # Previously was % 10 (50 min) which was too slow
+            if self.cycle_count == 1 or self.cycle_count % 1 == 0:
                 await self._record_equity_snapshot()
 
         except Exception as e:
@@ -286,7 +303,6 @@ class TradingEngine:
     def _log_llm_decision(self, prompt: str, response: str) -> None:
         """Log detailed LLM prompt and response to dedicated file for analysis."""
         import os
-        from datetime import datetime
 
         log_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         log_file = os.path.join(log_dir, "llm_decisions.log")

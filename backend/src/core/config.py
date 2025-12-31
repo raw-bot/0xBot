@@ -45,7 +45,6 @@ class TradingConfig:
         "BNB/USDT",
         "XRP/USDT",
         "ADA/USDT",
-        "DOGE/USDT",
         "AVAX/USDT",
         "DOT/USDT",
     ]

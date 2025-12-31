@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
@@ -243,7 +244,17 @@ async def list_bots(
     """
     try:
         bot_service = BotService(db)
+        logger.info(f"Listing bots for user: {current_user.id} ({current_user.email})")
+
+        # DEBUG: Check if ANY bots exist
+        all_bots_result = await db.execute(select(Bot))
+        all_bots = list(all_bots_result.scalars().all())
+        logger.info(f"DEBUG: Total bots in system: {len(all_bots)}")
+        for b in all_bots:
+            logger.info(f"  - Bot: {b.id}, User: {b.user_id}, Status: {b.status}")
+
         bots = await bot_service.get_user_bots(current_user.id, include_stopped)
+        logger.info(f"Found {len(bots)} bots for user {current_user.id}")
 
         return BotListResponse(bots=[_bot_to_response(bot) for bot in bots], total=len(bots))
 

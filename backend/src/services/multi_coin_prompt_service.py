@@ -16,6 +16,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from .alpha_setup_generator import AlphaSetup, AlphaSetupGenerator
+from .market_sentiment_service import MarketSentiment, get_sentiment_service
 from .narrative_analyzer import NarrativeAnalyzer, NarrativeClassification
 from .pain_trade_analyzer import PainTradeAnalyzer, SqueezeAnalysis
 
@@ -41,6 +42,7 @@ class MultiCoinPromptService:
         self.narrative_analyzer = NarrativeAnalyzer()
         self.pain_trade_analyzer = PainTradeAnalyzer()
         self.alpha_setup_generator = AlphaSetupGenerator()
+        self.sentiment_service = get_sentiment_service()
 
         # Coin mapping
         self.coin_mapping = {
@@ -81,6 +83,7 @@ class MultiCoinPromptService:
         all_positions: List,
         news_data: Optional[List[Dict]] = None,
         portfolio_state: Optional[Dict] = None,
+        sentiment_data: Optional[MarketSentiment] = None,
     ) -> Dict:
         """
         Generate NoF1-style comprehensive multi-coin prompt.
@@ -91,6 +94,7 @@ class MultiCoinPromptService:
             all_positions: List of open positions
             news_data: Optional list of news items from NewsService
             portfolio_state: Optional portfolio state dict
+            sentiment_data: Optional market sentiment from MarketSentimentService
 
         Returns:
             Dict with 'prompt', 'timestamp', and metadata
@@ -149,6 +153,12 @@ class MultiCoinPromptService:
             # Alpha setup generation
             alpha_setups[symbol] = self._generate_alpha_setup(symbol, market_data, narrative_class)
 
+        # Use provided sentiment or fetch if not provided
+        sentiment = sentiment_data
+        if sentiment is None:
+            # Try to get cached sentiment (sync-safe)
+            sentiment = self.sentiment_service._cached_sentiment
+
         # Build the prompt
         prompt = self._build_comprehensive_prompt(
             symbols=symbols,
@@ -160,6 +170,7 @@ class MultiCoinPromptService:
             crowded_trades=crowded_trades,
             alpha_setups=alpha_setups,
             portfolio_state=portfolio_state,
+            sentiment=sentiment,
         )
 
         return {
@@ -303,6 +314,7 @@ class MultiCoinPromptService:
         crowded_trades: Dict,
         alpha_setups: Dict[str, AlphaSetup],
         portfolio_state: Optional[Dict],
+        sentiment: Optional[MarketSentiment] = None,
     ) -> str:
         """Build the complete NoF1-style prompt."""
         lines = []
@@ -312,6 +324,15 @@ class MultiCoinPromptService:
         lines.append("# CURRENT STATE OF MARKETS")
         lines.append(f"It is {now.strftime('%Y-%m-%d')} {now.strftime('%H:%M')} UTC.")
         lines.append("")
+
+        # Section 0: Market Sentiment Context (Fear & Greed, Global Data)
+        if sentiment:
+            lines.append(self.sentiment_service.format_for_prompt(sentiment))
+        else:
+            lines.append("## 0. MARKET SENTIMENT CONTEXT")
+            lines.append("")
+            lines.append("*Sentiment data unavailable*")
+            lines.append("")
 
         # Section 1: Raw Data Dashboard
         lines.append("## 1. RAW DATA DASHBOARD")

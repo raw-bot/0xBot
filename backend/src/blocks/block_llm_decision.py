@@ -9,6 +9,7 @@ This block is responsible for:
 
 import os
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -114,7 +115,7 @@ class LLMDecisionBlock:
             # Validate and fix decisions
             decisions = {}
             for symbol, raw in raw_decisions.items():
-                decision = self._validate_and_fix(symbol, raw, market_data)
+                decision = self._validate_and_fix(symbol, raw, market_data, positions)
                 if decision:
                     decisions[symbol] = decision
                     logger.info(
@@ -168,6 +169,7 @@ class LLMDecisionBlock:
         symbol: str,
         raw: dict,
         market_data: Dict[str, Any],
+        positions: List = None,
     ) -> Optional[TradingDecision]:
         """Validate and fix a single decision."""
         try:
@@ -185,11 +187,33 @@ class LLMDecisionBlock:
             if signal == "hold":
                 return None
 
-            # Close signals should be processed (but orchestrator handles them)
+            # Close signals - check minimum position age first
             if signal == "close":
+                # Find position for this symbol
+                if positions:
+                    pos = next((p for p in positions if getattr(p, "symbol", None) == symbol), None)
+                    if pos and hasattr(pos, "opened_at") and pos.opened_at:
+                        age_seconds = (datetime.utcnow() - pos.opened_at).total_seconds()
+                        min_age = config.MIN_POSITION_AGE_FOR_EXIT_SECONDS
+                        if age_seconds < min_age:
+                            logger.info(
+                                f"   ⏳ {symbol}: Position too young "
+                                f"({age_seconds/60:.0f}min < {min_age/60:.0f}min)"
+                            )
+                            return None  # Ignore close signal
+
                 logger.info(f"   🔴 {symbol}: Close signal received")
-                # We'll handle closes via exit conditions in orchestrator
-                return None
+                return TradingDecision(
+                    symbol=symbol,
+                    signal="close",
+                    confidence=confidence,
+                    side="",  # Not relevant for close
+                    stop_loss=None,
+                    take_profit=None,
+                    size_pct=0,
+                    leverage=1,
+                    reasoning=raw.get("justification", raw.get("reasoning", "LLM close signal")),
+                )
 
             # For entry signals, check confidence
             if signal in ["buy_to_enter", "sell_to_enter"]:
