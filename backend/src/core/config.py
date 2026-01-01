@@ -29,13 +29,13 @@ class TradingConfig:
 
     # Position Management
     MAX_POSITION_AGE_SECONDS: int = 7200  # 2 hours
-    MIN_POSITION_AGE_FOR_EXIT_SECONDS: int = 1800  # 30 minutes
+    MIN_POSITION_AGE_FOR_EXIT_SECONDS: int = 3600  # 1 hour - more time to develop
 
-    # Risk Management (NoF1 Aggressive Mode)
-    DEFAULT_STOP_LOSS_PCT: float = 0.05  # 5% (wider SL for volatility)
-    DEFAULT_TAKE_PROFIT_PCT: float = 0.10  # 10% TP
-    DEFAULT_POSITION_SIZE_PCT: float = 0.20  # 20% position size (NoF1 style)
-    DEFAULT_LEVERAGE: float = 10.0  # 10x Leverage (NoF1 aggressive mode)
+    # Risk Management - Optimized for better R/R
+    DEFAULT_STOP_LOSS_PCT: float = 0.03  # 3% SL - room for volatility
+    DEFAULT_TAKE_PROFIT_PCT: float = 0.06  # 6% TP - 2:1 ratio, more achievable
+    DEFAULT_POSITION_SIZE_PCT: float = 0.15  # 15% position size (conservative)
+    DEFAULT_LEVERAGE: float = 5.0  # 5x Leverage - reduced risk
 
     # Security: Allowed trading symbols whitelist
     ALLOWED_SYMBOLS: List[str] = [
