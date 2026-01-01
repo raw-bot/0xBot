@@ -261,6 +261,7 @@ class LLMDecisionBlock:
                 take_profit=Decimal(str(take_profit)),
                 # Cap size_pct to max 25% to avoid margin errors
                 size_pct=min(0.25, float(raw.get("size_pct", config.DEFAULT_POSITION_SIZE_PCT))),
+                # Let LLM decide leverage based on conviction
                 leverage=int(raw.get("leverage", config.DEFAULT_LEVERAGE)),
                 reasoning=raw.get("reasoning", raw.get("justification", "")),
             )

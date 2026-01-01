@@ -71,6 +71,8 @@ class TradeHistoryItem(BaseModel):
     exit_price: float = 0.0
     quantity: float = 0.0
     size: float = 0.0  # Notional value (qty * price)
+    margin: float = 0.0  # Actual capital used (size / leverage)
+    leverage: float = 1.0
 
 
 class DashboardResponse(BaseModel):
@@ -217,6 +219,11 @@ async def get_dashboard_data(
                 entry_p = trade_price
                 exit_p = 0.0
 
+            # Get leverage from position
+            lev = float(position.leverage) if position and position.leverage else 1.0
+            notional = qty * entry_p
+            margin = notional / lev if lev > 0 else notional
+
             trade_history.append(
                 TradeHistoryItem(
                     timestamp=trade.executed_at.isoformat(),
@@ -227,7 +234,9 @@ async def get_dashboard_data(
                     entry_price=entry_p,
                     exit_price=exit_p,
                     quantity=qty,
-                    size=qty * entry_p,  # Size based on entry price
+                    size=notional,
+                    margin=margin,
+                    leverage=lev,
                 )
             )
 

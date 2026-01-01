@@ -1096,7 +1096,10 @@
                 </div>
                 <div class="balance-section">
                     <div class="balance-label" id="chart-title">total equity</div>
-                    <div class="balance-value" id="total-equity">$10,000.00</div>
+                    <div style="display: flex; align-items: baseline; gap: 20px;">
+                        <div class="balance-value" id="total-equity">$10 000,00</div>
+                        <div class="equity-breakdown" id="equity-breakdown" style="font-size: 0.75rem; color: #000;"></div>
+                    </div>
                     <div class="return-tag" id="return-tag">+0.00%</div>
                 </div>
                 <div class="chart-area">
@@ -1211,6 +1214,21 @@
     <script>
         const API_BASE = 'http://localhost:8000/api';
         let currentPeriod = '24h';
+
+        // French number formatting (spaces as thousands separator)
+        function formatMoney(num, decimals = 2) {
+            if (num == null || isNaN(num)) return '0.00';
+            const fixed = Number(num).toFixed(decimals);
+            const parts = fixed.split('.');
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+            return parts.join(',');
+        }
+        function formatPrice(num) {
+            if (num == null || isNaN(num)) return '0,00';
+            if (Math.abs(num) >= 1000) return formatMoney(num, 2);
+            if (Math.abs(num) >= 1) return formatMoney(num, 4);
+            return formatMoney(num, 6);
+        }
 
         // Time
         setInterval(() => {
@@ -1371,7 +1389,7 @@
             // Update displayed value and percentage based on mode
             const sign = displayValue >= 0 ? '' : '';
             document.getElementById('total-equity').textContent =
-                '$' + displayValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                '$' + formatMoney(displayValue);
 
             const tag = document.getElementById('return-tag');
             tag.textContent = (displayPct >= 0 ? '+' : '') + displayPct.toFixed(2) + '%';
@@ -1392,13 +1410,26 @@
 
                 // Equity Display
                 document.getElementById('total-equity').textContent =
-                    '$' + data.current_equity.toLocaleString(undefined, {minimumFractionDigits: 2});
+                    '$' + formatMoney(data.current_equity);
 
                 // Return
                 const tag = document.getElementById('return-tag');
                 const pct = data.total_return_pct;
                 tag.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
                 tag.className = 'return-tag' + (pct < 0 ? ' negative' : '');
+
+                // Equity breakdown: Cash + Margin + Unrealized PnL
+                const cash = data.bot?.capital || 0;
+                const positions = data.positions || [];
+                const marginLocked = positions.reduce((sum, p) => {
+                    const lev = p.leverage || 1;
+                    return sum + (p.entry_price * p.quantity / lev);
+                }, 0);
+                const unrealizedPnl = data.total_unrealized_pnl || 0;
+                const breakdownEl = document.getElementById('equity-breakdown');
+                const pnlSign = unrealizedPnl >= 0 ? '+' : '';
+                const pnlColor = unrealizedPnl >= 0 ? 'var(--success)' : 'var(--danger)';
+                breakdownEl.innerHTML = `Cash: $${formatMoney(cash)} | Marge: $${formatMoney(marginLocked)} | PnL: <span style="color:${pnlColor}">${pnlSign}$${formatMoney(unrealizedPnl)}</span>`;
 
                 // Win rate
                 if (data.bot && data.bot.total_trades > 0) {
@@ -1432,13 +1463,13 @@
                     <div class="position-card ${isProfit ? 'profit' : 'loss'}">
                         <div class="position-info">
                             <h4>${p.symbol} <span class="position-leverage">${leverage}x</span></h4>
-                            <span>${p.side.toUpperCase()} · ${p.quantity?.toFixed(4) || 0}</span>
+                            <span>${p.side.toUpperCase()} · ${formatMoney(p.quantity, 4)}</span>
                         </div>
                         <div class="position-pnl">
                             <div class="value ${isProfit ? 'positive' : 'negative'}">
-                                ${isProfit ? '+' : ''}$${p.unrealized_pnl?.toFixed(2) || '0.00'}
+                                ${isProfit ? '+' : ''}$${formatMoney(p.unrealized_pnl)}
                             </div>
-                            <div class="percent">${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%</div>
+                            <div class="percent">${pnlPct >= 0 ? '+' : ''}${formatMoney(pnlPct)}%</div>
                         </div>
                     </div>
                 `;
@@ -1475,10 +1506,10 @@
                         <td class="symbol-cell"><span class="crypto-icon ${sym}">${sym.substring(0,3).toUpperCase()}</span> ${t.symbol}</td>
                         <td>${t.side?.toUpperCase() || 'LONG'}</td>
                         <td><span class="status-badge ${statusClass}">${status}</span></td>
-                        <td>$${(t.size || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</td>
-                        <td>$${t.entry_price?.toFixed(2) || '0.00'}</td>
-                        <td>${isEntry ? '-' : '$' + (t.exit_price?.toFixed(2) || '0.00')}</td>
-                        <td class="pnl-cell" style="color: ${isEntry ? 'var(--text-light)' : (isProfit ? 'var(--success)' : 'var(--danger)')}">${isEntry ? '-' : (isProfit ? '+' : '') + '$' + pnl.toFixed(2)}</td>
+                        <td>$${formatMoney(t.margin || t.size, 0)} <span style="font-size:0.7em;color:var(--text-light)">${t.leverage ? t.leverage+'x' : ''}</span></td>
+                        <td>$${formatPrice(t.entry_price)}</td>
+                        <td>${isEntry ? '-' : '$' + formatPrice(t.exit_price)}</td>
+                        <td class="pnl-cell" style="color: ${isEntry ? 'var(--text-light)' : (isProfit ? 'var(--success)' : 'var(--danger)')}"> ${isEntry ? '-' : (isProfit ? '+' : '') + '$' + formatMoney(pnl)}</td>
                         <td>${new Date(t.timestamp+'Z').toLocaleTimeString('fr-FR')}</td>
                     </tr>
                 `;

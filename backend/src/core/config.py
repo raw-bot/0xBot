@@ -34,19 +34,16 @@ class TradingConfig:
     # Risk Management - Optimized for better R/R
     DEFAULT_STOP_LOSS_PCT: float = 0.03  # 3% SL - room for volatility
     DEFAULT_TAKE_PROFIT_PCT: float = 0.06  # 6% TP - 2:1 ratio, more achievable
-    DEFAULT_POSITION_SIZE_PCT: float = 0.15  # 15% position size (conservative)
+    DEFAULT_POSITION_SIZE_PCT: float = 0.25  # 25% position size (significant trades)
     DEFAULT_LEVERAGE: float = 5.0  # 5x Leverage - reduced risk
 
-    # Security: Allowed trading symbols whitelist
+    # Security: Allowed trading symbols whitelist (majors only)
     ALLOWED_SYMBOLS: List[str] = [
         "BTC/USDT",
         "ETH/USDT",
         "SOL/USDT",
         "BNB/USDT",
         "XRP/USDT",
-        "ADA/USDT",
-        "AVAX/USDT",
-        "DOT/USDT",
     ]
 
     # Rate Limiting
