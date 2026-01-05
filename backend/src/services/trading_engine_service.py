@@ -297,6 +297,9 @@ class TradingEngine:
             if self.cycle_count == 1 or self.cycle_count % 1 == 0:
                 await self._record_equity_snapshot()
 
+            # Log performance metrics every cycle
+            await self._log_performance_metrics()
+
         except Exception as e:
             logger.error(f"❌ Cycle error: {e}", exc_info=True)
 
@@ -990,6 +993,56 @@ class TradingEngine:
 
         except Exception as e:
             logger.error(f"Error recording equity snapshot: {e}")
+
+    async def _log_performance_metrics(self) -> None:
+        """Log key performance metrics at end of each cycle."""
+        try:
+            from sqlalchemy import func
+
+            from ..models.trade import Trade
+
+            async with AsyncSessionLocal() as db:
+                # Get all closed trades for this bot
+                query = select(Trade).where(
+                    Trade.bot_id == self.bot_id, Trade.realized_pnl.isnot(None)
+                )
+                result = await db.execute(query)
+                trades = result.scalars().all()
+
+                if not trades:
+                    return  # No trades yet, skip metrics
+
+                # Calculate metrics
+                total_trades = len(trades)
+                winning_trades = len([t for t in trades if float(t.realized_pnl) > 0])
+                win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+
+                total_pnl = sum(float(t.realized_pnl) for t in trades)
+                avg_pnl = total_pnl / total_trades if total_trades > 0 else 0
+
+                total_fees = sum(float(t.fees or 0) for t in trades)
+
+                # Calculate avg hold time (for trades that have both open and close)
+                avg_hold_mins = 0
+                hold_times = []
+                for t in trades:
+                    if t.executed_at and hasattr(t, "closed_at") and t.closed_at:
+                        hold = (t.closed_at - t.executed_at).total_seconds() / 60
+                        hold_times.append(hold)
+                if hold_times:
+                    avg_hold_mins = sum(hold_times) / len(hold_times)
+
+                # Log compact metrics line
+                logger.info(
+                    f"📊 METRICS | Trades: {total_trades} | "
+                    f"Win: {win_rate:.0f}% | "
+                    f"Avg PnL: ${avg_pnl:+.2f} | "
+                    f"Total: ${total_pnl:+.2f} | "
+                    f"Fees: ${total_fees:.2f}"
+                )
+
+        except Exception as e:
+            logger.debug(f"Metrics calculation skipped: {e}")
 
 
 # 🚨 SÉCURITÉ: Ancien système désactivé par nettoyage automatique
