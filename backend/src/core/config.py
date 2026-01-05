@@ -37,10 +37,15 @@ class TradingConfig:
     MIN_POSITION_AGE_FOR_EXIT_SECONDS: int = 3600  # 1 hour - more time to develop
 
     # Risk Management - Optimized for better R/R
-    DEFAULT_STOP_LOSS_PCT: float = 0.03  # 3% SL - room for volatility
-    DEFAULT_TAKE_PROFIT_PCT: float = 0.06  # 6% TP - 2:1 ratio, more achievable
-    DEFAULT_POSITION_SIZE_PCT: float = 0.25  # 25% position size (significant trades)
-    DEFAULT_LEVERAGE: float = 5.0  # 5x Leverage - reduced risk
+    DEFAULT_STOP_LOSS_PCT: float = 0.03  # 3% SL
+    DEFAULT_TAKE_PROFIT_PCT: float = 0.06  # 6% TP
+    DEFAULT_POSITION_SIZE_PCT: float = 0.25  # 25% position
+    DEFAULT_LEVERAGE: float = 5.0  # 5x Leverage for LONG
+
+    # SHORT-specific settings (safer due to unlimited loss potential)
+    SHORT_MAX_LEVERAGE: float = 3.0  # 3x max for SHORT
+    SHORT_MIN_CONFIDENCE: float = 0.65  # Lower threshold
+    SHORT_POSITION_SIZE_PCT: float = 0.15  # Smaller size
 
     # Trading Fees (Binance Futures Taker fee)
     PAPER_TRADING_FEE_PCT: float = 0.0005  # 0.05% per trade (real Binance rate)

@@ -429,6 +429,21 @@ class TradingEngine:
                         )
                         validated_entry = float(fixed_decision.get("entry_price", current_price))
 
+                        # Apply SHORT-specific limits (safer due to risk)
+                        requested_leverage = int(decision.get("leverage", 1))
+                        final_size_pct = size_pct
+                        if side == "short":
+                            # Cap SHORT leverage at 3x
+                            requested_leverage = min(
+                                requested_leverage, int(config.SHORT_MAX_LEVERAGE)
+                            )
+                            # Cap SHORT position size at 15%
+                            final_size_pct = min(size_pct, config.SHORT_POSITION_SIZE_PCT)
+                            logger.info(
+                                f"📉 SHORT limits: lev={requested_leverage}x, "
+                                f"size={final_size_pct:.1%}"
+                            )
+
                         # Prepare decision dict for entry handler
                         entry_decision = {
                             "symbol": symbol,
@@ -439,8 +454,8 @@ class TradingEngine:
                             "entry_price": validated_entry,
                             "stop_loss": validated_sl,
                             "take_profit": validated_tp,
-                            "size_pct": size_pct,
-                            "leverage": int(decision.get("leverage", 1)),
+                            "size_pct": final_size_pct,
+                            "leverage": requested_leverage,
                         }
 
                         # 🚨 CRITICAL FIX: Validate entry with RiskManager BEFORE execution

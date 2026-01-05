@@ -445,6 +445,54 @@ class MultiCoinPromptService:
             lines.append("### No Open Positions")
             lines.append("")
 
+        # Section 5.5: Directional Trading Rules (NEW - for market independence)
+        lines.append("## DIRECTIONAL TRADING STRATEGY")
+        lines.append("")
+
+        # Add bias based on Fear & Greed
+        if sentiment and hasattr(sentiment, "fear_greed_value"):
+            fg_value = sentiment.fear_greed_value
+            if fg_value < 35:
+                lines.append("### 🔴 BEARISH BIAS ACTIVE (Fear & Greed < 35)")
+                lines.append("**PRIORITY: Look for SHORT opportunities!**")
+                lines.append("- Market is fearful → expect more downside")
+                lines.append("- RSI > 60 on any coin = potential SHORT entry")
+                lines.append("- Failed bounces = excellent SHORT setups")
+                lines.append("- Reduce LONG position sizes by 50%")
+            elif fg_value > 65:
+                lines.append("### 🟢 BULLISH BIAS ACTIVE (Fear & Greed > 65)")
+                lines.append("**PRIORITY: Look for LONG opportunities!**")
+                lines.append("- Market is greedy → momentum favors longs")
+                lines.append("- RSI < 40 on any coin = potential LONG entry")
+                lines.append("- Dips are buying opportunities")
+            else:
+                lines.append("### ⚪ NEUTRAL MARKET (Fear & Greed 35-65)")
+                lines.append("**Use both LONG and SHORT based on technicals:**")
+                lines.append("- RSI > 70 = SHORT signal (overbought)")
+                lines.append("- RSI < 30 = LONG signal (oversold)")
+                lines.append("- Trade the range, not the trend")
+        else:
+            lines.append("### Directional Bias: NEUTRAL (no sentiment data)")
+
+        lines.append("")
+        lines.append("### SHORT Entry Criteria (sell_to_enter):")
+        lines.append("- RSI(14) > 70 on 1H timeframe")
+        lines.append("- Price rejected from resistance (EMA50 or recent high)")
+        lines.append("- Negative funding rate (shorts getting paid)")
+        lines.append("- Fear & Greed < 45 (fear mode)")
+        lines.append("- Use signal: `sell_to_enter` with leverage ≤ 3x")
+        lines.append("")
+        lines.append("### LONG Entry Criteria (buy_to_enter):")
+        lines.append("- RSI(14) < 30 on 1H timeframe")
+        lines.append("- Price bouncing from support (EMA20 or recent low)")
+        lines.append("- Positive funding rate (longs getting paid)")
+        lines.append("- Fear & Greed > 55 (greed mode)")
+        lines.append("- Use signal: `buy_to_enter` with leverage up to 5x")
+        lines.append("")
+        lines.append("**⚠️ IMPORTANT: The bot MUST take SHORT positions in bearish conditions!**")
+        lines.append("**Do NOT only recommend LONG. Profits come from BOTH directions.**")
+        lines.append("")
+
         # Section 6: Decision Framework
         lines.append("## DECISION FRAMEWORK")
         lines.append("")
