@@ -73,6 +73,7 @@ class TradeHistoryItem(BaseModel):
     size: float = 0.0  # Notional value (qty * price)
     margin: float = 0.0  # Actual capital used (size / leverage)
     leverage: float = 1.0
+    fees: float = 0.0  # Trading fees
 
 
 class DashboardResponse(BaseModel):
@@ -81,10 +82,15 @@ class DashboardResponse(BaseModel):
     bot: Optional[DashboardBotResponse]
     positions: List[DashboardPositionResponse]
     equity_snapshots: List[DashboardEquitySnapshot]
-    trade_history: List[TradeHistoryItem]  # NEW: for multi-curve chart
+    trade_history: List[TradeHistoryItem]
     current_equity: float
     total_return_pct: float
     total_unrealized_pnl: float
+    # HODL comparison
+    btc_start_price: float = 0.0
+    btc_current_price: float = 0.0
+    hodl_return_pct: float = 0.0
+    alpha_pct: float = 0.0
 
 
 # ============================================================================
@@ -237,6 +243,7 @@ async def get_dashboard_data(
                     size=notional,
                     margin=margin,
                     leverage=lev,
+                    fees=float(trade.fees) if trade.fees else 0.0,
                 )
             )
 
@@ -244,6 +251,42 @@ async def get_dashboard_data(
         winning_trades = sum(
             1 for t, _ in all_trade_rows if t.realized_pnl and float(t.realized_pnl) > 0
         )
+
+        # ---- HODL Comparison ----
+        # Get BTC price at bot start (first trade) and current
+        btc_start_price = 0.0
+        btc_current_price = 0.0
+        hodl_return_pct = 0.0
+        alpha_pct = 0.0
+
+        try:
+            # Get first trade to find start price
+            first_trade_query = (
+                select(Trade)
+                .where(Trade.bot_id == bot.id, Trade.symbol == "BTC/USDT")
+                .order_by(Trade.executed_at)
+                .limit(1)
+            )
+            first_trade_result = await db.execute(first_trade_query)
+            first_btc_trade = first_trade_result.scalar_one_or_none()
+
+            if first_btc_trade:
+                btc_start_price = float(first_btc_trade.price)
+
+                # Get current BTC price from exchange
+                from ..core.exchange_client import get_exchange_client
+
+                exchange = get_exchange_client()
+                btc_ticker = await exchange.fetch_ticker("BTC/USDT")
+                btc_current_price = btc_ticker.get("last", 0) or 0
+
+                if btc_start_price > 0 and btc_current_price > 0:
+                    hodl_return_pct = (
+                        (btc_current_price - btc_start_price) / btc_start_price
+                    ) * 100
+                    alpha_pct = total_return_pct - hodl_return_pct
+        except Exception as e:
+            logger.warning(f"Could not calculate HODL comparison: {e}")
 
         return DashboardResponse(
             bot=DashboardBotResponse(
@@ -279,6 +322,10 @@ async def get_dashboard_data(
             current_equity=current_equity,
             total_return_pct=total_return_pct,
             total_unrealized_pnl=total_unrealized_pnl,
+            btc_start_price=btc_start_price,
+            btc_current_price=btc_current_price,
+            hodl_return_pct=hodl_return_pct,
+            alpha_pct=alpha_pct,
         )
 
     except Exception as e:

@@ -25,7 +25,12 @@ class TradingConfig:
     # Trading Parameters (replacer les magic numbers)
     MIN_CONFIDENCE_ENTRY: float = 0.70  # 70% (NoF1 reference threshold)
     MIN_CONFIDENCE_EXIT_EARLY: float = 0.60  # 60%
-    MIN_CONFIDENCE_EXIT_NORMAL: float = 0.50  # 50%
+    MIN_CONFIDENCE_EXIT_NORMAL: float = 0.70  # 70% - raised to prevent premature exits
+
+    # Smart Exit Protection - Prevents micro-profit exits
+    # Exit is ALWAYS allowed if position is losing (protection mode)
+    # Exit only allowed if PnL >= this threshold when position is profitable
+    MIN_PNL_PCT_FOR_PROFIT_EXIT: float = 1.5  # 1.5% min profit to exit (or use SL/TP)
 
     # Position Management
     MAX_POSITION_AGE_SECONDS: int = 7200  # 2 hours
@@ -36,6 +41,9 @@ class TradingConfig:
     DEFAULT_TAKE_PROFIT_PCT: float = 0.06  # 6% TP - 2:1 ratio, more achievable
     DEFAULT_POSITION_SIZE_PCT: float = 0.25  # 25% position size (significant trades)
     DEFAULT_LEVERAGE: float = 5.0  # 5x Leverage - reduced risk
+
+    # Trading Fees (Binance Futures Taker fee)
+    PAPER_TRADING_FEE_PCT: float = 0.0005  # 0.05% per trade (real Binance rate)
 
     # Security: Allowed trading symbols whitelist (majors only)
     ALLOWED_SYMBOLS: List[str] = [

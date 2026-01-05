@@ -112,7 +112,7 @@ class TradeExecutorService:
             else:
                 # Paper trading mode - use current market price for consistency
                 actual_price = Decimal(str(current_price))  # Ensure actual_price is Decimal
-                fees = actual_price * quantity * Decimal("0.001")  # Estimate 0.1% fee
+                fees = actual_price * quantity * Decimal(str(config.PAPER_TRADING_FEE_PCT))
                 logger.info(
                     f"PAPER: {order_side} {quantity} {symbol} @ {actual_price} (planned entry)"
                 )
@@ -242,7 +242,7 @@ class TradeExecutorService:
                     if not isinstance(current_price, Decimal)
                     else current_price
                 )
-                fees = actual_price * position.quantity * Decimal("0.001")
+                fees = actual_price * position.quantity * Decimal(str(config.PAPER_TRADING_FEE_PCT))
                 logger.info(
                     f"PAPER EXIT: {order_side} {position.quantity} {position.symbol} @ {actual_price}"
                 )

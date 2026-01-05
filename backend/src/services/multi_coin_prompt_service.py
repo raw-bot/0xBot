@@ -360,12 +360,12 @@ class MultiCoinPromptService:
 
             lines.append(f"### {coin_name} ({symbol})")
             lines.append(
-                f"- **Price**: ${current:,.4f} (4H Range: ${low_4h:,.4f} - ${high_4h:,.4f})"
+                f"- **Price**: ${current:,.2f} (4H Range: ${low_4h:,.2f} - ${high_4h:,.2f})"
             )
             lines.append(f"- **Net Funding**: {funding:+.4f}% / 8h")
             lines.append(f"- **Open Interest**: {oi:,.0f}")
             lines.append(
-                f"- **RSI(14)**: {tech_1h.get('rsi14', 50):.1f} | **EMA20**: ${tech_1h.get('ema20', 0):,.4f} | **EMA50**: ${tech_1h.get('ema50', 0):,.4f}"
+                f"- **RSI(14)**: {tech_1h.get('rsi14', 50):.1f} | **EMA20**: ${tech_1h.get('ema20', 0):,.2f} | **EMA50**: ${tech_1h.get('ema50', 0):,.2f}"
             )
             lines.append(f"- **Vol Ratio**: {self._calc_volume_ratio(data):.2f}x average")
             lines.append("")
@@ -448,20 +448,35 @@ class MultiCoinPromptService:
         # Section 6: Decision Framework
         lines.append("## DECISION FRAMEWORK")
         lines.append("")
+        lines.append(
+            "**IMPORTANT: Analyze EACH symbol independently. Having an open position on one symbol should NOT prevent entries on other symbols if there is available capital.**"
+        )
+        lines.append("")
         lines.append("### For OPEN positions:")
-        lines.append("1. Is invalidation condition met? (Y/N)")
-        lines.append("2. Is stop loss triggered? (Y/N)")
-        lines.append("3. Has thesis fundamentally changed? (Y/N)")
-        lines.append("→ If all N: **HOLD** with original SL/TP")
-        lines.append("→ If any Y: **EXIT** with justification")
+        lines.append("1. Is there DANGER detected? (incoming crash, major resistance, bad news)")
+        lines.append("2. Is position LOSING money? (protection mode)")
+        lines.append("3. Is profit SIGNIFICANT? (≥1.5% unrealized PnL)")
+        lines.append("4. Is stop loss/take profit about to trigger?")
+        lines.append("")
+        lines.append("**EXIT RULES:**")
+        lines.append("→ If LOSING (PnL < 0%) AND danger detected: **CLOSE** (protection)")
+        lines.append("→ If profit ≥ 1.5% AND target reached: **CLOSE** (profit-taking)")
+        lines.append("→ If profit < 1.5%: **HOLD** - let the profit run! Never exit micro-profits.")
+        lines.append("→ If no danger AND losing < 2%: **HOLD** - give it time to develop")
+        lines.append("")
+        lines.append("**⚠️ NEVER recommend CLOSE for small profits (<1.5%)! This is wasteful.**")
         lines.append("")
         lines.append("### For symbols WITHOUT position:")
         lines.append("1. Is there a clear edge? (confidence > 0.70)")
         lines.append("2. Does expected move exceed 0.15% fee hurdle?")
         lines.append("3. Is R:R > 1.5?")
-        lines.append("4. Excessive correlation with existing positions?")
-        lines.append("→ If all yes/no appropriately: **ENTRY** with calculated SL/TP/Size")
+        lines.append("4. Is there sufficient available capital?")
+        lines.append("→ If all conditions met: **ENTRY** with calculated SL/TP/Size")
         lines.append("→ Otherwise: **HOLD** (no trade)")
+        lines.append("")
+        lines.append(
+            "**NOTE: You may recommend entries on multiple symbols in the same response. Each symbol should be analyzed on its own merits.**"
+        )
         lines.append("")
         lines.append("### SHOW YOUR CALCULATIONS:")
         lines.append("- Margin = confidence_tier × available_capital")

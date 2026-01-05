@@ -388,8 +388,9 @@
             border-radius: 50px;
             padding: 28px 32px 24px;
             position: relative;
+            display: flex;
+            flex-direction: column;
             min-height: 320px;
-            height: calc(45vh - 40px);
             backdrop-filter: blur(10px);
         }
 
@@ -477,7 +478,7 @@
         }
 
         .chart-area {
-            height: calc(100% - 120px);
+            flex: 1;
             min-height: 150px;
             margin-top: 16px;
             position: relative;
@@ -1088,10 +1089,36 @@
             <div class="chart-card">
                 <div class="chart-header">
                     <div><!-- Spacer or period dropdown if needed --></div>
-                    <!-- Toggle Button -->
-                    <div class="chart-toggle">
-                        <button class="chart-toggle-btn active" onclick="setChartMode('equity')">Equity</button>
-                        <button class="chart-toggle-btn" onclick="setChartMode('pnl')">Realized PnL</button>
+                    <!-- Legend -->
+                    <div class="chart-toggle" style="gap: 8px; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <span style="width: 10px; height: 3px; background: #999; border-radius: 2px;"></span>
+                            <span style="font-size: 10px; color: #666;">Equity</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <span style="width: 10px; height: 4px; background: #f5ff00; border-radius: 2px;"></span>
+                            <span style="font-size: 10px; color: #666; font-weight: bold;">Total</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <span style="width: 10px; height: 3px; background: #F7931A; border-radius: 2px;"></span>
+                            <span style="font-size: 10px; color: #666;">BTC</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <span style="width: 10px; height: 3px; background: #627EEA; border-radius: 2px;"></span>
+                            <span style="font-size: 10px; color: #666;">ETH</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <span style="width: 10px; height: 3px; background: #9945FF; border-radius: 2px;"></span>
+                            <span style="font-size: 10px; color: #666;">SOL</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <span style="width: 10px; height: 3px; background: #F0B90B; border-radius: 2px;"></span>
+                            <span style="font-size: 10px; color: #666;">BNB</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <span style="width: 10px; height: 3px; background: #5a5a5a; border-radius: 2px;"></span>
+                            <span style="font-size: 10px; color: #666;">XRP</span>
+                        </div>
                     </div>
                 </div>
                 <div class="balance-section">
@@ -1171,6 +1198,28 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Bot vs HODL Comparison -->
+                <div class="winrate-card compact" id="hodl-widget">
+                    <div class="winrate-header">
+                        <span class="winrate-label">bot vs hodl btc</span>
+                        <span class="winrate-label" id="hodl-btc-price">--</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 8px; padding: 8px 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: #666; font-size: 12px;">📈 Bot</span>
+                            <span id="hodl-bot-return" style="font-weight: 600; font-size: 14px; color: #333;">+0.00%</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: #666; font-size: 12px;">📊 HODL BTC</span>
+                            <span id="hodl-btc-return" style="font-weight: 600; font-size: 14px; color: #F7931A;">+0.00%</span>
+                        </div>
+                        <div style="border-top: 1px solid rgba(0,0,0,0.1); padding-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: #666; font-size: 12px;">🎯 Alpha</span>
+                            <span id="hodl-alpha" style="font-weight: 700; font-size: 16px; color: var(--success);">+0.00%</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -1200,12 +1249,13 @@
                         <th data-sort="size" class="sortable">Size ↕</th>
                         <th data-sort="entry" class="sortable">Entry ↕</th>
                         <th data-sort="exit" class="sortable">Exit ↕</th>
+                        <th data-sort="fees" class="sortable">Fees ↕</th>
                         <th data-sort="pnl" class="sortable">PnL ↕</th>
                         <th data-sort="time" class="sortable">Time ↕</th>
                     </tr>
                 </thead>
                 <tbody id="trades-body">
-                    <tr><td colspan="8" class="empty-state">No trades yet</td></tr>
+                    <tr><td colspan="9" class="empty-state">No trades yet</td></tr>
                 </tbody>
             </table>
         </div>
@@ -1225,9 +1275,7 @@
         }
         function formatPrice(num) {
             if (num == null || isNaN(num)) return '0,00';
-            if (Math.abs(num) >= 1000) return formatMoney(num, 2);
-            if (Math.abs(num) >= 1) return formatMoney(num, 4);
-            return formatMoney(num, 6);
+            return formatMoney(num, 2);
         }
 
         // Time
@@ -1239,27 +1287,41 @@
         // Chart
         const ctx = document.getElementById('equityChart').getContext('2d');
         const gradient = ctx.createLinearGradient(0, 0, 0, 180);
-        gradient.addColorStop(0, 'rgba(245, 255, 0, 0.9)');
-        gradient.addColorStop(0.3, 'rgba(245, 255, 0, 0.55)');
-        gradient.addColorStop(0.6, 'rgba(245, 255, 0, 0.25)');
-        gradient.addColorStop(1, 'rgba(245, 255, 0, 0.02)');
+        gradient.addColorStop(0, 'rgba(150, 150, 150, 0.4)');
+        gradient.addColorStop(0.3, 'rgba(150, 150, 150, 0.25)');
+        gradient.addColorStop(0.6, 'rgba(150, 150, 150, 0.1)');
+        gradient.addColorStop(1, 'rgba(150, 150, 150, 0.02)');
+
+        // Crypto colors matching logos
+        const cryptoColors = {
+            'BTC/USDT': '#F7931A',
+            'ETH/USDT': '#627EEA',
+            'SOL/USDT': '#9945FF',
+            'BNB/USDT': '#F0B90B',
+            'XRP/USDT': '#5a5a5a'
+        };
 
         const chart = new Chart(ctx, {
             type: 'line',
-            data: { labels: [], datasets: [{
-                data: [],
-                borderColor: '#f5ff00',
-                backgroundColor: gradient,
-                borderWidth: 2.5,
-                fill: true,
-                tension: 0,
-                pointRadius: 0,
-                pointHoverRadius: 5,
-                pointHoverBackgroundColor: '#8aa300'
-            }]},
+            data: { labels: [], datasets: [
+                { label: 'Equity', data: [], borderColor: '#999999', backgroundColor: gradient, borderWidth: 1.5, fill: true, tension: 0, pointRadius: 0, pointHoverRadius: 3 },
+                { label: 'Total PnL', data: [], borderColor: '#f5ff00', borderWidth: 3, fill: false, tension: 0, pointRadius: 0, spanGaps: true },
+                { label: 'BTC', data: [], borderColor: '#F7931A', borderWidth: 1.5, fill: false, tension: 0, pointRadius: 0, spanGaps: true },
+                { label: 'ETH', data: [], borderColor: '#627EEA', borderWidth: 1.5, fill: false, tension: 0, pointRadius: 0, spanGaps: true },
+                { label: 'SOL', data: [], borderColor: '#9945FF', borderWidth: 1.5, fill: false, tension: 0, pointRadius: 0, spanGaps: true },
+                { label: 'BNB', data: [], borderColor: '#F0B90B', borderWidth: 1.5, fill: false, tension: 0, pointRadius: 0, spanGaps: true },
+                { label: 'XRP', data: [], borderColor: '#5a5a5a', borderWidth: 1.5, fill: false, tension: 0, pointRadius: 0, spanGaps: true }
+            ]},
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        left: 10,
+                        right: 10,
+                        bottom: 40
+                    }
+                },
                 plugins: {
                     legend: { display: false },
                     tooltip: { backgroundColor: '#333', padding: 10 }
@@ -1311,92 +1373,96 @@
             dot.style.top = (centerY + radius * Math.sin(rad)) + 'px';
         }
 
-        // Chart Mode Logic
-        let currentChartMode = 'equity';
+        // Chart data storage
         let lastDashboardData = null;
-
-        function setChartMode(mode) {
-            currentChartMode = mode;
-            // Update buttons
-            document.querySelectorAll('.chart-toggle-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
-
-            // Update chart title
-            document.getElementById('chart-title').textContent = mode === 'equity' ? 'total equity' : 'realized pnl';
-
-            // Refresh chart with existing data
-            if (lastDashboardData) updateChartData(lastDashboardData);
-        }
 
         function updateChartData(data) {
             lastDashboardData = data;
             const initialCapital = data.bot?.initial_capital || 10000;
-            const labels = [];
-            const values = [];
-            let displayValue = 0;
-            let displayPct = 0;
 
-            if (currentChartMode === 'equity') {
-                // Equity Mode (Existing)
-                displayValue = data.current_equity;
-                displayPct = data.total_return_pct;
-                if (data.equity_snapshots?.length > 0) {
-                    // Determine if we need to show dates (for periods > 24h)
-                    const snapshots = data.equity_snapshots;
-                    const firstTime = new Date(snapshots[0].timestamp);
-                    const lastTime = new Date(snapshots[snapshots.length - 1].timestamp);
-                    const spanHours = (lastTime - firstTime) / (1000 * 60 * 60);
-                    const showDate = spanHours > 24;
+            // Always show equity mode values in header
+            const displayValue = data.current_equity;
+            const displayPct = data.total_return_pct;
 
-                    snapshots.forEach(s => {
-                        const date = new Date(s.timestamp);
-                        if (showDate) {
-                            // Show day/month + time for longer periods
-                            labels.push(date.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'}) + ' ' +
-                                        date.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}));
-                        } else {
-                            // Just time for short periods
-                            labels.push(date.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}));
-                        }
-                        values.push(s.equity - initialCapital);
-                    });
-                }
-            } else {
-                // Realized PnL Mode (From Trade History)
-                let runningPnL = 0;
-                // Add initial point
-                labels.push('');
-                values.push(0);
-
-                // Sort trades by timestamp (executed_at)
-                // Filter for trades with non-zero PnL (realized trades)
-                const tradesData = data.trade_history || [];
-
-                const closedTrades = tradesData
-                    .filter(t => t.pnl !== 0)
-                    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-                closedTrades.forEach(t => {
-                    runningPnL += t.pnl;
-                    labels.push(new Date(t.timestamp).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}));
-                    values.push(runningPnL);
-                });
-
-                displayValue = runningPnL;
-                displayPct = initialCapital > 0 ? (runningPnL / initialCapital) * 100 : 0;
-            }
-
-            // Update displayed value and percentage based on mode
-            const sign = displayValue >= 0 ? '' : '';
-            document.getElementById('total-equity').textContent =
-                '$' + formatMoney(displayValue);
-
+            document.getElementById('total-equity').textContent = '$' + formatMoney(displayValue);
             const tag = document.getElementById('return-tag');
             tag.textContent = (displayPct >= 0 ? '+' : '') + displayPct.toFixed(2) + '%';
             tag.className = 'return-tag' + (displayPct < 0 ? ' negative' : '');
 
+            // Build equity curve from snapshots
+            const labels = [];
+            const equityValues = [];
+
+            if (data.equity_snapshots?.length > 0) {
+                const snapshots = data.equity_snapshots;
+                const firstTime = new Date(snapshots[0].timestamp);
+                const lastTime = new Date(snapshots[snapshots.length - 1].timestamp);
+                const spanHours = (lastTime - firstTime) / (1000 * 60 * 60);
+                const showDate = spanHours > 24;
+
+                snapshots.forEach(s => {
+                    const date = new Date(s.timestamp);
+                    if (showDate) {
+                        labels.push(date.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'}) + ' ' +
+                                    date.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}));
+                    } else {
+                        labels.push(date.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}));
+                    }
+                    equityValues.push(s.equity - initialCapital);
+                });
+            }
+
+            // Build realized PnL curves per crypto
+            const tradesData = data.trade_history || [];
+            const closedTrades = tradesData
+                .filter(t => t.pnl !== 0)
+                .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+            // Initialize PnL trackers per crypto
+            const cryptoSymbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT'];
+            const pnlByCrypto = {};
+            cryptoSymbols.forEach(s => pnlByCrypto[s] = { running: 0, byTime: new Map() });
+            let globalRunningPnL = 0;
+            const globalPnlByTime = new Map();
+
+            // Calculate cumulative PnL per crypto at each trade
+            closedTrades.forEach(t => {
+                const symbol = t.symbol;
+                if (pnlByCrypto[symbol]) {
+                    pnlByCrypto[symbol].running += t.pnl;
+                    pnlByCrypto[symbol].byTime.set(new Date(t.timestamp).getTime(), pnlByCrypto[symbol].running);
+                }
+                globalRunningPnL += t.pnl;
+                globalPnlByTime.set(new Date(t.timestamp).getTime(), globalRunningPnL);
+            });
+
+            // Create aligned data arrays for each crypto + global
+            const createAlignedPnl = (pnlByTime) => {
+                const aligned = new Array(labels.length).fill(null);
+                if (data.equity_snapshots?.length > 0) {
+                    for (const [tradeTime, pnl] of pnlByTime) {
+                        let closestIdx = 0;
+                        let closestDiff = Infinity;
+                        data.equity_snapshots.forEach((s, idx) => {
+                            const diff = Math.abs(new Date(s.timestamp).getTime() - tradeTime);
+                            if (diff < closestDiff) { closestDiff = diff; closestIdx = idx; }
+                        });
+                        aligned[closestIdx] = pnl;
+                    }
+                    if (aligned[0] === null) aligned[0] = 0;
+                }
+                return aligned;
+            };
+
+            // Update chart datasets
             chart.data.labels = labels;
-            chart.data.datasets[0].data = values;
+            chart.data.datasets[0].data = equityValues;                          // Equity
+            chart.data.datasets[1].data = createAlignedPnl(globalPnlByTime);     // Total PnL (yellow)
+            chart.data.datasets[2].data = createAlignedPnl(pnlByCrypto['BTC/USDT'].byTime);  // BTC
+            chart.data.datasets[3].data = createAlignedPnl(pnlByCrypto['ETH/USDT'].byTime);  // ETH
+            chart.data.datasets[4].data = createAlignedPnl(pnlByCrypto['SOL/USDT'].byTime);  // SOL
+            chart.data.datasets[5].data = createAlignedPnl(pnlByCrypto['BNB/USDT'].byTime);  // BNB
+            chart.data.datasets[6].data = createAlignedPnl(pnlByCrypto['XRP/USDT'].byTime);  // XRP
             chart.update();
         }
 
@@ -1426,10 +1492,14 @@
                     return sum + (p.entry_price * p.quantity / lev);
                 }, 0);
                 const unrealizedPnl = data.total_unrealized_pnl || 0;
+
+                // Calculate total fees from trade history
+                const totalFees = (data.trade_history || []).reduce((sum, t) => sum + (t.fees || 0), 0);
+
                 const breakdownEl = document.getElementById('equity-breakdown');
                 const pnlSign = unrealizedPnl >= 0 ? '+' : '';
                 const pnlColor = unrealizedPnl >= 0 ? 'var(--success)' : 'var(--danger)';
-                breakdownEl.innerHTML = `Cash: $${formatMoney(cash)} | Marge: $${formatMoney(marginLocked)} | PnL: <span style="color:${pnlColor}">${pnlSign}$${formatMoney(unrealizedPnl)}</span>`;
+                breakdownEl.innerHTML = `Cash: $${formatMoney(cash)} | Marge: $${formatMoney(marginLocked)} | PnL: <span style="color:${pnlColor}">${pnlSign}$${formatMoney(unrealizedPnl)}</span> | <span style="color:var(--danger)">Fees: -$${formatMoney(totalFees)}</span>`;
 
                 // Win rate
                 if (data.bot && data.bot.total_trades > 0) {
@@ -1446,7 +1516,39 @@
                 // Positions & Trades
                 renderPositions(data.positions || []);
                 renderTrades(data.trade_history || []);
+
+                // Update HODL comparison widget
+                updateHodlWidget(data);
             } catch (e) { console.error(e); }
+        }
+
+        function updateHodlWidget(data) {
+            const botReturn = data.total_return_pct || 0;
+            const hodlReturn = data.hodl_return_pct || 0;
+            const alpha = data.alpha_pct || 0;
+            const btcStart = data.btc_start_price || 0;
+            const btcCurrent = data.btc_current_price || 0;
+
+            // Update values
+            const botEl = document.getElementById('hodl-bot-return');
+            const hodlEl = document.getElementById('hodl-btc-return');
+            const alphaEl = document.getElementById('hodl-alpha');
+            const priceEl = document.getElementById('hodl-btc-price');
+
+            if (botEl) {
+                botEl.textContent = (botReturn >= 0 ? '+' : '') + botReturn.toFixed(2) + '%';
+                botEl.style.color = botReturn >= 0 ? 'var(--success)' : 'var(--danger)';
+            }
+            if (hodlEl) {
+                hodlEl.textContent = (hodlReturn >= 0 ? '+' : '') + hodlReturn.toFixed(2) + '%';
+            }
+            if (alphaEl) {
+                alphaEl.textContent = (alpha >= 0 ? '+' : '') + alpha.toFixed(2) + '%';
+                alphaEl.style.color = alpha >= 0 ? 'var(--success)' : 'var(--danger)';
+            }
+            if (priceEl && btcCurrent > 0) {
+                priceEl.textContent = '$' + formatMoney(btcCurrent, 0);
+            }
         }
 
         function renderPositions(positions) {
@@ -1479,11 +1581,12 @@
         function renderTrades(trades) {
             const tbody = document.getElementById('trades-body');
             if (!trades.length) {
-                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No trades yet</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No trades yet</td></tr>';
                 return;
             }
             tbody.innerHTML = trades.slice().reverse().slice(0, 30).map(t => {
                 const pnl = t.pnl || 0;
+                const fees = t.fees || 0;
                 const isEntry = pnl === 0;  // Entry trades have 0 PnL
                 const isProfit = pnl > 0;
                 const sym = t.symbol.split('/')[0].toLowerCase();
@@ -1509,6 +1612,7 @@
                         <td>$${formatMoney(t.margin || t.size, 0)} <span style="font-size:0.7em;color:var(--text-light)">${t.leverage ? t.leverage+'x' : ''}</span></td>
                         <td>$${formatPrice(t.entry_price)}</td>
                         <td>${isEntry ? '-' : '$' + formatPrice(t.exit_price)}</td>
+                        <td style="color: var(--danger); font-size: 0.85em;">-$${formatMoney(fees)}</td>
                         <td class="pnl-cell" style="color: ${isEntry ? 'var(--text-light)' : (isProfit ? 'var(--success)' : 'var(--danger)')}"> ${isEntry ? '-' : (isProfit ? '+' : '') + '$' + formatMoney(pnl)}</td>
                         <td>${new Date(t.timestamp+'Z').toLocaleTimeString('fr-FR')}</td>
                     </tr>
@@ -1557,6 +1661,7 @@
                     case 'size': valA = a.size || 0; valB = b.size || 0; break;
                     case 'entry': valA = a.entry_price || 0; valB = b.entry_price || 0; break;
                     case 'exit': valA = a.exit_price || 0; valB = b.exit_price || 0; break;
+                    case 'fees': valA = a.fees || 0; valB = b.fees || 0; break;
                     case 'pnl': valA = a.pnl || 0; valB = b.pnl || 0; break;
                     case 'time': valA = new Date(a.timestamp); valB = new Date(b.timestamp); break;
                     default: return 0;

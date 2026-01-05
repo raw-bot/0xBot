@@ -366,6 +366,26 @@ class TradingEngine:
                         # Find the position object
                         position = next((p for p in current_positions if p.symbol == symbol), None)
                         if position:
+                            # Smart Exit Protection:
+                            # - ALWAYS allow exit if losing (protection mode)
+                            # - Only allow profit-taking if profit >= MIN_PNL_PCT_FOR_PROFIT_EXIT
+                            pnl_pct = float(position.unrealized_pnl_pct)
+
+                            # Allow exit if: losing OR significant profit
+                            if pnl_pct < 0:
+                                # Protection mode - exit to limit losses
+                                logger.info(f"🛡️ {symbol}: Protection exit (PnL: {pnl_pct:+.2f}%)")
+                            elif pnl_pct >= config.MIN_PNL_PCT_FOR_PROFIT_EXIT:
+                                # Significant profit - allow exit
+                                logger.info(f"💰 {symbol}: Profit exit (PnL: {pnl_pct:+.2f}%)")
+                            else:
+                                # Micro-profit - block exit, let it run
+                                logger.info(
+                                    f"⏳ {symbol}: Exit blocked - PnL {pnl_pct:+.2f}% < "
+                                    f"{config.MIN_PNL_PCT_FOR_PROFIT_EXIT}% (let profit run)"
+                                )
+                                continue
+
                             await self.trade_executor.execute_exit(
                                 position=position,
                                 current_price=Decimal(str(current_price)),
