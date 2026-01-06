@@ -22,10 +22,11 @@ class TradingConfig:
     CRYPTOCOMPARE_API_KEY = os.getenv("CRYPTOCOMPARE_API_KEY", "")
     NEWS_FETCH_INTERVAL: int = 300  # 5 minutes (aligned with cycle)
 
-    # Trading Parameters (replacer les magic numbers)
-    MIN_CONFIDENCE_ENTRY: float = 0.70  # 70% (NoF1 reference threshold)
+    # Trading Parameters - Quality over Quantity
+    MIN_CONFIDENCE_ENTRY: float = 0.75  # 75% - raised to reduce overtrading
     MIN_CONFIDENCE_EXIT_EARLY: float = 0.60  # 60%
-    MIN_CONFIDENCE_EXIT_NORMAL: float = 0.70  # 70% - raised to prevent premature exits
+    MIN_CONFIDENCE_EXIT_NORMAL: float = 0.70  # 70%
+    MAX_NEW_ENTRIES_PER_CYCLE: int = 2  # Max 2 new positions per cycle
 
     # Smart Exit Protection - Prevents micro-profit exits
     # Exit is ALWAYS allowed if position is losing (protection mode)
