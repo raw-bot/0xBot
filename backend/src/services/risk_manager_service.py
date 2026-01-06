@@ -170,10 +170,42 @@ class RiskManagerService:
             if risk_reward < 1.3:  # Légèrement plus permissif
                 return (
                     False,
-                    f"Risk/reward ratio {risk_reward:.2f} too low (min 1.3) - SL: {stop_loss_pct:.3%}, TP: {take_profit_pct:.3%}",
+                    f"Risk/reward ratio {risk_reward:.2f} too low (min 1.3)",
                 )
 
-            # 5. Check minimum position size (at least $50 for meaningful trades)
+            # 6. CRITICAL: Fee protection - reject trades that don't cover fees
+            # Total fees = 0.05% entry + 0.05% exit = 0.10% round-trip
+            fee_pct = Decimal("0.0010")  # 0.10%
+            min_profit_ratio = Decimal("3")  # Must make at least 3x fees
+
+            # Calculate expected profit at TP in dollars
+            position_notional = new_margin * leverage
+            expected_profit_pct = take_profit_pct
+            expected_profit_dollar = position_notional * expected_profit_pct
+            total_fees_dollar = position_notional * fee_pct
+
+            # Profit must exceed 3x fees
+            min_required_profit = total_fees_dollar * min_profit_ratio
+            if expected_profit_dollar < min_required_profit:
+                return (
+                    False,
+                    f"Expected profit ${expected_profit_dollar:.2f} < 3x fees "
+                    f"(${min_required_profit:.2f}). Trade not worth it.",
+                )
+
+            # Also check absolute minimum ($10)
+            if expected_profit_dollar < Decimal("10"):
+                return (
+                    False,
+                    f"Expected profit ${expected_profit_dollar:.2f} below $10 minimum",
+                )
+
+            logger.info(
+                f"   💵 Profit check: ${expected_profit_dollar:.2f} expected "
+                f"(fees: ${total_fees_dollar:.2f}) ✅"
+            )
+
+            # 7. Check minimum position size (at least $50 for meaningful trades)
             if new_margin < Decimal("50"):
                 return False, f"Position size ${new_margin:,.2f} below minimum $50"
 
