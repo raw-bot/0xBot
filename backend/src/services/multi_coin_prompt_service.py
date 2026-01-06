@@ -595,22 +595,54 @@ class MultiCoinPromptService:
             target_symbols = list(self.coin_mapping.keys())
 
         try:
+            data = None
+
             # Try direct JSON parse
             if response_text.strip().startswith("{"):
                 data = json.loads(response_text)
-                return data
-
-            # Extract JSON from response
-            start_brace = response_text.find("{")
-            end_brace = response_text.rfind("}")
-
-            if start_brace != -1 and end_brace != -1 and end_brace > start_brace:
-                json_part = response_text[start_brace : end_brace + 1]
-                data = json.loads(json_part)
-                return data
             else:
-                logger.error(f"Could not find JSON in response: {response_text[:100]}...")
-                return self._create_fallback_response(target_symbols)
+                # Extract JSON from response
+                start_brace = response_text.find("{")
+                end_brace = response_text.rfind("}")
+
+                if start_brace != -1 and end_brace != -1 and end_brace > start_brace:
+                    json_part = response_text[start_brace : end_brace + 1]
+                    data = json.loads(json_part)
+                else:
+                    logger.error(f"Could not find JSON in response: {response_text[:100]}...")
+                    return self._create_fallback_response(target_symbols)
+
+            # Validate all target symbols are present
+            if data:
+                # Check if it's a nested 'decisions' format
+                decisions_data = data.get("decisions", data)
+
+                # Count how many target symbols we got
+                found_symbols = [s for s in target_symbols if s in decisions_data]
+                missing_symbols = [s for s in target_symbols if s not in decisions_data]
+
+                if missing_symbols:
+                    logger.warning(
+                        f"⚠️ LLM response missing {len(missing_symbols)} symbols: "
+                        f"{missing_symbols}"
+                    )
+                    # Auto-fill missing symbols with HOLD
+                    for sym in missing_symbols:
+                        decisions_data[sym] = {
+                            "signal": "hold",
+                            "confidence": 0.50,
+                            "justification": "Symbol missing from LLM response - auto HOLD",
+                        }
+
+                    logger.info(f"✅ Auto-filled {len(missing_symbols)} missing symbols with HOLD")
+
+                # Update data with filled decisions
+                if "decisions" in data:
+                    data["decisions"] = decisions_data
+                else:
+                    data = decisions_data
+
+            return data
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response: {e}")
