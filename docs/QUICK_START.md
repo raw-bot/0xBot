@@ -13,7 +13,7 @@
 
 ### Étape 1.1: Clone et Navigate
 ```bash
-cd /Users/cube/Documents/00-code/nof1
+cd /Users/cube/Documents/00-code/0xBot
 ```
 
 ### Étape 1.2: Démarre les Services Docker
@@ -71,14 +71,14 @@ alembic upgrade head
 
 ### Méthode Simple (1 commande)
 ```bash
-cd /Users/cube/Documents/00-code/nof1/backend
+cd /Users/cube/Documents/00-code/0xBot/backend
 source venv/bin/activate && python -m uvicorn src.main:app --host 0.0.0.0 --port 8020 --reload
 ```
 
 ### Ou Étape par Étape
 ```bash
 # 1. Va dans backend
-cd /Users/cube/Documents/00-code/nof1/backend
+cd /Users/cube/Documents/00-code/0xBot/backend
 
 # 2. Active l'environnement virtuel
 source venv/bin/activate
@@ -173,7 +173,7 @@ Ctrl + C
 
 ### Arrêt des Services Docker
 ```bash
-cd /Users/cube/Documents/00-code/nof1/docker
+cd /Users/cube/Documents/00-code/0xBot/docker
 docker-compose down
 ```
 
@@ -183,7 +183,7 @@ docker-compose down
 Ctrl + C
 
 # Arrête Docker
-cd /Users/cube/Documents/00-code/nof1/docker
+cd /Users/cube/Documents/00-code/0xBot/docker
 docker-compose down
 
 # Désactive venv
@@ -196,7 +196,7 @@ deactivate
 
 ```bash
 # 1. Démarre Docker
-cd /Users/cube/Documents/00-code/nof1/docker
+cd /Users/cube/Documents/00-code/0xBot/docker
 docker-compose up -d
 
 # 2. Démarre le serveur
@@ -212,15 +212,15 @@ python -m uvicorn src.main:app --host 0.0.0.0 --port 8020 --reload
 ### Voir les Logs Docker
 ```bash
 # Logs PostgreSQL
-docker logs nof1-postgres -f
+docker logs trading_agent_postgres -f
 
 # Logs Redis
-docker logs nof1-redis -f
+docker logs trading_agent_redis -f
 ```
 
 ### Migrations Database
 ```bash
-cd /Users/cube/Documents/00-code/nof1/backend
+cd /Users/cube/Documents/00-code/0xBot/backend
 source venv/bin/activate
 
 # Voir l'état des migrations
@@ -239,7 +239,7 @@ alembic downgrade -1
 ### Réinitialiser la Database
 ```bash
 # ATTENTION: Efface TOUT!
-cd /Users/cube/Documents/00-code/nof1/docker
+cd /Users/cube/Documents/00-code/0xBot/docker
 docker-compose down -v  # -v efface les volumes
 docker-compose up -d
 
@@ -252,7 +252,7 @@ alembic upgrade head
 ### Vérifier les Bots Actifs
 ```bash
 # Se connecter à PostgreSQL
-docker exec -it nof1-postgres psql -U postgres -d trading_agent
+docker exec -it trading_agent_postgres psql -U postgres -d trading_agent
 
 # Voir tous les bots
 SELECT id, name, model_name, status, capital FROM bots;
@@ -273,7 +273,7 @@ SELECT * FROM trades ORDER BY executed_at DESC LIMIT 10;
 
 ### Lancer tous les Tests
 ```bash
-cd /Users/cube/Documents/00-code/nof1/backend
+cd /Users/cube/Documents/00-code/0xBot/backend
 source venv/bin/activate
 pytest tests/ -v
 ```
@@ -303,7 +303,7 @@ pip freeze > requirements-freeze.txt
 docker ps
 
 # Vérifie les logs
-cd /Users/cube/Documents/00-code/nof1/backend
+cd /Users/cube/Documents/00-code/0xBot/backend
 source venv/bin/activate
 python -m uvicorn src.main:app --host 0.0.0.0 --port 8020 --log-level debug
 ```
@@ -311,7 +311,7 @@ python -m uvicorn src.main:app --host 0.0.0.0 --port 8020 --log-level debug
 ### Erreur "Module not found"
 ```bash
 # Réinstalle les dépendances
-cd /Users/cube/Documents/00-code/nof1/backend
+cd /Users/cube/Documents/00-code/0xBot/backend
 source venv/bin/activate
 pip install -r requirements.txt --force-reinstall
 ```
@@ -319,11 +319,11 @@ pip install -r requirements.txt --force-reinstall
 ### Erreur Database
 ```bash
 # Redémarre PostgreSQL
-cd /Users/cube/Documents/00-code/nof1/docker
+cd /Users/cube/Documents/00-code/0xBot/docker
 docker-compose restart postgres
 
 # Vérifie la connexion
-docker exec -it nof1-postgres psql -U postgres -c "SELECT 1;"
+docker exec -it trading_agent_postgres psql -U postgres -c "SELECT 1;"
 ```
 
 ### Port déjà utilisé
@@ -420,7 +420,7 @@ open http://localhost:8020/docs  # macOS
 ## 🎯 Commande Ultime (Tout en Un)
 
 ```bash
-cd /Users/cube/Documents/00-code/nof1 && \
+cd /Users/cube/Documents/00-code/0xBot && \
   cd docker && docker-compose up -d && \
   cd ../backend && \
   source venv/bin/activate && \

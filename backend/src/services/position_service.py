@@ -3,13 +3,13 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, Optional
+from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..core.config import config
 from ..models.position import Position, PositionSide, PositionStatus
-from ..models.trade import Trade, TradeSide
 
 
 class PositionOpen:
@@ -23,7 +23,7 @@ class PositionOpen:
         entry_price: Decimal,
         stop_loss: Optional[Decimal] = None,
         take_profit: Optional[Decimal] = None,
-        leverage: Decimal = Decimal("10.0"),
+        leverage: Decimal = Decimal(str(config.DEFAULT_LEVERAGE)),
     ):
         self.symbol = symbol
         self.side = side
@@ -32,50 +32,6 @@ class PositionOpen:
         self.stop_loss = stop_loss
         self.take_profit = take_profit
         self.leverage = leverage
-
-    async def get_open_positions_with_relations(self, bot_id):
-        """Récupère les positions avec toutes les relations chargées."""
-        query = (
-            select(Position)
-            .options(selectinload(Position.bot))
-            .where(Position.bot_id == bot_id, Position.status == PositionStatus.OPEN)
-        )
-        result = await self.db.execute(query)
-        return result.scalars().all()
-
-    async def get_positions_batch(self, bot_ids: list) -> Dict[str, list]:
-        """Récupère les positions pour plusieurs bots en une seule requête."""
-        if not bot_ids:
-            return {}
-
-        query = select(Position).where(Position.bot_id.in_(bot_ids))
-        result = await self.db.execute(query)
-        positions = result.scalars().all()
-
-        # Grouper par bot_id
-        positions_by_bot = {}
-        for position in positions:
-            bot_id = str(position.bot_id)
-            if bot_id not in positions_by_bot:
-                positions_by_bot[bot_id] = []
-            positions_by_bot[bot_id].append(position)
-
-        return positions_by_bot
-
-    async def get_recent_trades(self, bot_id: str, hours: int = 24) -> list:
-        """Récupère les trades récents avec une limite de temps."""
-        from datetime import datetime, timedelta
-
-        cutoff_time = datetime.utcnow() - timedelta(hours=hours)
-        query = (
-            select(Trade)
-            .where(Trade.bot_id == bot_id, Trade.executed_at >= cutoff_time)
-            .order_by(Trade.executed_at.desc())
-            .limit(100)
-        )
-
-        result = await self.db.execute(query)
-        return result.scalars().all()
 
 
 class PositionService:

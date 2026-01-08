@@ -1,4 +1,4 @@
-# Backend - NOF1 Trading Bot
+# Backend - 0xBot Trading Bot
 
 Backend FastAPI pour le bot de trading automatisé avec IA.
 

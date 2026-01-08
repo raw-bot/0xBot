@@ -22,8 +22,8 @@ class TradingConfig:
     CRYPTOCOMPARE_API_KEY = os.getenv("CRYPTOCOMPARE_API_KEY", "")
     NEWS_FETCH_INTERVAL: int = 300  # 5 minutes (aligned with cycle)
 
-    # Trading Parameters - Quality over Quantity
-    MIN_CONFIDENCE_ENTRY: float = 0.75  # 75% - raised to reduce overtrading
+    # Trading Parameters - Quality over Quantity (Optimized for fee efficiency)
+    MIN_CONFIDENCE_ENTRY: float = 0.70  # 70% - test mode, allows more trades
     MIN_CONFIDENCE_EXIT_EARLY: float = 0.60  # 60%
     MIN_CONFIDENCE_EXIT_NORMAL: float = 0.70  # 70%
     MAX_NEW_ENTRIES_PER_CYCLE: int = 2  # Max 2 new positions per cycle
@@ -31,22 +31,24 @@ class TradingConfig:
     # Smart Exit Protection - Prevents micro-profit exits
     # Exit is ALWAYS allowed if position is losing (protection mode)
     # Exit only allowed if PnL >= this threshold when position is profitable
-    MIN_PNL_PCT_FOR_PROFIT_EXIT: float = 1.5  # 1.5% min profit to exit (or use SL/TP)
+    MIN_PNL_PCT_FOR_PROFIT_EXIT: float = 2.0  # 2.0% min profit to exit (covers fees + buffer)
 
-    # Position Management
-    MAX_POSITION_AGE_SECONDS: int = 7200  # 2 hours
-    MIN_POSITION_AGE_FOR_EXIT_SECONDS: int = 3600  # 1 hour - more time to develop
+    # Position Management (DEPRECATED - no longer used for exit decisions)
+    # These values are kept for reference but LLM decides exits based on
+    # market conditions, not arbitrary time limits (changed 2026-01-08)
+    MAX_POSITION_AGE_SECONDS: int = 14400  # Unused
+    MIN_POSITION_AGE_FOR_EXIT_SECONDS: int = 7200  # Unused
 
-    # Risk Management - Optimized for better R/R
-    DEFAULT_STOP_LOSS_PCT: float = 0.03  # 3% SL
-    DEFAULT_TAKE_PROFIT_PCT: float = 0.06  # 6% TP
-    DEFAULT_POSITION_SIZE_PCT: float = 0.25  # 25% position
+    # Risk Management - Optimized for fee efficiency (higher targets)
+    DEFAULT_STOP_LOSS_PCT: float = 0.035  # 3.5% SL (slightly wider)
+    DEFAULT_TAKE_PROFIT_PCT: float = 0.08  # 8% TP (more ambitious, covers fees)
+    DEFAULT_POSITION_SIZE_PCT: float = 0.35  # 35% position (larger to overcome fees)
     DEFAULT_LEVERAGE: float = 5.0  # 5x Leverage for LONG
 
     # SHORT-specific settings (safer due to unlimited loss potential)
     SHORT_MAX_LEVERAGE: float = 3.0  # 3x max for SHORT
     SHORT_MIN_CONFIDENCE: float = 0.65  # Lower threshold
-    SHORT_POSITION_SIZE_PCT: float = 0.15  # Smaller size
+    SHORT_POSITION_SIZE_PCT: float = 0.25  # 25% size (larger to overcome fees)
 
     # Trading Fees (Binance Futures Taker fee)
     PAPER_TRADING_FEE_PCT: float = 0.0005  # 0.05% per trade (real Binance rate)

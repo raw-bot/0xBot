@@ -18,9 +18,9 @@ class LLMDecisionValidator:
     Validates LLM decisions for sanity and consistency.
 
     Based on research and bot reference logs:
-    - Typical SL: 1-5% (bot uses 3.5%)
-    - Typical TP: 3-10% (bot uses 7%)
-    - Typical R/R: 1:2 to 1:3 (bot uses 2:1)
+    - Typical SL: 1-5% (config uses 3.5% per DEFAULT_STOP_LOSS_PCT)
+    - Typical TP: 5-10% (config uses 8% per DEFAULT_TAKE_PROFIT_PCT)
+    - Typical R/R: 1:2 to 1:3 (bot uses ~2.3:1)
     """
 
     # Maximum acceptable distance for SL/TP from entry price
@@ -119,11 +119,11 @@ class LLMDecisionValidator:
         if not prices_valid:
             # Calculate defaults based on config
             if side == "long":
-                sl = entry * (1 - config.DEFAULT_STOP_LOSS_PCT)  # 3.5% below
-                tp = entry * (1 + config.DEFAULT_TAKE_PROFIT_PCT)  # 7% above
+                sl = entry * (1 - config.DEFAULT_STOP_LOSS_PCT)  # 3% below
+                tp = entry * (1 + config.DEFAULT_TAKE_PROFIT_PCT)  # 6% above
             else:  # short
-                sl = entry * (1 + config.DEFAULT_STOP_LOSS_PCT)  # 3.5% above
-                tp = entry * (1 - config.DEFAULT_TAKE_PROFIT_PCT)  # 7% below
+                sl = entry * (1 + config.DEFAULT_STOP_LOSS_PCT)  # 3% above
+                tp = entry * (1 - config.DEFAULT_TAKE_PROFIT_PCT)  # 6% below
 
             fixed["stop_loss"] = sl
             fixed["take_profit"] = tp

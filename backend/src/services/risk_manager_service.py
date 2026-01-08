@@ -39,7 +39,7 @@ class RiskManagerService:
             # 1. Check position size constraint
             max_position_pct = Decimal(
                 str(bot.risk_params.get("max_position_pct", 0.25))
-            )  # 25% max (NoF1 aggressive mode)
+            )  # 25% max (0xBot aggressive mode)
             if size_pct > max_position_pct:
                 return False, f"Position size {size_pct:.1%} exceeds max {max_position_pct:.1%}"
 

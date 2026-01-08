@@ -69,6 +69,10 @@ class LLMDecisionBlock:
             # Must match the format expected by _build_comprehensive_prompt
             all_coins_data = {}
             for symbol, snap in market_data.items():
+                # Get OHLCV for FVG analysis if available
+                ohlcv = getattr(snap, "ohlcv_1h", None) or []
+                price_series = [float(c.close) for c in ohlcv] if ohlcv else []
+
                 all_coins_data[symbol] = {
                     "current_price": float(snap.price),
                     "funding_rate": 0.0,  # Not available from simple ticker
@@ -80,7 +84,9 @@ class LLMDecisionBlock:
                             "ema50": snap.ema_slow or 0,
                         }
                     },
-                    "price_series": [],  # Would need historical data
+                    "price_series": price_series,
+                    "ohlcv": ohlcv,  # For FVG detection
+                    "timeframe": "1h",
                     "change_24h": snap.change_24h or 0,
                     "atr": snap.atr or 0,
                     "trend": snap.trend or "neutral",
@@ -187,21 +193,12 @@ class LLMDecisionBlock:
             if signal == "hold":
                 return None
 
-            # Close signals - check minimum position age first
+            # Close signals - trust LLM judgment on market conditions
             if signal == "close":
-                # Find position for this symbol
-                if positions:
-                    pos = next((p for p in positions if getattr(p, "symbol", None) == symbol), None)
-                    if pos and hasattr(pos, "opened_at") and pos.opened_at:
-                        age_seconds = (datetime.utcnow() - pos.opened_at).total_seconds()
-                        min_age = config.MIN_POSITION_AGE_FOR_EXIT_SECONDS
-                        if age_seconds < min_age:
-                            logger.info(
-                                f"   ⏳ {symbol}: Position too young "
-                                f"({age_seconds/60:.0f}min < {min_age/60:.0f}min)"
-                            )
-                            return None  # Ignore close signal
-
+                # NOTE: Time-based blocking REMOVED (2026-01-08)
+                # Previously blocked exits if position < MIN_POSITION_AGE
+                # Now: LLM decides based on market conditions, not time
+                # The prompt instructs LLM not to exit prematurely unless danger
                 logger.info(f"   🔴 {symbol}: Close signal received")
                 return TradingDecision(
                     symbol=symbol,

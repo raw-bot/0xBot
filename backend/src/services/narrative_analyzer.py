@@ -1,7 +1,7 @@
 """
 Narrative Analyzer Service - Analyze news narrative vs price reality.
 
-Implements the NoF1-style "Narrative vs Reality Check" with time-decay classification.
+Implements the 0xBot-style "Narrative vs Reality Check" with time-decay classification.
 Classifications: ABSORPTION, DISTRIBUTION, PRICED_IN, DIVERGENCE, IMPULSE
 """
 
@@ -330,7 +330,7 @@ class NarrativeAnalyzer:
 
     def format_for_prompt(self, analyzed_news: Dict[str, List[Dict]]) -> str:
         """
-        Format analyzed news into NoF1-style prompt section.
+        Format analyzed news into 0xBot-style prompt section.
 
         Args:
             analyzed_news: Dict from analyze_news_vs_reality()

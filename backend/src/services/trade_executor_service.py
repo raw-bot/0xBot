@@ -52,7 +52,22 @@ class TradeExecutorService:
             # Extract decision details
             symbol = decision.get("symbol", "")
             side = decision.get("side", "long")
-            size_pct = Decimal(str(decision.get("size_pct", 0.05)))  # Default to 5% if not provided
+
+            # Use SHORT-specific settings for short positions (safer due to unlimited loss potential)
+            is_short = side.lower() == "short"
+            if is_short:
+                # SHORT: use reduced leverage and position size
+                leverage = Decimal(str(config.SHORT_MAX_LEVERAGE))  # 3x
+                default_size_pct = config.SHORT_POSITION_SIZE_PCT  # 15%
+                logger.info(
+                    f"📉 SHORT position: using reduced leverage {leverage}x and size {default_size_pct:.0%}"
+                )
+            else:
+                # LONG: use standard settings
+                leverage = Decimal(str(config.DEFAULT_LEVERAGE))  # 5x
+                default_size_pct = config.DEFAULT_POSITION_SIZE_PCT  # 25%
+
+            size_pct = Decimal(str(decision.get("size_pct", default_size_pct)))
 
             # Use absolute prices provided by LLM (not percentages)
             stop_loss_price = Decimal(str(decision.get("stop_loss", 0)))
@@ -71,7 +86,7 @@ class TradeExecutorService:
                 size_pct=size_pct,
                 current_price=current_price,
                 confidence=Decimal(str(confidence)),
-                leverage=Decimal(str(config.DEFAULT_LEVERAGE)),  # Use configured leverage (10x)
+                leverage=leverage,  # Use SHORT or LONG leverage
             )
 
             if quantity <= 0:
@@ -125,7 +140,7 @@ class TradeExecutorService:
                 entry_price=actual_price,
                 stop_loss=stop_loss_price,
                 take_profit=take_profit_price,
-                leverage=Decimal(str(config.DEFAULT_LEVERAGE)),
+                leverage=leverage,  # Use SHORT or LONG leverage
             )
 
             logger.info(
@@ -158,8 +173,8 @@ class TradeExecutorService:
 
             # Update bot capital: deduct the cost of the position (Margin + Fees)
             # Cost = (Price * Quantity / Leverage) + Fees
-            leverage = Decimal(str(config.DEFAULT_LEVERAGE))
-            margin_cost = (actual_price * quantity) / leverage
+            # Use position's actual leverage (3x for SHORT, 5x for LONG)
+            margin_cost = (actual_price * quantity) / position_data.leverage
             total_cost = margin_cost + fees
             bot.capital -= total_cost
 

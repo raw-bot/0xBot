@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
 class BotStatus(str, enum.Enum):
     """Bot status enum."""
+
     INACTIVE = "inactive"
     ACTIVE = "active"
     PAUSED = "paused"
@@ -31,6 +32,7 @@ class BotStatus(str, enum.Enum):
 
 class ModelName(str, enum.Enum):
     """Supported LLM models."""
+
     CLAUDE_SONNET = "claude-4.5-sonnet"
     GPT4 = "gpt-4"
     DEEPSEEK_CHAT = "deepseek-chat"
@@ -44,33 +46,25 @@ class Bot(Base):
 
     # Primary key
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=generate_uuid
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid
     )
 
     # Foreign keys
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
 
     # Bot configuration
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     model_name: Mapped[str] = mapped_column(
-        String(50),  # Use String instead of Enum - validation done in service
-        nullable=False
+        String(50), nullable=False  # Use String instead of Enum - validation done in service
     )
     initial_capital: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=2), nullable=False)
     capital: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=2), nullable=False)
 
     # Trading symbols (JSON list)
     trading_symbols: Mapped[list] = mapped_column(
-        JSON,
-        nullable=False,
-        default=lambda: ["BTC/USDT"]  # Default to BTC only
+        JSON, nullable=False, default=lambda: ["BTC/USDT"]  # Default to BTC only
     )
 
     # Risk parameters (JSON)
@@ -81,16 +75,16 @@ class Bot(Base):
             "max_position_pct": 0.10,
             "max_drawdown_pct": 0.20,
             "max_trades_per_day": 10,
-            "stop_loss_pct": 0.035,      # 3.5% stop loss (default if not specified)
-            "take_profit_pct": 0.07       # 7% take profit (default if not specified)
-        }
+            "stop_loss_pct": 0.03,  # 3% stop loss (default, aligned with TradingConfig)
+            "take_profit_pct": 0.06,  # 6% take profit (default, aligned with TradingConfig)
+        },
     )
 
     # Bot status
     status: Mapped[str] = mapped_column(
         SQLEnum(BotStatus, name="bot_status_enum", create_constraint=True),
         nullable=False,
-        default=BotStatus.INACTIVE
+        default=BotStatus.INACTIVE,
     )
 
     # Trading mode
@@ -99,28 +93,19 @@ class Bot(Base):
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-        nullable=False
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
     )
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="bots")
     positions: Mapped[list["Position"]] = relationship(
-        "Position",
-        back_populates="bot",
-        cascade="all, delete-orphan"
+        "Position", back_populates="bot", cascade="all, delete-orphan"
     )
     trades: Mapped[list["Trade"]] = relationship(
-        "Trade",
-        back_populates="bot",
-        cascade="all, delete-orphan"
+        "Trade", back_populates="bot", cascade="all, delete-orphan"
     )
     decisions: Mapped[list["LLMDecision"]] = relationship(
-        "LLMDecision",
-        back_populates="bot",
-        cascade="all, delete-orphan"
+        "LLMDecision", back_populates="bot", cascade="all, delete-orphan"
     )
 
     @property
@@ -132,9 +117,10 @@ class Bot(Base):
     def total_unrealized_pnl(self) -> Decimal:
         """Calculate total unrealized PnL from open positions."""
         from .position import PositionStatus
+
         return sum(
             (pos.unrealized_pnl for pos in self.positions if pos.status == PositionStatus.OPEN),
-            Decimal("0")
+            Decimal("0"),
         )
 
     @property
@@ -155,4 +141,6 @@ class Bot(Base):
         return ((self.capital - self.initial_capital) / self.initial_capital) * Decimal("100")
 
     def __repr__(self) -> str:
-        return f"<Bot(id={self.id}, name={self.name}, model={self.model_name}, status={self.status})>"
+        return (
+            f"<Bot(id={self.id}, name={self.name}, model={self.model_name}, status={self.status})>"
+        )

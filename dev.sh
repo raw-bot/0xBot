@@ -55,7 +55,7 @@ echo ""
 echo -e "${BLUE}1️⃣  Démarrage du serveur en arrière-plan...${NC}"
 
 # Démarrer le serveur en arrière-plan
-./start.sh > /tmp/nof1_server.log 2>&1 &
+./start.sh > /tmp/0xbot_server.log 2>&1 &
 SERVER_PID=$!
 
 echo -e "${GREEN}✓${NC} Serveur lancé (PID: $SERVER_PID)"

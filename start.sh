@@ -1,10 +1,10 @@
 #!/bin/bash
-# Script de démarrage intelligent pour NOF1 Trading Bot
+# Script de démarrage intelligent pour 0xBot Trading Bot
 # Attend que PostgreSQL soit prêt avant de lancer le backend
 
 set -e  # Arrêter si erreur (désactivé pour auto-start)
 
-echo "🚀 Démarrage du NOF1 Trading Bot..."
+echo "🚀 Démarrage du 0xBot Trading Bot..."
 echo ""
 
 # Couleurs pour les messages

@@ -220,7 +220,7 @@ class TradingEngine:
                 logger.warning("⚠️  No market data available")
                 return
 
-            # 2. Generate Enhanced NoF1-Style Prompt
+            # 2. Generate Enhanced 0xBot-Style Prompt
             # Includes: Raw Data, Narrative Analysis, Pain Trade, Alpha Setups
             portfolio_state_tuple = await self._get_portfolio_state()
             portfolio_state = portfolio_state_tuple[0] if portfolio_state_tuple else {}
@@ -252,14 +252,14 @@ class TradingEngine:
             )
 
             logger.info(
-                f"📊 Step 1: Analyzing {len(all_coins_data)} coins with NoF1-style prompt..."
+                f"📊 Step 1: Analyzing {len(all_coins_data)} coins with 0xBot-style prompt..."
             )
 
             # 3. Call LLM ONCE for all coins (increased tokens for comprehensive response)
             llm_response = await self.llm_client.analyze_market(
                 model=FORCED_MODEL_DEEPSEEK,
                 prompt=prompt_data["prompt"],
-                max_tokens=6000,  # Increased for NoF1-style Chain of Thought responses
+                max_tokens=6000,  # Increased for 0xBot-style Chain of Thought responses
                 temperature=0.7,
             )
 
@@ -403,14 +403,21 @@ class TradingEngine:
 
                         # Calculate size_pct from quantity (Monk Mode provides quantity)
                         quantity = float(decision.get("quantity", 0))
-                        size_pct = 0.05  # Default fallback
+
+                        # Use config defaults based on side (LONG: 25%, SHORT: 15%)
+                        default_size = (
+                            config.SHORT_POSITION_SIZE_PCT
+                            if side == "short"
+                            else config.DEFAULT_POSITION_SIZE_PCT
+                        )
+                        size_pct = default_size  # Start with config default
 
                         if quantity > 0 and current_price > 0 and total_value > 0:
                             notional = quantity * current_price
-                            size_pct = notional / total_value
-                            # Cap at reasonable max if calculation goes wild
-                            if size_pct > 0.25:
-                                size_pct = 0.25
+                            calculated_size = notional / total_value
+                            # Only use LLM's size if reasonable (between 5% and config max)
+                            if 0.05 <= calculated_size <= default_size:
+                                size_pct = calculated_size
 
                         # Validate and fix LLM decision BEFORE processing
                         is_valid, reason, fixed_decision = (
@@ -628,35 +635,12 @@ class TradingEngine:
                 )
                 continue
 
-            # Additional exit conditions for stuck positions
-            if position_age.total_seconds() > config.MAX_POSITION_AGE_SECONDS:  # 2 hours
-                if pnl_pct < -2.0:
-                    logger.info(
-                        f"    → ⏰ EXIT TRIGGERED: TIMEOUT_LOSS (2h+ with {pnl_pct:.2f}% loss)"
-                    )
-                    logger.warning(
-                        f"⏰ {position.symbol} Position aged {hold_hours:.1f}h with {pnl_pct:.2f}% loss - force closing"
-                    )
-                    await self.trade_executor.execute_exit(
-                        position=position,
-                        current_price=current_price,
-                        reason="time_based_loss_limit",
-                    )
-                    continue
-
-                elif pnl_pct > 1.0:
-                    logger.info(
-                        f"    → ⏰ EXIT TRIGGERED: PROFIT_TAKING (2h+ with {pnl_pct:.2f}% profit)"
-                    )
-                    logger.info(
-                        f"⏰ {position.symbol} Position aged {hold_hours:.1f}h with {pnl_pct:.2f}% profit - taking profit"
-                    )
-                    await self.trade_executor.execute_exit(
-                        position=position,
-                        current_price=current_price,
-                        reason="time_based_profit_taking",
-                    )
-                    continue
+            # NOTE: Time-based exits REMOVED (user feedback 2026-01-08)
+            # Reason: Arbitrary time limits are counterproductive:
+            # - Can force-close winning positions that are still running
+            # - Don't adapt to actual market conditions
+            # - LLM should decide exits based on market signals, not time
+            # Exit conditions are now ONLY: SL/TP hit OR LLM recommends CLOSE
 
             # No exit conditions met
             logger.info(f"    → ✓ HOLD (no exit conditions met)")

@@ -5,7 +5,7 @@ echo "========================"
 echo ""
 
 # Aller dans le bon répertoire
-PROJECT_DIR="/Users/cube/Documents/00-code/nof1"
+PROJECT_DIR="$(dirname "$0")"
 FRONTEND_DIR="$PROJECT_DIR/frontend"
 
 # Vérifier que le répertoire existe

@@ -1,5 +1,5 @@
 """
-Enhanced Multi-Coin Prompt Service - NoF1-Style Trading Intelligence
+Enhanced Multi-Coin Prompt Service - 0xBot-Style Trading Intelligence
 
 Generates comprehensive prompts with:
 1. RAW DATA DASHBOARD (Price Structure, Funding, OI, Volume)
@@ -16,6 +16,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from .alpha_setup_generator import AlphaSetup, AlphaSetupGenerator
+from .fvg_detector_service import FVG, get_fvg_detector
 from .market_sentiment_service import MarketSentiment, get_sentiment_service
 from .narrative_analyzer import NarrativeAnalyzer, NarrativeClassification
 from .pain_trade_analyzer import PainTradeAnalyzer, SqueezeAnalysis
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 class MultiCoinPromptService:
     """
-    Enhanced Multi-Coin Prompt Service with NoF1-style analysis.
+    Enhanced Multi-Coin Prompt Service with 0xBot-style analysis.
 
     Generates comprehensive prompts that include:
     - Multi-timeframe price structure
@@ -43,6 +44,7 @@ class MultiCoinPromptService:
         self.pain_trade_analyzer = PainTradeAnalyzer()
         self.alpha_setup_generator = AlphaSetupGenerator()
         self.sentiment_service = get_sentiment_service()
+        self.fvg_detector = get_fvg_detector()
 
         # Coin mapping
         self.coin_mapping = {
@@ -86,7 +88,7 @@ class MultiCoinPromptService:
         sentiment_data: Optional[MarketSentiment] = None,
     ) -> Dict:
         """
-        Generate NoF1-style comprehensive multi-coin prompt.
+        Generate 0xBot-style comprehensive multi-coin prompt.
 
         Args:
             bot: Bot instance
@@ -126,6 +128,7 @@ class MultiCoinPromptService:
         squeeze_analyses = {}
         crowded_trades = {}
         alpha_setups = {}
+        fvg_analyses = {}  # NEW: FVG analysis per symbol
 
         for symbol in symbols:
             if symbol not in all_coins_data:
@@ -153,6 +156,9 @@ class MultiCoinPromptService:
             # Alpha setup generation
             alpha_setups[symbol] = self._generate_alpha_setup(symbol, market_data, narrative_class)
 
+            # FVG (Fair Value Gap) analysis
+            fvg_analyses[symbol] = self._analyze_fvg(symbol, market_data)
+
         # Use provided sentiment or fetch if not provided
         sentiment = sentiment_data
         if sentiment is None:
@@ -169,6 +175,7 @@ class MultiCoinPromptService:
             squeeze_analyses=squeeze_analyses,
             crowded_trades=crowded_trades,
             alpha_setups=alpha_setups,
+            fvg_analyses=fvg_analyses,
             portfolio_state=portfolio_state,
             sentiment=sentiment,
         )
@@ -303,6 +310,52 @@ class MultiCoinPromptService:
             narrative_classification=narrative_class,
         )
 
+    def _analyze_fvg(self, symbol: str, market_data: Dict) -> str:
+        """
+        Analyze Fair Value Gaps for a symbol.
+
+        Converts OHLCV data to dict format and runs FVG detection.
+        Returns formatted string for prompt injection.
+        """
+        ohlcv_data = market_data.get("ohlcv", [])
+
+        if not ohlcv_data or len(ohlcv_data) < 3:
+            return f"### FVG Analysis ({symbol})\nInsufficient data for FVG detection.\n"
+
+        # Convert OHLCV objects to dict format for FVG detector
+        candles = []
+        for candle in ohlcv_data:
+            candles.append(
+                {
+                    "open": float(candle.open),
+                    "high": float(candle.high),
+                    "low": float(candle.low),
+                    "close": float(candle.close),
+                    "timestamp": candle.datetime.isoformat(),
+                }
+            )
+
+        # Get price range for Premium/Discount zone calculation
+        price_series = market_data.get("price_series", [])
+        if price_series and len(price_series) > 20:
+            range_high = max(price_series[-20:])
+            range_low = min(price_series[-20:])
+        else:
+            range_high = max(c["high"] for c in candles[-20:])
+            range_low = min(c["low"] for c in candles[-20:])
+
+        # Run FVG detection
+        timeframe = market_data.get("timeframe", "1h")
+        fvgs = self.fvg_detector.detect_fvgs(symbol, candles, timeframe)
+
+        # Update mitigation status with current price
+        current_price = market_data.get("current_price", 0)
+        if current_price > 0:
+            self.fvg_detector.update_mitigation(symbol, current_price)
+
+        # Format for prompt
+        return self.fvg_detector.format_for_prompt(symbol, range_high, range_low)
+
     def _build_comprehensive_prompt(
         self,
         symbols: List[str],
@@ -313,10 +366,11 @@ class MultiCoinPromptService:
         squeeze_analyses: Dict[str, SqueezeAnalysis],
         crowded_trades: Dict,
         alpha_setups: Dict[str, AlphaSetup],
+        fvg_analyses: Dict[str, str],
         portfolio_state: Optional[Dict],
         sentiment: Optional[MarketSentiment] = None,
     ) -> str:
-        """Build the complete NoF1-style prompt."""
+        """Build the complete 0xBot-style prompt."""
         lines = []
 
         # Header
@@ -378,6 +432,14 @@ class MultiCoinPromptService:
 
         # Section 4: Alpha Setups
         lines.append(self.alpha_setup_generator.format_for_prompt(alpha_setups))
+
+        # Section 4.5: FVG Analysis (ICT-style Fair Value Gaps)
+        lines.append("## 4.5 FAIR VALUE GAP (FVG) ANALYSIS")
+        lines.append("")
+        for symbol in symbols:
+            if symbol in fvg_analyses:
+                lines.append(fvg_analyses[symbol])
+        lines.append("")
 
         # Section 5: Portfolio State
         lines.append("## 5. CURRENT PORTFOLIO STATE")
@@ -516,16 +578,23 @@ class MultiCoinPromptService:
         lines.append("### For OPEN positions:")
         lines.append("1. Is there DANGER detected? (incoming crash, major resistance, bad news)")
         lines.append("2. Is position LOSING money? (protection mode)")
-        lines.append("3. Is profit SIGNIFICANT? (≥1.5% unrealized PnL)")
+        lines.append("3. Is profit SIGNIFICANT? (≥2.0% unrealized PnL)")
         lines.append("4. Is stop loss/take profit about to trigger?")
         lines.append("")
         lines.append("**EXIT RULES:**")
         lines.append("→ If LOSING (PnL < 0%) AND danger detected: **CLOSE** (protection)")
-        lines.append("→ If profit ≥ 1.5% AND target reached: **CLOSE** (profit-taking)")
-        lines.append("→ If profit < 1.5%: **HOLD** - let the profit run! Never exit micro-profits.")
+        lines.append("→ If profit ≥ 2.0% AND target reached: **CLOSE** (profit-taking)")
+        lines.append("→ If profit < 2.0%: **HOLD** - let the profit run! Never exit micro-profits.")
         lines.append("→ If no danger AND losing < 2%: **HOLD** - give it time to develop")
         lines.append("")
-        lines.append("**⚠️ NEVER recommend CLOSE for small profits (<1.5%)! This is wasteful.**")
+        lines.append("**⚠️ ANTI-OVERTRADING: NEVER exit recent positions prematurely!**")
+        lines.append("- A position opened < 1 hour ago should NOT be closed unless:")
+        lines.append("  1. SL/TP is about to be hit")
+        lines.append("  2. MAJOR danger detected (crash, black swan event)")
+        lines.append("- Let trades BREATHE. Markets fluctuate. Be patient.")
+        lines.append("- TIME is not a reason to exit. Only MARKET CONDITIONS matter.")
+        lines.append("")
+        lines.append("**⚠️ NEVER recommend CLOSE for small profits (<2.0%)! This is wasteful.**")
         lines.append("")
         lines.append("### For symbols WITHOUT position:")
         lines.append("")
@@ -539,9 +608,10 @@ class MultiCoinPromptService:
         lines.append("   - Example: 5x leverage → need 0.02% move just to cover fees")
         lines.append("")
         lines.append("2. **Minimum expected profit:**")
-        lines.append("   - Expected profit MUST be > $5 (absolute minimum)")
-        lines.append("   - Expected profit % MUST be > 0.5% after fees")
-        lines.append("   - If expected profit < $5 or < 0.5%: DO NOT TRADE")
+        lines.append("   - Round-trip fees with 35% position @ 5x = ~$17.50")
+        lines.append("   - Expected profit MUST be > $20 (covers fees + buffer)")
+        lines.append("   - Expected profit % MUST be > 2.0% after fees")
+        lines.append("   - If expected profit < $20: DO NOT TRADE")
         lines.append("")
         lines.append("3. **Is this trade WORTH IT?**")
         lines.append("   - Will this trade meaningfully impact the portfolio?")
@@ -549,15 +619,15 @@ class MultiCoinPromptService:
         lines.append("   - Would a better opportunity come later?")
         lines.append("")
         lines.append("**❌ REJECT trades that:**")
-        lines.append("- Have expected profit < $5")
-        lines.append("- Target < 0.5% profit after fees")
+        lines.append("- Have expected profit < $20 (after fees)")
+        lines.append("- Target < 2.0% profit after fees")
         lines.append("- Are based on minor price fluctuations")
-        lines.append("- Would result in micro-gains not worth the execution risk")
+        lines.append("- Would result in fees eating the profit")
         lines.append("")
         lines.append("**✅ ONLY ENTER if:**")
-        lines.append("1. Clear edge with confidence > 0.70")
-        lines.append("2. Expected profit > $10 AND > 1% after fees")
-        lines.append("3. R:R ratio > 2.0 (target at least 2x the stop distance)")
+        lines.append("1. Clear edge with confidence >= 0.65")
+        lines.append("2. Expected profit > $35 AND > 2% after fees")
+        lines.append("3. R:R ratio >= 1.5 (target at least 1.5x the stop distance)")
         lines.append("4. Sufficient capital available")
         lines.append("5. Trade makes STRATEGIC sense, not just technical")
         lines.append("")
@@ -573,28 +643,54 @@ class MultiCoinPromptService:
         lines.append("- R:R = target_distance / stop_distance")
         lines.append("")
 
-        # Response Format
+        # Response Format - Structured Text (not JSON template to avoid copying)
         lines.append("## RESPONSE FORMAT")
         lines.append("")
-        lines.append("Return a JSON object with keys for each symbol you are acting on.")
-        lines.append("For **HOLD** (existing position): Copy existing SL/TP/invalidation")
-        lines.append("For **EXIT**: Signal close with justification")
-        lines.append("For **ENTRY**: Full trade parameters")
+        lines.append(f"**⚠️ MANDATORY: Analyze ALL {len(symbols)} symbols: {', '.join(symbols)}**")
         lines.append("")
+        lines.append("### Step 1: CHAIN OF THOUGHT (Required)")
+        lines.append("Before making decisions, reason through each symbol:")
+        lines.append("- What is the current trend? (bullish/bearish/neutral)")
+        lines.append("- Is there a clear edge? (funding, OI, technicals)")
+        lines.append("- What is the expected profit after fees?")
+        lines.append("- What is my confidence level and why?")
+        lines.append("")
+        lines.append("### Step 2: OUTPUT YOUR DECISIONS")
+        lines.append("After your analysis, output a JSON object with your decisions.")
+        lines.append("")
+        lines.append("**IMPORTANT RULES:**")
+        lines.append(
+            "- `signal` must be EXACTLY ONE OF: `hold`, `buy_to_enter`, `sell_to_enter`, `close`"
+        )
+        lines.append("- `confidence` must be a DECIMAL NUMBER like `0.75`, NOT a range")
+        lines.append("- For `hold`: only signal, confidence, justification needed")
+        lines.append(
+            "- For entries: include entry_price, stop_loss, take_profit, leverage, quantity"
+        )
+        lines.append("")
+        lines.append("**Example for 2 symbols (adapt to your analysis):**")
         lines.append("```json")
         lines.append("{")
-        lines.append('  "BTC/USDT": {')
-        lines.append('    "signal": "hold|buy_to_enter|sell_to_enter|close",')
-        lines.append('    "confidence": 0.0-1.0,')
-        lines.append('    "quantity": <float>,')
-        lines.append('    "leverage": <int 1-20>,')
-        lines.append('    "profit_target": <float>,')
-        lines.append('    "stop_loss": <float>,')
-        lines.append('    "invalidation_condition": "<string>",')
-        lines.append('    "justification": "<1-3 sentences explaining the decision>"')
-        lines.append("  }")
+        lines.append(f'  "{symbols[0]}": {{')
+        lines.append('    "signal": "hold",')
+        lines.append('    "confidence": 0.60,')
+        lines.append('    "justification": "No clear edge, RSI neutral at 52"')
+        lines.append("  },")
+        if len(symbols) > 1:
+            lines.append(f'  "{symbols[1]}": {{')
+            lines.append('    "signal": "buy_to_enter",')
+            lines.append('    "confidence": 0.78,')
+            lines.append('    "justification": "Strong support bounce with bullish FVG",')
+            lines.append('    "entry_price": 3150.00,')
+            lines.append('    "stop_loss": 3045.00,')
+            lines.append('    "take_profit": 3400.00,')
+            lines.append('    "leverage": 5,')
+            lines.append('    "quantity": 0.5')
+            lines.append("  }")
         lines.append("}")
         lines.append("```")
+        lines.append("")
+        lines.append("**⚠️ DO NOT copy the example values! Use YOUR OWN analysis.**")
 
         return "\n".join(lines)
 

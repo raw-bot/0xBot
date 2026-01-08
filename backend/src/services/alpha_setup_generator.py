@@ -1,7 +1,7 @@
 """
 Alpha Setup Generator - Generate structured trading hypotheses.
 
-Implements NoF1-style "ALPHA SETUPS: MENU OF HYPOTHESES" with:
+Implements 0xBot-style "ALPHA SETUPS: MENU OF HYPOTHESES" with:
 - Hypothesis A: Trend Following
 - Hypothesis B: Mean Reversion / Fade
 - Hypothesis C: Microstructure Edge
@@ -396,7 +396,7 @@ class AlphaSetupGenerator:
 
     def format_for_prompt(self, setups: Dict[str, AlphaSetup]) -> str:
         """
-        Format alpha setups into NoF1-style prompt section.
+        Format alpha setups into 0xBot-style prompt section.
 
         Args:
             setups: Dict mapping symbols to AlphaSetup

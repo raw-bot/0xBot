@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script d'installation complète du NOF1 Trading Bot
+# Script d'installation complète du 0xBot Trading Bot
 # À exécuter une seule fois lors du premier setup
 
 set -e
@@ -24,7 +24,7 @@ error() {
 }
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🚀 Installation du NOF1 Trading Bot"
+echo "🚀 Installation du 0xBot Trading Bot"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 

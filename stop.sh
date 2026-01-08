@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script d'arrêt propre du NOF1 Trading Bot
+# Script d'arrêt propre du 0xBot Trading Bot
 
 set -e
 
@@ -9,7 +9,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo "🛑 Arrêt du NOF1 Trading Bot..."
+echo "🛑 Arrêt du 0xBot Trading Bot..."
 echo ""
 
 # 1. Arrêter le backend (si en cours)

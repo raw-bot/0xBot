@@ -1,7 +1,7 @@
 """
 Pain Trade Analyzer Service - Detect liquidation hunting opportunities.
 
-Implements NoF1-style "Pain Trade" analysis:
+Implements 0xBot-style "Pain Trade" analysis:
 - Squeeze Watch (High OI + Counter-Trend Funding)
 - Liquidity Traps / Crowded Trades detection
 - Trigger Levels for liquidations
@@ -289,7 +289,7 @@ class PainTradeAnalyzer:
         crowded_trades: Dict[str, List[CrowdedTradeAnalysis]],
     ) -> str:
         """
-        Format pain trade analysis into NoF1-style prompt section.
+        Format pain trade analysis into 0xBot-style prompt section.
 
         Args:
             squeeze_analyses: Dict mapping symbols to SqueezeAnalysis

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script de vérification du statut des services NOF1
+# Script de vérification du statut des services 0xBot
 
 # Couleurs
 RED='\033[0;31m'
@@ -9,7 +9,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🔍 Statut du NOF1 Trading Bot"
+echo "🔍 Statut du 0xBot Trading Bot"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
