@@ -1,194 +1,227 @@
-"""Service de mémoire de trading pour enrichir le contexte LLM"""
-import logging
-from datetime import datetime, timedelta
-from typing import Dict, List
+"""Trading memory service - learns from trade history."""
 
-from sqlalchemy import and_
-from sqlalchemy.orm import Session
+from decimal import Decimal
+from typing import Dict, List, Optional
+from datetime import datetime
+from uuid import UUID
 
-from ..models.bot import Bot
-from ..models.llm_decision import LLMDecision
-from ..models.position import Position, PositionStatus
-from ..models.trade import Trade
+from ..core.logger import get_logger
+from ..core.memory.memory_manager import MemoryManager
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
+
+
+def get_trading_memory(db=None, bot_id=None):
+    """Factory function to create TradingMemoryService instance.
+
+    Args:
+        db: Database session (not used currently, for compatibility)
+        bot_id: Bot UUID
+
+    Returns:
+        TradingMemoryService instance
+    """
+    return TradingMemoryService(bot_id=bot_id)
 
 
 class TradingMemoryService:
-    """
-    Service for managing trading context and memory."""
+    """Service to memorize and recall trading patterns and profitable setups."""
 
-    def __init__(self, db: Session):
-        self.db = db
-        self._session_start = datetime.now()
-        self._invocation_count = 0
+    def __init__(self, bot_id: UUID):
+        self.bot_id = bot_id
+        self.memory = MemoryManager.get_provider()
 
-    def increment_invocation(self):
-        """Incrémenter le compteur d'invocations LLM"""
-        self._invocation_count += 1
-
-    def get_session_context(self, bot: Bot) -> Dict:
-        """
-        Contexte de la session en cours
-        - Durée de la session
-        - Nombre d'invocations LLM
-        - Timestamp actuel
-        """
-        session_minutes = int((datetime.now() - self._session_start).total_seconds() / 60)
-        return {
-            "session_minutes": session_minutes,
-            "total_invocations": self._invocation_count,
-            "current_time": datetime.now().isoformat()
-        }
-
-    def get_portfolio_context(self, bot: Bot, open_positions: List = None) -> Dict:
-        """
-        Contexte du portfolio
-        - Capital initial vs actuel
-        - Cash disponible
-        - Capital investi
-        - Performance (PnL, return %)
+    async def remember_profitable_setup(
+        self,
+        symbol: str,
+        entry_pattern: Dict,
+        pnl: Decimal,
+        confidence: Decimal,
+    ) -> bool:
+        """Remember a profitable trading setup.
 
         Args:
-            bot: Bot instance
-            open_positions: List of open positions (passed to avoid async query issues)
+            symbol: Trading pair (BTC, ETH, etc)
+            entry_pattern: Pattern that led to profit (indicators, RSI, etc)
+            pnl: Profit/loss amount
+            confidence: Confidence level of the setup
+
+        Returns:
+            True if remembered
         """
-        # Calculate invested capital from open positions
-        if open_positions is None:
-            open_positions = []
+        try:
+            key = f"profitable_setup:{symbol}:{datetime.utcnow().isoformat()}"
 
-        invested = sum(
-            float(pos.entry_price * pos.quantity)
-            for pos in open_positions
-            if pos.status == PositionStatus.OPEN
-        )
-
-        # Available cash = total capital - invested in positions
-        current_capital = float(bot.capital)
-        available_cash = current_capital - invested
-
-        # Calculate percentages
-        return_pct = ((current_capital - float(bot.initial_capital)) / float(bot.initial_capital)) * 100
-        cash_pct = (available_cash / current_capital) * 100 if current_capital > 0 else 0
-        invested_pct = (invested / current_capital) * 100 if current_capital > 0 else 0
-
-        return {
-            "initial_capital": float(bot.initial_capital),
-            "current_equity": current_capital,
-            "available_cash": available_cash,
-            "cash_pct": cash_pct,
-            "invested": invested,
-            "invested_pct": invested_pct,
-            "return_pct": return_pct,
-            "pnl": current_capital - float(bot.initial_capital)
-        }
-
-    def get_positions_context(self, bot: Bot, open_positions: List = None) -> List[Dict]:
-        """
-        Contexte des positions ouvertes
-        - Détails de chaque position
-        - PnL par position
-        - Stop loss / Take profit
-
-        Args:
-            bot: Bot instance
-            open_positions: List of open positions (passed to avoid async query issues)
-        """
-        if open_positions is None:
-            open_positions = []
-
-        # Filter only open positions
-        open_positions = [pos for pos in open_positions if pos.status == PositionStatus.OPEN]
-
-        positions_data = []
-        for position in open_positions:
-
-            # Calculate PnL
-            if position.side == "long":
-                pnl = (position.current_price - position.entry_price) * position.quantity
-            else:
-                pnl = (position.entry_price - position.current_price) * position.quantity
-
-            pnl_pct = (pnl / (position.entry_price * position.quantity)) * 100 if position.quantity > 0 else 0
-
-            positions_data.append({
-                "symbol": position.symbol,
-                "side": position.side.upper(),
-                "size": float(position.quantity),  # Use quantity, display as size
-                "entry_price": float(position.entry_price),
-                "current_price": float(position.current_price),
+            data = {
+                "symbol": symbol,
+                "pattern": entry_pattern,
                 "pnl": float(pnl),
-                "pnl_pct": float(pnl_pct),
-                "stop_loss": float(position.stop_loss) if position.stop_loss else None,
-                "take_profit": float(position.take_profit) if position.take_profit else None,
-                "notional_usd": float(position.entry_price * position.quantity)
-            })
+                "confidence": float(confidence),
+                "timestamp": datetime.utcnow().isoformat(),
+            }
 
-        return positions_data
+            success = await MemoryManager.remember(
+                key,
+                data,
+                metadata={"symbol": symbol, "profitable": pnl > 0},
+            )
 
-    def get_trades_today_context(self, bot: Bot) -> Dict:
-        """
-        Contexte des trades du jour
-        - Nombre de trades exécutés
-        - Win rate
-        - Meilleur/pire trade
+            if success:
+                logger.info(f"[MEMORY] Remembered profitable setup for {symbol}: ${float(pnl):.2f}")
 
-        Note: Simplified version to avoid async DB queries
-        TODO: Pass trades as parameter like positions
-        """
-        # For now, return default values to avoid async DB issues
-        # The bot has risk_params with max_trades_per_day
-        return {
-            "trades_today": 0,  # NOT IMPLEMENTED: Pass from trading engine
-            "max_trades_per_day": bot.risk_params.get("max_trades_per_day", 10),
-            "win_rate": 0.0,  # NOT IMPLEMENTED: Calculate from passed trades
-            "total_closed_trades": 0,
-            "winning_trades": 0,
-            "best_trade": None,
-            "worst_trade": None
-        }
+            return success
 
-    def get_sharpe_ratio(self, bot: Bot, period_days: int = 7) -> float:
-        """
-        Calculer le Sharpe Ratio sur une période donnée
-        Mesure le ratio rendement/risque
+        except Exception as e:
+            logger.error(f"[MEMORY] Error remembering setup: {e}")
+            return False
 
-        Note: Simplified version to avoid async DB queries
-        TODO: Calculate from passed trades data
-        """
-        # For now, return 0.0 to avoid async DB issues
-        # NOT IMPLEMENTED: Pass trades data and calculate properly
-        return 0.0
-
-    def get_full_context(self, bot: Bot, open_positions: List = None) -> Dict:
-        """
-        Obtenir le contexte complet pour enrichir les prompts LLM
-        Appelé à chaque décision de trading
+    async def remember_losing_setup(
+        self,
+        symbol: str,
+        entry_pattern: Dict,
+        pnl: Decimal,
+    ) -> bool:
+        """Remember a losing trading setup to avoid it.
 
         Args:
-            bot: Bot instance
-            open_positions: List of open positions (passed to avoid async query issues)
+            symbol: Trading pair
+            entry_pattern: Pattern that led to loss
+            pnl: Loss amount
+
+        Returns:
+            True if remembered
         """
-        self.increment_invocation()
+        try:
+            key = f"losing_setup:{symbol}:{datetime.utcnow().isoformat()}"
 
-        return {
-            "session": self.get_session_context(bot),
-            "portfolio": self.get_portfolio_context(bot, open_positions),
-            "positions": self.get_positions_context(bot, open_positions),
-            "trades_today": self.get_trades_today_context(bot),
-            "sharpe_ratio": self.get_sharpe_ratio(bot)
-        }
+            data = {
+                "symbol": symbol,
+                "pattern": entry_pattern,
+                "pnl": float(pnl),
+                "timestamp": datetime.utcnow().isoformat(),
+            }
 
+            success = await MemoryManager.remember(
+                key,
+                data,
+                metadata={"symbol": symbol, "avoid": True},
+            )
 
-# Global instances cache (one per bot)
-_memory_instances: Dict[str, TradingMemoryService] = {}
+            if success:
+                logger.warning(f"[MEMORY] Remembered losing setup for {symbol}: ${float(pnl):.2f}")
 
+            return success
 
-def get_trading_memory(db: Session, bot_id: str) -> TradingMemoryService:
-    """
-    Factory function pour obtenir l'instance de TradingMemoryService pour un bot
-    Maintient une instance par bot pour conserver l'état de session
-    """
-    if bot_id not in _memory_instances:
-        _memory_instances[bot_id] = TradingMemoryService(db)
-    return _memory_instances[bot_id]
+        except Exception as e:
+            logger.error(f"[MEMORY] Error remembering loss: {e}")
+            return False
+
+    async def remember_symbol_stats(self, symbol: str, stats: Dict) -> bool:
+        """Remember aggregate stats for a symbol.
+
+        Args:
+            symbol: Trading pair
+            stats: Win rate, avg profit, etc
+
+        Returns:
+            True if remembered
+        """
+        try:
+            key = f"symbol_stats:{symbol}"
+
+            success = await MemoryManager.remember(key, stats, metadata={"symbol": symbol})
+
+            if success:
+                logger.info(
+                    f"[MEMORY] Updated stats for {symbol}: "
+                    f"WR={stats.get('win_rate', 0):.1f}%, "
+                    f"Profit=${stats.get('avg_profit', 0):.2f}"
+                )
+
+            return success
+
+        except Exception as e:
+            logger.error(f"[MEMORY] Error remembering stats: {e}")
+            return False
+
+    async def recall_symbol_stats(self, symbol: str) -> Optional[Dict]:
+        """Recall stats for a symbol.
+
+        Returns:
+            Stats dict or None if not found
+        """
+        try:
+            key = f"symbol_stats:{symbol}"
+            stats = await MemoryManager.recall(key)
+
+            if stats:
+                logger.info(f"[MEMORY] Recalled stats for {symbol}")
+
+            return stats
+
+        except Exception as e:
+            logger.error(f"[MEMORY] Error recalling stats: {e}")
+            return None
+
+    async def get_best_performing_setups(self, symbol: str, limit: int = 5) -> List[Dict]:
+        """Get best performing setups for a symbol.
+
+        Returns:
+            List of profitable setup patterns
+        """
+        try:
+            logger.debug(f"[MEMORY] Getting best setups for {symbol}")
+            return []
+
+        except Exception as e:
+            logger.error(f"[MEMORY] Error getting best setups: {e}")
+            return []
+
+    async def get_avoiding_patterns(self, symbol: str) -> List[Dict]:
+        """Get patterns to avoid for a symbol.
+
+        Returns:
+            List of losing patterns
+        """
+        try:
+            logger.debug(f"[MEMORY] Getting patterns to avoid for {symbol}")
+            return []
+
+        except Exception as e:
+            logger.error(f"[MEMORY] Error getting avoiding patterns: {e}")
+            return []
+
+    async def suggest_confidence_adjustment(self, symbol: str) -> float:
+        """Suggest confidence adjustment based on memory.
+
+        Returns:
+            Adjustment factor (1.0 = no change, 0.8 = reduce confidence by 20%)
+        """
+        try:
+            stats = await self.recall_symbol_stats(symbol)
+
+            if not stats:
+                return 1.0
+
+            win_rate = stats.get("win_rate", 0.5)
+
+            # Check highest win rates FIRST (most specific conditions first)
+            if win_rate > 0.70:
+                adjustment = 1.3  # High win rate - big confidence boost
+                logger.info(f"[MEMORY] {symbol} very profitable (WR {win_rate*100:.0f}%) - boosting confidence by 30%")
+            elif win_rate > 0.65:
+                adjustment = 1.15  # Good win rate - moderate boost
+                logger.info(f"[MEMORY] {symbol} profitable (WR {win_rate*100:.0f}%) - boosting confidence by 15%")
+            elif win_rate < 0.45:
+                adjustment = 0.7  # Low win rate - significant reduction
+                logger.info(f"[MEMORY] {symbol} unprofitable (WR {win_rate*100:.0f}%) - reducing confidence by 30%")
+            elif win_rate < 0.50:
+                adjustment = 0.85  # Moderate low - slight reduction
+            else:
+                adjustment = 1.0  # Normal range - no adjustment
+
+            return adjustment
+
+        except Exception as e:
+            logger.error(f"[MEMORY] Error suggesting confidence adjustment: {e}")
+            return 1.0

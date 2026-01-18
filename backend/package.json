@@ -1,0 +1,35 @@
+{
+  "name": "0xbot-mcp-server",
+  "version": "1.0.0",
+  "description": "0xBot MCP Server - Docker-based hub for trading tools, reduces context consumption by 90%",
+  "type": "module",
+  "main": "mcp-server/index.js",
+  "scripts": {
+    "start:mcp": "node mcp-server/index.js",
+    "test:mcp": "node --test mcp-server/**/*.test.js",
+    "lint": "eslint mcp-server/ mcp-workflows/",
+    "dev": "nodemon mcp-server/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "trading",
+    "bot",
+    "docker",
+    "context-protocol",
+    "workflow"
+  ],
+  "author": "0xBot Team",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.52.0",
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

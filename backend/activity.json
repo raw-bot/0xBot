@@ -1,1894 +1,5 @@
 [
   {
-    "timestamp": "2025-12-20T15:21:19.308344",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 47.5,
-    "decisions_count": 4,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "buy_to_enter",
-        "confidence": 0.72
-      },
-      "XRP/USDT": {
-        "signal": "buy_to_enter",
-        "confidence": 0.71
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T15:25:02.852031",
-    "type": "TRADE_REJECTED",
-    "bot": "0xBot Fresh",
-    "symbol": "SOL/USDT",
-    "signal": "buy_to_enter",
-    "confidence": 0.72,
-    "reason": "Position size $23.20 below minimum $50"
-  },
-  {
-    "timestamp": "2025-12-20T15:25:02.855606",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 43.5,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "buy_to_enter",
-        "confidence": 0.72
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T15:28:43.023064",
-    "type": "TRADE_REJECTED",
-    "bot": "0xBot Fresh",
-    "symbol": "SOL/USDT",
-    "signal": "buy_to_enter",
-    "confidence": 0.75,
-    "reason": "Position size $8.63 below minimum $50"
-  },
-  {
-    "timestamp": "2025-12-20T15:28:43.029463",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 40.1,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "buy_to_enter",
-        "confidence": 0.75
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T15:32:17.029344",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 34.0,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T15:35:51.134595",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 34.0,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T15:39:31.969618",
-    "type": "TRADE_REJECTED",
-    "bot": "0xBot Fresh",
-    "symbol": "SOL/USDT",
-    "signal": "buy_to_enter",
-    "confidence": 0.72,
-    "reason": "Position size $2.38 below minimum $50"
-  },
-  {
-    "timestamp": "2025-12-20T15:39:31.978271",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 40.8,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "buy_to_enter",
-        "confidence": 0.72
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T15:43:06.784623",
-    "type": "TRADE_ENTRY",
-    "bot": "0xBot Fresh",
-    "symbol": "SOL/USDT",
-    "side": "short",
-    "quantity": 0.41777023,
-    "entry_price": 126.45,
-    "stop_loss": 130.88,
-    "take_profit": 117.6,
-    "confidence": 0.65
-  },
-  {
-    "timestamp": "2025-12-20T15:43:06.793003",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 34.8,
-    "decisions_count": 3,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "SOL/USDT": {
-        "signal": "sell_to_enter",
-        "confidence": 0.65
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T15:46:40.960987",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 34.1,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T15:50:15.736079",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 34.7,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "close",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T15:53:50.035547",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 34.3,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T15:57:23.004433",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 32.9,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.65
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T16:00:54.939709",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 31.9,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.72
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.65
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T16:04:27.474486",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 32.5,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T16:08:00.958117",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 33.4,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T16:11:32.539583",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 31.5,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T16:15:06.037082",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 33.5,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.72
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T16:18:40.394078",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 34.3,
-    "decisions_count": 4,
-    "decisions_summary": {
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T16:22:12.389111",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 32.0,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.72
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.65
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T16:25:43.924247",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 31.5,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T16:29:15.170254",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 31.2,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.72
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T16:32:46.727760",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 31.5,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.6
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T16:36:17.788608",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 31.0,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.65
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.8
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T16:39:51.374395",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 33.5,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.65
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.72
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T16:43:30.145036",
-    "type": "TRADE_REJECTED",
-    "bot": "0xBot Fresh",
-    "symbol": "BNB/USDT",
-    "signal": "buy_to_enter",
-    "confidence": 0.72,
-    "reason": "Position size $28.51 below minimum $50"
-  },
-  {
-    "timestamp": "2025-12-20T16:43:30.151289",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 38.7,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.65
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.78
-      },
-      "BNB/USDT": {
-        "signal": "buy_to_enter",
-        "confidence": 0.72
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T16:47:02.962639",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 32.7,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.72
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T16:50:33.299259",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 30.3,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T16:54:13.400900",
-    "type": "TRADE_REJECTED",
-    "bot": "0xBot Fresh",
-    "symbol": "BNB/USDT",
-    "signal": "sell_to_enter",
-    "confidence": 0.72,
-    "reason": "Risk/reward ratio 1.30 too low (min 1.3) - SL: 3.500%, TP: 4.550%"
-  },
-  {
-    "timestamp": "2025-12-20T16:54:13.410247",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 40.1,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "sell_to_enter",
-        "confidence": 0.72
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T16:57:44.611170",
-    "type": "TRADE_ENTRY",
-    "bot": "0xBot Fresh",
-    "symbol": "BNB/USDT",
-    "side": "short",
-    "quantity": 0.21731229,
-    "entry_price": 853.5,
-    "stop_loss": 883.37,
-    "take_profit": 793.76,
-    "confidence": 0.65
-  },
-  {
-    "timestamp": "2025-12-20T16:57:44.617850",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 31.2,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.72
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "BNB/USDT": {
-        "signal": "sell_to_enter",
-        "confidence": 0.65
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T17:01:17.681488",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 33.0,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T17:04:47.034598",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 29.3,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.65
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.68
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T17:08:16.819164",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 29.7,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.65
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T17:11:45.801258",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 28.9,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.72
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.73
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T17:15:15.033098",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 29.2,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T17:18:42.827011",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 27.8,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T17:22:10.176381",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 27.3,
-    "decisions_count": 4,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.72
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.68
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T17:25:41.952807",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 31.7,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.72
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.68
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T17:29:14.832167",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 32.8,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T17:32:44.838942",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 30.0,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.65
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T17:36:17.700776",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 32.8,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T17:39:48.373433",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 30.6,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T17:43:19.567872",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 31.2,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T17:46:49.179268",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 29.6,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T17:50:20.875137",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 31.6,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T17:53:51.265288",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 30.3,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T17:57:23.553730",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 32.2,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "SOL/USDT": {
-        "signal": "close",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T18:00:53.457672",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 29.9,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.65
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.72
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T18:04:25.847508",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 32.4,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.65
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.72
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T18:07:56.794032",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 30.9,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.65
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.6
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T18:11:31.390756",
-    "type": "TRADE_REJECTED",
-    "bot": "0xBot Fresh",
-    "symbol": "XRP/USDT",
-    "signal": "buy_to_enter",
-    "confidence": 0.75,
-    "reason": "Total exposure $4,790.41 would exceed max $4,681.93"
-  },
-  {
-    "timestamp": "2025-12-20T18:11:31.400492",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 34.6,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "SOL/USDT": {
-        "signal": "close",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "close",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "buy_to_enter",
-        "confidence": 0.75
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T18:15:12.167905",
-    "type": "TRADE_REJECTED",
-    "bot": "0xBot Fresh",
-    "symbol": "XRP/USDT",
-    "signal": "buy_to_enter",
-    "confidence": 0.75,
-    "reason": "Total exposure $5,864.40 would exceed max $4,681.93"
-  },
-  {
-    "timestamp": "2025-12-20T18:15:12.180155",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 40.7,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "buy_to_enter",
-        "confidence": 0.75
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T18:18:46.200250",
-    "type": "TRADE_REJECTED",
-    "bot": "0xBot Fresh",
-    "symbol": "XRP/USDT",
-    "signal": "buy_to_enter",
-    "confidence": 0.75,
-    "reason": "Total exposure $5,864.40 would exceed max $4,681.93"
-  },
-  {
-    "timestamp": "2025-12-20T18:18:46.209670",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 34.0,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "SOL/USDT": {
-        "signal": "close",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "close",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "buy_to_enter",
-        "confidence": 0.75
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T18:22:17.375252",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 31.1,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.72
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.65
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T18:25:55.627906",
-    "type": "TRADE_REJECTED",
-    "bot": "0xBot Fresh",
-    "symbol": "XRP/USDT",
-    "signal": "buy_to_enter",
-    "confidence": 0.72,
-    "reason": "Total exposure $4,789.98 would exceed max $4,681.93"
-  },
-  {
-    "timestamp": "2025-12-20T18:25:55.633578",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 38.2,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.68
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.65
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.6
-      },
-      "XRP/USDT": {
-        "signal": "buy_to_enter",
-        "confidence": 0.72
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T18:29:21.331893",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 25.7,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.72
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.65
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T18:32:54.365394",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 33.0,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.65
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.55
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.6
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "XRP/USDT": {
-        "signal": "close",
-        "confidence": 0.0
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T18:36:23.078648",
-    "type": "TRADE_REJECTED",
-    "bot": "0xBot Fresh",
-    "symbol": "XRP/USDT",
-    "signal": "buy_to_enter",
-    "confidence": 0.72,
-    "reason": "Total exposure $5,864.40 would exceed max $4,681.93"
-  },
-  {
-    "timestamp": "2025-12-20T18:36:23.087727",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 28.7,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.0
-      },
-      "XRP/USDT": {
-        "signal": "buy_to_enter",
-        "confidence": 0.72
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T18:39:59.404900",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 36.3,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.5
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.5
-      },
-      "SOL/USDT": {
-        "signal": "hold",
-        "confidence": 0.5
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.5
-      },
-      "XRP/USDT": {
-        "signal": "hold",
-        "confidence": 0.5
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T18:43:31.438141",
-    "type": "TRADE_REJECTED",
-    "bot": "0xBot Fresh",
-    "symbol": "XRP/USDT",
-    "signal": "buy_to_enter",
-    "confidence": 0.75,
-    "reason": "Total exposure $5,864.40 would exceed max $4,681.93"
-  },
-  {
-    "timestamp": "2025-12-20T18:43:31.447774",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 32.0,
-    "decisions_count": 5,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "ETH/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "SOL/USDT": {
-        "signal": "close",
-        "confidence": 0.0
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.7
-      },
-      "XRP/USDT": {
-        "signal": "buy_to_enter",
-        "confidence": 0.75
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T18:48:44.233678",
-    "type": "TRADE_ENTRY",
-    "bot": "0xBot Fresh",
-    "symbol": "BTC/USDT",
-    "side": "long",
-    "quantity": 0.011187,
-    "entry_price": 88154.6,
-    "stop_loss": 85069.19,
-    "take_profit": 94325.42,
-    "confidence": 0.72
-  },
-  {
-    "timestamp": "2025-12-20T18:48:44.366394",
-    "type": "TRADE_ENTRY",
-    "bot": "0xBot Fresh",
-    "symbol": "BNB/USDT",
-    "side": "long",
-    "quantity": 0.09947027,
-    "entry_price": 852.7,
-    "stop_loss": 822.86,
-    "take_profit": 891.5,
-    "confidence": 0.68
-  },
-  {
-    "timestamp": "2025-12-20T18:48:44.376518",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 28.6,
-    "decisions_count": 2,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "buy_to_enter",
-        "confidence": 0.72
-      },
-      "BNB/USDT": {
-        "signal": "buy_to_enter",
-        "confidence": 0.68
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T18:52:18.479471",
-    "type": "TRADE_REJECTED",
-    "bot": "0xBot Fresh",
-    "symbol": "SOL/USDT",
-    "signal": "buy_to_enter",
-    "confidence": 0.68,
-    "reason": "Risk/reward ratio 1.30 too low (min 1.3) - SL: 2.004%, TP: 2.605%"
-  },
-  {
-    "timestamp": "2025-12-20T18:52:18.489654",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 34.1,
-    "decisions_count": 3,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.72
-      },
-      "SOL/USDT": {
-        "signal": "buy_to_enter",
-        "confidence": 0.68
-      }
-    }
-  },
-  {
-    "timestamp": "2025-12-20T18:55:55.980160",
-    "type": "TRADE_ENTRY",
-    "bot": "0xBot Fresh",
-    "symbol": "XRP/USDT",
-    "side": "short",
-    "quantity": 1093.71434826,
-    "entry_price": 1.92,
-    "stop_loss": 1.93,
-    "take_profit": 1.88,
-    "confidence": 0.68
-  },
-  {
-    "timestamp": "2025-12-20T18:55:55.990446",
-    "type": "CYCLE_END",
-    "bot": "0xBot Fresh",
-    "duration_seconds": 37.5,
-    "decisions_count": 3,
-    "decisions_summary": {
-      "BTC/USDT": {
-        "signal": "hold",
-        "confidence": 0.75
-      },
-      "BNB/USDT": {
-        "signal": "hold",
-        "confidence": 0.72
-      },
-      "XRP/USDT": {
-        "signal": "sell_to_enter",
-        "confidence": 0.68
-      }
-    }
-  },
-  {
     "timestamp": "2025-12-20T18:59:20.513815",
     "type": "CYCLE_END",
     "bot": "0xBot Fresh",
@@ -10268,5 +8379,941 @@
     "stop_loss": 2.18,
     "take_profit": 2.05,
     "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-09T18:05:35.592699",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 6.214265458185054,
+    "entry_price": 899.2,
+    "stop_loss": 903.72,
+    "take_profit": 892.2,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-09T18:45:46.037531",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "long",
+    "quantity": 10.4434244355019,
+    "entry_price": 894.6,
+    "stop_loss": 877.08,
+    "take_profit": 928.55,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-09T18:51:43.596283",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "SOL/USDT",
+    "side": "short",
+    "quantity": 51.15420475319927,
+    "entry_price": 136.75,
+    "stop_loss": 140.7,
+    "take_profit": 129.92,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-09T19:32:03.774949",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BTC/USDT",
+    "side": "short",
+    "quantity": 0.05806130412178573,
+    "entry_price": 90210.9,
+    "stop_loss": 91600.0,
+    "take_profit": 88000.0,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-09T21:19:48.974934",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 6.269668008048289,
+    "entry_price": 894.6,
+    "stop_loss": 903.8,
+    "take_profit": 877.08,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-09T21:37:35.003303",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "long",
+    "quantity": 10.4358085439499,
+    "entry_price": 894.2,
+    "stop_loss": 877.08,
+    "take_profit": 928.55,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-09T22:13:43.998761",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "long",
+    "quantity": 10.40189732142857,
+    "entry_price": 896.0,
+    "stop_loss": 877.0,
+    "take_profit": 928.55,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-09T23:58:53.557727",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "long",
+    "quantity": 6.227101238977564,
+    "entry_price": 895.9,
+    "stop_loss": 888.0,
+    "take_profit": 915.0,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-10T00:37:47.233237",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 10.34333611574847,
+    "entry_price": 898.5,
+    "stop_loss": 902.95,
+    "take_profit": 889.4,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-10T01:37:39.224004",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 10.307125375458893,
+    "entry_price": 898.9,
+    "stop_loss": 901.0,
+    "take_profit": 880.92,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-10T02:25:40.213718",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 10.260230427540256,
+    "entry_price": 900.5,
+    "stop_loss": 902.62,
+    "take_profit": 889.4,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-10T03:31:45.335343",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 10.247419533851277,
+    "entry_price": 901.0,
+    "stop_loss": 903.17,
+    "take_profit": 890.0,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-10T04:07:45.612965",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 10.156063782829397,
+    "entry_price": 906.2,
+    "stop_loss": 909.88,
+    "take_profit": 900.22,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-10T05:35:00.584267",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 6.077429484354341,
+    "entry_price": 907.6,
+    "stop_loss": 925.0,
+    "take_profit": 880.0,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-10T10:12:50.163348",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 10.19552313325197,
+    "entry_price": 901.3,
+    "stop_loss": 909.6,
+    "take_profit": 880.8,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-10T13:56:54.355393",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 12.118915622574566,
+    "entry_price": 901.9,
+    "stop_loss": 910.0,
+    "take_profit": 880.0,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-10T15:21:06.747777",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 12.028943739658025,
+    "entry_price": 906.5,
+    "stop_loss": 910.0,
+    "take_profit": 888.37,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-10T15:44:59.229593",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 11.90260204642975,
+    "entry_price": 908.9,
+    "stop_loss": 912.0,
+    "take_profit": 895.0,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-10T16:11:56.371545",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "ETH/USDT",
+    "side": "long",
+    "quantity": 2.616550916579181,
+    "entry_price": 3095.75,
+    "stop_loss": 3072.05,
+    "take_profit": 3133.49,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-10T16:29:55.065736",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 11.879740381435344,
+    "entry_price": 907.1,
+    "stop_loss": 915.0,
+    "take_profit": 895.0,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-10T16:48:00.728453",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "XRP/USDT",
+    "side": "short",
+    "quantity": 3853.021584451554,
+    "entry_price": 2.0941,
+    "stop_loss": 2.12,
+    "take_profit": 2.02,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-10T19:02:54.037154",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 6.978178035694733,
+    "entry_price": 913.3,
+    "stop_loss": 918.0,
+    "take_profit": 892.0,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-10T23:24:03.905302",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "ETH/USDT",
+    "side": "short",
+    "quantity": 3.4462745167939226,
+    "entry_price": 3085.64,
+    "stop_loss": 3139.0,
+    "take_profit": 2980.0,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-11T01:00:01.855190",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "XRP/USDT",
+    "side": "short",
+    "quantity": 3811.2943372744244,
+    "entry_price": 2.0891,
+    "stop_loss": 2.14,
+    "take_profit": 2.02,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-11T02:18:02.759883",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "long",
+    "quantity": 6.555613591378931,
+    "entry_price": 909.4,
+    "stop_loss": 899.0,
+    "take_profit": 941.0,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-11T03:42:08.178312",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "SOL/USDT",
+    "side": "short",
+    "quantity": 32.82447238767556,
+    "entry_price": 135.99,
+    "stop_loss": 137.3,
+    "take_profit": 131.5,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-11T05:21:05.168084",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "SOL/USDT",
+    "side": "short",
+    "quantity": 61.14118447173002,
+    "entry_price": 136.01,
+    "stop_loss": 138.1,
+    "take_profit": 131.44,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-11T08:42:05.754782",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 10.720920376244122,
+    "entry_price": 914.3,
+    "stop_loss": 917.15,
+    "take_profit": 901.9,
+    "confidence": 0.75
+  },
+  {
+    "timestamp": "2026-01-11T09:35:39.636800",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "SOL/USDT",
+    "side": "short",
+    "quantity": 32.230183707824054,
+    "entry_price": 136.63,
+    "stop_loss": 141.41205,
+    "take_profit": 125.6996,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-11T09:53:23.965318",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "ETH/USDT",
+    "side": "short",
+    "quantity": 1.5381736454590857,
+    "entry_price": 3103.45,
+    "stop_loss": 3145.0,
+    "take_profit": 2995.0,
+    "confidence": 0.75
+  },
+  {
+    "timestamp": "2026-01-11T10:02:16.591735",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 3.9200487724682156,
+    "entry_price": 912.4,
+    "stop_loss": 920.0,
+    "take_profit": 894.0,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-11T10:37:13.081563",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "XRP/USDT",
+    "side": "short",
+    "quantity": 3584.400688204932,
+    "entry_price": 2.0924,
+    "stop_loss": 2.14,
+    "take_profit": 2.02,
+    "confidence": 0.75
+  },
+  {
+    "timestamp": "2026-01-11T10:40:17.203240",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "SOL/USDT",
+    "side": "short",
+    "quantity": 41.164566698410376,
+    "entry_price": 136.51,
+    "stop_loss": 137.5,
+    "take_profit": 133.5,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-11T11:22:15.926633",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 4.6120276043378245,
+    "entry_price": 912.9,
+    "stop_loss": 920.5,
+    "take_profit": 901.9,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-11T11:46:14.293766",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 4.60788493150685,
+    "entry_price": 912.5,
+    "stop_loss": 919.56,
+    "take_profit": 894.25,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-11T13:31:23.514001",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 6.622594417077176,
+    "entry_price": 913.5,
+    "stop_loss": 920.0,
+    "take_profit": 892.2,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-11T13:55:16.717064",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "ETH/USDT",
+    "side": "short",
+    "quantity": 1.9027112007021538,
+    "entry_price": 3110.43,
+    "stop_loss": 3155.0,
+    "take_profit": 3025.0,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-11T13:55:16.778186",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "SOL/USDT",
+    "side": "short",
+    "quantity": 32.35260105063476,
+    "entry_price": 137.06,
+    "stop_loss": 140.5,
+    "take_profit": 132.0,
+    "confidence": 0.75
+  },
+  {
+    "timestamp": "2026-01-11T14:34:17.298242",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "XRP/USDT",
+    "side": "short",
+    "quantity": 1582.6025341780594,
+    "entry_price": 2.0993,
+    "stop_loss": 2.16,
+    "take_profit": 2.02,
+    "confidence": 0.75
+  },
+  {
+    "timestamp": "2026-01-11T16:07:01.570359",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "ETH/USDT",
+    "side": "short",
+    "quantity": 2.0180926115956903,
+    "entry_price": 3118.4,
+    "stop_loss": 3129.9,
+    "take_profit": 3098.31,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-11T16:34:08.094534",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "SOL/USDT",
+    "side": "short",
+    "quantity": 85.96638059436839,
+    "entry_price": 140.99,
+    "stop_loss": 141.54,
+    "take_profit": 138.09,
+    "confidence": 0.81
+  },
+  {
+    "timestamp": "2026-01-11T16:37:06.271758",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "ETH/USDT",
+    "side": "short",
+    "quantity": 1.7339891281156357,
+    "entry_price": 3140.21,
+    "stop_loss": 3147.03,
+    "take_profit": 3115.75,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-12T03:49:55.436362",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "ETH/USDT",
+    "side": "short",
+    "quantity": 2.255145928121879,
+    "entry_price": 3153.95,
+    "stop_loss": 3170.0,
+    "take_profit": 3132.0,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-12T03:49:55.485587",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "SOL/USDT",
+    "side": "short",
+    "quantity": 37.339721132286996,
+    "entry_price": 142.72,
+    "stop_loss": 144.0,
+    "take_profit": 140.65,
+    "confidence": 0.75
+  },
+  {
+    "timestamp": "2026-01-12T05:10:39.016823",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BTC/USDT",
+    "side": "short",
+    "quantity": 0.04333342377296036,
+    "entry_price": 92142.5,
+    "stop_loss": 92360.0,
+    "take_profit": 91613.93,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-12T05:40:49.250907",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "ETH/USDT",
+    "side": "short",
+    "quantity": 2.5033603425809963,
+    "entry_price": 3161.88,
+    "stop_loss": 3175.0,
+    "take_profit": 3140.0,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-13T23:02:33.874200",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BTC/USDT",
+    "side": "short",
+    "quantity": 0.06910024506153617,
+    "entry_price": 96016.7,
+    "stop_loss": 96600.0,
+    "take_profit": 95112.0,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-13T23:02:33.923590",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "ETH/USDT",
+    "side": "short",
+    "quantity": 1.4875931783428245,
+    "entry_price": 3341.71,
+    "stop_loss": 3370.0,
+    "take_profit": 3273.0,
+    "confidence": 0.75
+  },
+  {
+    "timestamp": "2026-01-13T23:09:20.314294",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 6.557851785336996,
+    "entry_price": 946.6,
+    "stop_loss": 951.42,
+    "take_profit": 935.97,
+    "confidence": 0.78
+  },
+  {
+    "timestamp": "2026-01-14T01:30:36.493141",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 5.685801201011378,
+    "entry_price": 949.2,
+    "stop_loss": 960.0,
+    "take_profit": 930.0,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-14T02:57:25.155131",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "XRP/USDT",
+    "side": "short",
+    "quantity": 1862.9307564728647,
+    "entry_price": 2.1706,
+    "stop_loss": 2.19,
+    "take_profit": 2.13,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-14T05:42:18.946858",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "ETH/USDT",
+    "side": "short",
+    "quantity": 1.5906218516119748,
+    "entry_price": 3335.04,
+    "stop_loss": 3370.0,
+    "take_profit": 3265.0,
+    "confidence": 0.8
+  },
+  {
+    "timestamp": "2026-01-14T05:51:25.568269",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BTC/USDT",
+    "side": "long",
+    "quantity": 0.06974607830647275,
+    "entry_price": 94978.1,
+    "stop_loss": 94124.0,
+    "take_profit": 96264.0,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-14T05:57:27.875655",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "ETH/USDT",
+    "side": "short",
+    "quantity": 1.292240415983274,
+    "entry_price": 3328.98,
+    "stop_loss": 3378.0,
+    "take_profit": 3264.0,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-14T06:48:25.428612",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "short",
+    "quantity": 4.916630272688539,
+    "entry_price": 938.8,
+    "stop_loss": 942.5,
+    "take_profit": 930.3,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-14T07:09:23.969257",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "ETH/USDT",
+    "side": "short",
+    "quantity": 1.3551070785941612,
+    "entry_price": 3340.07,
+    "stop_loss": 3377.5,
+    "take_profit": 3265.0,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-14T09:00:39.022078",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "SOL/USDT",
+    "side": "long",
+    "quantity": 52.31502900151913,
+    "entry_price": 144.82,
+    "stop_loss": 143.8,
+    "take_profit": 146.92,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-14T11:06:43.612428",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "XRP/USDT",
+    "side": "long",
+    "quantity": 2663.001126654774,
+    "entry_price": 2.1302,
+    "stop_loss": 2.105,
+    "take_profit": 2.18,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-14T14:09:33.388708",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "SOL/USDT",
+    "side": "long",
+    "quantity": 65.00775541155384,
+    "entry_price": 145.06,
+    "stop_loss": 143.4,
+    "take_profit": 151.0,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-15T17:29:14.166813",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "XRP/USDT",
+    "side": "long",
+    "quantity": 4791.796444487039,
+    "entry_price": 2.0869,
+    "stop_loss": 2.05865,
+    "take_profit": 2.13,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-15T17:53:08.399621",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "long",
+    "quantity": 5.970982142857143,
+    "entry_price": 940.8,
+    "stop_loss": 926.02,
+    "take_profit": 978.5,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-15T18:32:15.237637",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "SOL/USDT",
+    "side": "long",
+    "quantity": 70.69391835016835,
+    "entry_price": 142.56,
+    "stop_loss": 141.5,
+    "take_profit": 145.41,
+    "confidence": 0.75
+  },
+  {
+    "timestamp": "2026-01-15T19:26:27.095426",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "long",
+    "quantity": 13.188431023316062,
+    "entry_price": 926.4,
+    "stop_loss": 924.0,
+    "take_profit": 935.07,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-15T19:26:27.153815",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "XRP/USDT",
+    "side": "long",
+    "quantity": 4431.335981398954,
+    "entry_price": 2.0644,
+    "stop_loss": 2.049,
+    "take_profit": 2.09,
+    "confidence": 0.78
+  },
+  {
+    "timestamp": "2026-01-15T19:35:18.199665",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "SOL/USDT",
+    "side": "long",
+    "quantity": 48.369465433232115,
+    "entry_price": 141.61,
+    "stop_loss": 141.49,
+    "take_profit": 143.08,
+    "confidence": 0.7
+  },
+  {
+    "timestamp": "2026-01-15T21:11:13.225040",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "SOL/USDT",
+    "side": "long",
+    "quantity": 64.03482578274082,
+    "entry_price": 141.49,
+    "stop_loss": 140.5,
+    "take_profit": 144.0,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-15T21:29:16.498492",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "ETH/USDT",
+    "side": "long",
+    "quantity": 1.234459066012386,
+    "entry_price": 3297.26,
+    "stop_loss": 3270.0,
+    "take_profit": 3350.0,
+    "confidence": 0.75
+  },
+  {
+    "timestamp": "2026-01-15T21:47:34.556027",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "XRP/USDT",
+    "side": "long",
+    "quantity": 2454.0483777520276,
+    "entry_price": 2.0712,
+    "stop_loss": 2.05,
+    "take_profit": 2.11,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-15T23:38:29.864619",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "SOL/USDT",
+    "side": "long",
+    "quantity": 73.81893156080748,
+    "entry_price": 142.17,
+    "stop_loss": 140.65,
+    "take_profit": 145.0,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-16T02:02:26.511459",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "SOL/USDT",
+    "side": "long",
+    "quantity": 73.75501407459535,
+    "entry_price": 142.1,
+    "stop_loss": 140.5,
+    "take_profit": 144.5,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-16T05:14:33.332864",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "XRP/USDT",
+    "side": "long",
+    "quantity": 3799.795419329847,
+    "entry_price": 2.0652,
+    "stop_loss": 2.05,
+    "take_profit": 2.11,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-16T05:38:37.949572",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "XRP/USDT",
+    "side": "long",
+    "quantity": 3772.4765315010163,
+    "entry_price": 2.0666,
+    "stop_loss": 2.045,
+    "take_profit": 2.11,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-16T07:50:42.861336",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "XRP/USDT",
+    "side": "long",
+    "quantity": 3764.553679131484,
+    "entry_price": 2.0725,
+    "stop_loss": 2.045,
+    "take_profit": 2.115,
+    "confidence": 0.75
+  },
+  {
+    "timestamp": "2026-01-16T09:05:17.756577",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "XRP/USDT",
+    "side": "long",
+    "quantity": 3759.501831678396,
+    "entry_price": 2.0746,
+    "stop_loss": 2.04,
+    "take_profit": 2.13,
+    "confidence": 0.72
+  },
+  {
+    "timestamp": "2026-01-16T16:30:31.317070",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BTC/USDT",
+    "side": "long",
+    "quantity": 0.0012884184721324134,
+    "entry_price": 94800.1,
+    "stop_loss": 91482.0965,
+    "take_profit": 102384.108,
+    "confidence": 0.6
+  },
+  {
+    "timestamp": "2026-01-16T21:42:34.941760",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "SOL/USDT",
+    "side": "long",
+    "quantity": 1.318407274731331,
+    "entry_price": 145.16,
+    "stop_loss": 140.0794,
+    "take_profit": 156.7728,
+    "confidence": 0.6
+  },
+  {
+    "timestamp": "2026-01-16T23:48:37.231342",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "BNB/USDT",
+    "side": "long",
+    "quantity": 0.20007318113932152,
+    "entry_price": 937.4,
+    "stop_loss": 904.591,
+    "take_profit": 1012.392,
+    "confidence": 0.6
+  },
+  {
+    "timestamp": "2026-01-17T14:24:48.865845",
+    "type": "TRADE_ENTRY",
+    "bot": "0xBot",
+    "symbol": "ETH/USDT",
+    "side": "long",
+    "quantity": 0.05560729877980522,
+    "entry_price": 3305.21,
+    "stop_loss": 3189.52765,
+    "take_profit": 3569.6268,
+    "confidence": 0.6
   }
 ]

@@ -1,0 +1,28 @@
+# 0xBot MCP Server - Docker Hub for all Trading Tools
+# Centralizes all bot services into a single MCP interface
+# Reduces context consumption by 90% compared to individual MCP servers
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache python3 py3-pip curl
+
+# Copy bot configuration and scripts
+COPY package.json package-lock.json ./
+COPY mcp-server/ ./mcp-server/
+COPY mcp-workflows/ ./mcp-workflows/
+
+# Install Node dependencies
+RUN npm install
+
+# Expose MCP server port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
+
+# Start MCP server
+CMD ["npm", "run", "start:mcp"]

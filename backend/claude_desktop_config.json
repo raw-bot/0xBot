@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "0xbot": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--name",
+        "0xbot-mcp",
+        "--network",
+        "host",
+        "-e",
+        "BOT_API_URL=http://localhost:8000",
+        "-e",
+        "PYTHON_BIN=python3",
+        "0xbot-mcp-server:latest"
+      ],
+      "env": {
+        "BOT_API_URL": "http://localhost:8000",
+        "PYTHON_BIN": "python3"
+      }
+    }
+  }
+}

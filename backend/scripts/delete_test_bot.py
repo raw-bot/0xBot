@@ -1,33 +1,38 @@
+#!/usr/bin/env python3
+"""Delete a bot by ID."""
 import asyncio
 import sys
 import uuid
-from pathlib import Path
 
-from sqlalchemy import delete, select
-from src.core.database import AsyncSessionLocal
+from sqlalchemy import select
+
+from utils import DBSession, GREEN, YELLOW, RED, NC
+
 from src.models.bot import Bot
 
-# Add backend to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
+async def delete_bot(bot_id: str):
+    try:
+        bot_uuid = uuid.UUID(bot_id)
+    except ValueError:
+        print(f"{RED}Invalid UUID: {bot_id}{NC}")
+        return
 
-async def delete_test_bot():
-    bot_id = uuid.UUID("c005bfa7-2bd8-4bcb-9fda-e88f5bddcae4")
-
-    async with AsyncSessionLocal() as db:
-        print(f"Deleting bot {bot_id}...")
-
-        # Check if exists
-        result = await db.execute(select(Bot).where(Bot.id == bot_id))
+    async with DBSession() as db:
+        result = await db.execute(select(Bot).where(Bot.id == bot_uuid))
         bot = result.scalar_one_or_none()
 
-        if bot:
-            await db.delete(bot)
-            await db.commit()
-            print("✅ Bot deleted successfully")
-        else:
-            print("⚠️  Bot not found")
+        if not bot:
+            print(f"{YELLOW}Bot not found: {bot_id}{NC}")
+            return
+
+        await db.delete(bot)
+        await db.commit()
+        print(f"{GREEN}Bot deleted: {bot_id}{NC}")
 
 
 if __name__ == "__main__":
-    asyncio.run(delete_test_bot())
+    if len(sys.argv) < 2:
+        print(f"Usage: python delete_test_bot.py <bot_id>")
+        sys.exit(1)
+    asyncio.run(delete_bot(sys.argv[1]))

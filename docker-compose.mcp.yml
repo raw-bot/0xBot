@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  # 0xBot Backend API
+  bot-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.production
+    container_name: 0xbot-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/trading_agent
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=info
+      - DECISION_MODE=trinity
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - 0xbot-network
+
+  # 0xBot MCP Server (Docker Hub for all tools)
+  mcp-server:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.mcp
+    container_name: 0xbot-mcp
+    environment:
+      - BOT_API_URL=http://bot-api:8000
+      - PYTHON_BIN=python3
+      - MCP_LOG_LEVEL=info
+    depends_on:
+      bot-api:
+        condition: service_healthy
+    stdin_open: true
+    networks:
+      - 0xbot-network
+    volumes:
+      - ./backend/mcp-workflows:/app/mcp-workflows
+      - /tmp:/tmp  # For workflow result files
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: 0xbot-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: trading_agent
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - 0xbot-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: 0xbot-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis_data:/data
+    networks:
+      - 0xbot-network
+
+  # (Optional) Monitoring - Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: 0xbot-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - 0xbot-network
+
+  # (Optional) Monitoring - Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: 0xbot-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - 0xbot-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  0xbot-network:
+    driver: bridge

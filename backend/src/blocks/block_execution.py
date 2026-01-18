@@ -1,30 +1,26 @@
-"""Block: Execution - Handles trade execution.
-
-This block is responsible for:
-- Opening new positions
-- Closing existing positions
-- Recording trades to database
-- Updating bot capital
-"""
+"""Block: Execution - Handles trade execution."""
 
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, Tuple
+from typing import Optional
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import config
 from ..core.database import AsyncSessionLocal
 from ..core.exchange_client import get_exchange_client
 from ..core.logger import get_logger
+from ..core.memory.memory_manager import MemoryManager
 from ..models.bot import Bot
 from ..models.position import Position, PositionSide, PositionStatus
 from ..models.trade import Trade, TradeSide
+from ..services.trading_memory_service import TradingMemoryService
 
 logger = get_logger(__name__)
+
+FEE_RATE = Decimal("0.001")
 
 
 @dataclass
@@ -38,11 +34,12 @@ class ExecutionResult:
 
 
 class ExecutionBlock:
-    """Handles trade execution."""
+    """Handles trade execution with memory integration for learning."""
 
-    def __init__(self, bot_id: uuid.UUID):
+    def __init__(self, bot_id: uuid.UUID, paper_trading: bool = True):
         self.bot_id = bot_id
-        self.exchange = get_exchange_client()
+        self.exchange = get_exchange_client(paper_trading=paper_trading)
+        self.memory = TradingMemoryService(bot_id)
 
     async def open_position(
         self,
@@ -54,28 +51,18 @@ class ExecutionBlock:
         take_profit: Decimal,
         leverage: int = int(config.DEFAULT_LEVERAGE),
     ) -> ExecutionResult:
-        """
-        Open a new position.
-
-        Returns:
-            ExecutionResult with position and trade
-        """
+        """Open a new position."""
         async with AsyncSessionLocal() as db:
             try:
-                # Get bot
-                query = select(Bot).where(Bot.id == self.bot_id)
-                result = await db.execute(query)
-                bot = result.scalar_one()
+                bot = await self._get_bot(db)
 
-                # Calculate position size
                 margin = bot.capital * Decimal(str(size_pct))
                 notional = margin * Decimal(str(leverage))
                 quantity = notional / entry_price
+                fees = notional * FEE_RATE
 
-                # Place order (paper trading mode)
                 logger.info(f"PAPER: {side} {quantity:.6f} {symbol} @ {entry_price:,.2f}")
 
-                # Create position
                 position = Position(
                     bot_id=self.bot_id,
                     symbol=symbol,
@@ -92,8 +79,6 @@ class ExecutionBlock:
                 db.add(position)
                 await db.flush()
 
-                # Create trade record
-                fees = notional * Decimal("0.001")  # 0.1% fee
                 trade = Trade(
                     bot_id=self.bot_id,
                     position_id=position.id,
@@ -107,22 +92,12 @@ class ExecutionBlock:
                 )
                 db.add(trade)
 
-                # Deduct margin from capital
                 bot.capital = bot.capital - margin - fees
-
                 await db.commit()
 
-                logger.info(
-                    f"Position created: Entry @ {entry_price:,.2f}, "
-                    f"SL @ {stop_loss:,.2f}, TP @ {take_profit:,.2f}"
-                )
                 logger.info(f"Entry executed: Capital: ${float(bot.capital):,.2f}")
 
-                return ExecutionResult(
-                    success=True,
-                    position=position,
-                    trade=trade,
-                )
+                return ExecutionResult(success=True, position=position, trade=trade)
 
             except Exception as e:
                 logger.error(f"Error opening position: {e}")
@@ -134,38 +109,19 @@ class ExecutionBlock:
         current_price: Decimal,
         reason: str = "manual",
     ) -> ExecutionResult:
-        """
-        Close an existing position.
-
-        Returns:
-            ExecutionResult with trade
-        """
+        """Close an existing position."""
         async with AsyncSessionLocal() as db:
             try:
-                # Refresh position from DB
-                query = select(Position).where(Position.id == position.id)
-                result = await db.execute(query)
-                position = result.scalar_one()
-
+                position = await self._refresh_position(db, position.id)
                 if position.status != PositionStatus.OPEN:
                     return ExecutionResult(success=False, error="Position already closed")
 
-                # Get bot
-                bot_query = select(Bot).where(Bot.id == self.bot_id)
-                bot_result = await db.execute(bot_query)
-                bot = bot_result.scalar_one()
+                bot = await self._get_bot(db)
 
-                # Calculate PnL
-                if position.side == PositionSide.LONG:
-                    pnl = (current_price - position.entry_price) * position.quantity
-                else:
-                    pnl = (position.entry_price - current_price) * position.quantity
-
-                # Calculate margin to return
+                pnl = self._calculate_pnl(position, current_price)
                 margin = position.entry_price * position.quantity / position.leverage
-                fees = current_price * position.quantity * Decimal("0.001")
+                fees = current_price * position.quantity * FEE_RATE
 
-                # Create exit trade
                 trade = Trade(
                     bot_id=self.bot_id,
                     position_id=position.id,
@@ -179,28 +135,90 @@ class ExecutionBlock:
                 )
                 db.add(trade)
 
-                # Update position
                 position.status = PositionStatus.CLOSED
                 position.current_price = current_price
                 position.closed_at = datetime.utcnow()
 
-                # Return margin + PnL to capital
                 bot.capital = bot.capital + margin + pnl - fees
-
                 await db.commit()
 
                 pnl_str = f"+${float(pnl):,.2f}" if pnl >= 0 else f"-${abs(float(pnl)):,.2f}"
-                logger.info(
-                    f"✅ EXIT {position.symbol} @ ${current_price:,.2f} "
-                    f"| PnL: {pnl_str} | Reason: {reason}"
-                )
+                logger.info(f"EXIT {position.symbol} @ ${current_price:,.2f} | PnL: {pnl_str} | Reason: {reason}")
 
-                return ExecutionResult(
-                    success=True,
-                    position=position,
-                    trade=trade,
-                )
+                # Record outcome in memory for learning
+                if MemoryManager.is_enabled():
+                    await self._record_trade_outcome(position, pnl, reason)
+
+                return ExecutionResult(success=True, position=position, trade=trade)
 
             except Exception as e:
                 logger.error(f"Error closing position: {e}")
                 return ExecutionResult(success=False, error=str(e))
+
+    async def _get_bot(self, db) -> Bot:
+        """Get bot from database."""
+        result = await db.execute(select(Bot).where(Bot.id == self.bot_id))
+        bot = result.scalar_one_or_none()
+        if not bot:
+            raise ValueError(f"Bot {self.bot_id} not found in database")
+        return bot
+
+    async def _refresh_position(self, db, position_id: uuid.UUID) -> Position:
+        """Refresh position from database."""
+        result = await db.execute(select(Position).where(Position.id == position_id))
+        position = result.scalar_one_or_none()
+        if not position:
+            raise ValueError(f"Position {position_id} not found in database")
+        return position
+
+    def _calculate_pnl(self, position: Position, current_price: Decimal) -> Decimal:
+        """Calculate PnL for a position."""
+        if position.side == PositionSide.LONG:
+            return (current_price - position.entry_price) * position.quantity
+        return (position.entry_price - current_price) * position.quantity
+
+    async def _record_trade_outcome(
+        self, position: Position, pnl: Decimal, reason: str
+    ) -> None:
+        """Record trade outcome in memory for future learning.
+
+        Args:
+            position: Closed position
+            pnl: Realized PnL
+            reason: Why the position was closed
+        """
+        try:
+            # Create a pattern entry for memory
+            entry_pattern = {
+                "side": position.side.value,
+                "entry_price": float(position.entry_price),
+                "exit_price": float(position.current_price),
+                "stop_loss": float(position.stop_loss) if position.stop_loss else None,
+                "take_profit": float(position.take_profit) if position.take_profit else None,
+                "close_reason": reason,
+                "hold_hours": (position.closed_at - position.opened_at).total_seconds() / 3600
+                if position.closed_at
+                else 0,
+            }
+
+            # Record as profitable or losing setup
+            if pnl > 0:
+                await self.memory.remember_profitable_setup(
+                    symbol=position.symbol,
+                    entry_pattern=entry_pattern,
+                    pnl=pnl,
+                    confidence=Decimal("0.50"),  # Default confidence for recorded trade
+                )
+            else:
+                await self.memory.remember_losing_setup(
+                    symbol=position.symbol,
+                    entry_pattern=entry_pattern,
+                    pnl=pnl,
+                )
+
+            # Update symbol stats
+            # (This would normally be done by StrategyPerformanceService)
+            logger.debug(f"[MEMORY] Recorded outcome for {position.symbol}: PnL=${float(pnl):.2f}")
+
+        except Exception as e:
+            logger.warning(f"[MEMORY] Failed to record outcome for {position.symbol}: {e}")

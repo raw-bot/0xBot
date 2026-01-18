@@ -1,77 +1,49 @@
 """
-Enhanced Multi-Coin Prompt Service - 0xBot-Style Trading Intelligence
-
-Generates comprehensive prompts with:
-1. RAW DATA DASHBOARD (Price Structure, Funding, OI, Volume)
-2. NARRATIVE VS REALITY CHECK (News classification)
-3. PAIN TRADE ANALYSIS (Squeeze detection, Trigger levels)
-4. ALPHA SETUPS (3 hypotheses per asset)
-5. PORTFOLIO STATE & DECISION FRAMEWORK
+Multi-Coin Prompt Service - Generates comprehensive trading prompts with market analysis.
 """
 
 import json
 import logging
 from datetime import datetime
-from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from .alpha_setup_generator import AlphaSetup, AlphaSetupGenerator
-from .fvg_detector_service import FVG, get_fvg_detector
+from .fvg_detector_service import get_fvg_detector
 from .market_sentiment_service import MarketSentiment, get_sentiment_service
-from .narrative_analyzer import NarrativeAnalyzer, NarrativeClassification
+from .narrative_analyzer import NarrativeAnalyzer
 from .pain_trade_analyzer import PainTradeAnalyzer, SqueezeAnalysis
 
 logger = logging.getLogger(__name__)
 
+COIN_MAPPING = {
+    "BTC/USDT": "Bitcoin",
+    "ETH/USDT": "Ethereum",
+    "SOL/USDT": "Solana",
+    "BNB/USDT": "BNB",
+    "XRP/USDT": "XRP",
+}
+
 
 class MultiCoinPromptService:
-    """
-    Enhanced Multi-Coin Prompt Service with 0xBot-style analysis.
-
-    Generates comprehensive prompts that include:
-    - Multi-timeframe price structure
-    - Funding rate and OI analysis
-    - Narrative vs Reality classification
-    - Pain trade / squeeze detection
-    - 3-hypothesis alpha setups per asset
-    - Explicit decision framework
-    """
+    """Generates 0xBot-style multi-coin trading prompts with comprehensive analysis."""
 
     def __init__(self, db=None):
-        """Initialize with all analysis services."""
-        self.db = db  # For compatibility
+        self.db = db
         self.narrative_analyzer = NarrativeAnalyzer()
         self.pain_trade_analyzer = PainTradeAnalyzer()
         self.alpha_setup_generator = AlphaSetupGenerator()
         self.sentiment_service = get_sentiment_service()
         self.fvg_detector = get_fvg_detector()
-
-        # Coin mapping
-        self.coin_mapping = {
-            "BTC/USDT": "Bitcoin",
-            "ETH/USDT": "Ethereum",
-            "SOL/USDT": "Solana",
-            "BNB/USDT": "BNB",
-            "XRP/USDT": "XRP",
-        }
+        self.coin_mapping = COIN_MAPPING
 
     def get_simple_decision(
         self, bot, symbol, market_snapshot, market_regime, all_coins_data, bot_positions=None
     ):
-        """
-        Compatibility wrapper for SimpleLLMPromptService interface.
-        """
-        if all_coins_data is None:
-            all_coins_data = {}
-        if not isinstance(all_coins_data, dict):
-            logger.warning(f"all_coins_data not a dict, converting to empty dict")
-            all_coins_data = {}
-
-        all_positions = bot_positions or []
+        """Compatibility wrapper for SimpleLLMPromptService interface."""
+        all_coins_data = all_coins_data if isinstance(all_coins_data, dict) else {}
         prompt_data = self.get_multi_coin_decision(
-            bot=bot, all_coins_data=all_coins_data, all_positions=all_positions
+            bot=bot, all_coins_data=all_coins_data, all_positions=bot_positions or []
         )
-
         return {
             "prompt": prompt_data["prompt"],
             "symbol": symbol,
@@ -87,85 +59,45 @@ class MultiCoinPromptService:
         portfolio_state: Optional[Dict] = None,
         sentiment_data: Optional[MarketSentiment] = None,
     ) -> Dict:
-        """
-        Generate 0xBot-style comprehensive multi-coin prompt.
-
-        Args:
-            bot: Bot instance
-            all_coins_data: Dict mapping symbols to market data
-            all_positions: List of open positions
-            news_data: Optional list of news items from NewsService
-            portfolio_state: Optional portfolio state dict
-            sentiment_data: Optional market sentiment from MarketSentimentService
-
-        Returns:
-            Dict with 'prompt', 'timestamp', and metadata
-        """
-        if all_positions is None:
-            all_positions = []
-        if news_data is None:
-            news_data = []
-
-        # Get list of symbols
+        """Generate comprehensive multi-coin prompt with all analysis sections."""
+        all_positions = all_positions or []
+        news_data = news_data or []
         symbols = list(all_coins_data.keys()) if all_coins_data else list(self.coin_mapping.keys())
 
-        # Build position symbols set
-        position_symbols = set()
-        for pos in all_positions:
-            if hasattr(pos, "symbol"):
-                position_symbols.add(pos.symbol)
-            elif isinstance(pos, dict) and "symbol" in pos:
-                position_symbols.add(pos["symbol"])
+        position_symbols = {
+            pos.symbol if hasattr(pos, "symbol") else pos.get("symbol")
+            for pos in all_positions
+            if hasattr(pos, "symbol") or (isinstance(pos, dict) and "symbol" in pos)
+        }
 
-        # Prepare price data for narrative analysis
         price_data = self._prepare_price_data(all_coins_data)
-
-        # Run analyses
         analyzed_news = self.narrative_analyzer.analyze_news_vs_reality(
             news_items=news_data, price_data=price_data, symbols=symbols
         )
 
-        squeeze_analyses = {}
-        crowded_trades = {}
-        alpha_setups = {}
-        fvg_analyses = {}  # NEW: FVG analysis per symbol
+        squeeze_analyses, crowded_trades, alpha_setups, fvg_analyses = {}, {}, {}, {}
 
         for symbol in symbols:
             if symbol not in all_coins_data:
                 continue
 
             market_data = all_coins_data[symbol]
+            news_for_symbol = analyzed_news.get(symbol, [])
+            narrative_class = news_for_symbol[0].get("classification", "NEUTRAL") if news_for_symbol else "NEUTRAL"
 
-            # Get narrative classification for this symbol
-            narrative_class = "NEUTRAL"
-            if symbol in analyzed_news and analyzed_news[symbol]:
-                narrative_class = analyzed_news[symbol][0].get("classification", "NEUTRAL")
-
-            # Squeeze analysis
             squeeze_analyses[symbol] = self._analyze_squeeze(symbol, market_data)
-
-            # Crowded trade detection
             crowded_trades[symbol] = self.pain_trade_analyzer.detect_crowded_trades(
                 symbol=symbol,
                 funding_rate=market_data.get("funding_rate", 0),
                 price_change_24h=self._calc_price_change(market_data, "24h"),
-                narrative_sentiment=self._get_primary_sentiment(analyzed_news.get(symbol, [])),
+                narrative_sentiment=self._get_primary_sentiment(news_for_symbol),
                 volume_ratio=self._calc_volume_ratio(market_data),
             )
-
-            # Alpha setup generation
             alpha_setups[symbol] = self._generate_alpha_setup(symbol, market_data, narrative_class)
-
-            # FVG (Fair Value Gap) analysis
             fvg_analyses[symbol] = self._analyze_fvg(symbol, market_data)
 
-        # Use provided sentiment or fetch if not provided
-        sentiment = sentiment_data
-        if sentiment is None:
-            # Try to get cached sentiment (sync-safe)
-            sentiment = self.sentiment_service._cached_sentiment
+        sentiment = sentiment_data or self.sentiment_service._cached_sentiment
 
-        # Build the prompt
         prompt = self._build_comprehensive_prompt(
             symbols=symbols,
             all_coins_data=all_coins_data,
@@ -191,17 +123,28 @@ class MultiCoinPromptService:
             ),
         }
 
+    def _get_price_at_offset(self, market_data: Dict, offset: int) -> float:
+        """Get price from series at offset candles back, or current price if unavailable."""
+        current = market_data.get("current_price", 0)
+        price_series = market_data.get("price_series", [])
+        return price_series[-offset] if len(price_series) > offset else current
+
+    def _get_price_range(self, market_data: Dict, lookback: int) -> tuple:
+        """Get (high, low) from recent price series."""
+        current = market_data.get("current_price", 0)
+        price_series = market_data.get("price_series", [])
+        recent = price_series[-lookback:] if len(price_series) > lookback else price_series
+        if not recent:
+            return current, current
+        return max(recent), min(recent)
+
     def _prepare_price_data(self, all_coins_data: Dict) -> Dict[str, Dict]:
         """Prepare price data structure for narrative analysis."""
         price_data = {}
         for symbol, data in all_coins_data.items():
             current = data.get("current_price", 0)
-            # Estimate 1h ago price from price series if available
-            price_series = data.get("price_series", [])
-            price_1h_ago = price_series[-12] if len(price_series) > 12 else current  # 5min candles
-
+            price_1h_ago = self._get_price_at_offset(data, 12)
             change_pct = ((current - price_1h_ago) / price_1h_ago * 100) if price_1h_ago > 0 else 0
-
             price_data[symbol] = {
                 "current_price": current,
                 "price_1h_ago": price_1h_ago,
@@ -213,45 +156,25 @@ class MultiCoinPromptService:
     def _calc_price_change(self, market_data: Dict, period: str) -> float:
         """Calculate price change for a period."""
         current = market_data.get("current_price", 0)
-        price_series = market_data.get("price_series", [])
-
-        if period == "1h" and len(price_series) > 12:
-            old_price = price_series[-12]
-        elif period == "4h" and len(price_series) > 48:
-            old_price = price_series[-48]
-        elif period == "24h" and len(price_series) > 288:
-            old_price = price_series[-288]
-        else:
-            old_price = price_series[0] if price_series else current
-
+        offsets = {"1h": 12, "4h": 48, "24h": 288}
+        offset = offsets.get(period, 0)
+        old_price = self._get_price_at_offset(market_data, offset) if offset else market_data.get("price_series", [current])[0]
         return ((current - old_price) / old_price * 100) if old_price > 0 else 0
 
     def _calc_volume_ratio(self, market_data: Dict) -> float:
         """Calculate current volume vs average."""
         tech = market_data.get("technical_indicators", {}).get("1h", {})
-        current_vol = tech.get("volume", 0)
         avg_vol = tech.get("avg_volume", 1)
-        return current_vol / avg_vol if avg_vol > 0 else 1.0
+        return tech.get("volume", 0) / avg_vol if avg_vol > 0 else 1.0
 
     def _get_primary_sentiment(self, news_list: List[Dict]) -> str:
         """Get primary sentiment from news list."""
-        if not news_list:
-            return "neutral"
-        return news_list[0].get("sentiment", "neutral")
+        return news_list[0].get("sentiment", "neutral") if news_list else "neutral"
 
     def _analyze_squeeze(self, symbol: str, market_data: Dict) -> SqueezeAnalysis:
         """Analyze squeeze potential for a symbol."""
         current = market_data.get("current_price", 0)
-        price_series = market_data.get("price_series", [])
-
-        price_1h_ago = price_series[-12] if len(price_series) > 12 else current
-        price_4h_ago = price_series[-48] if len(price_series) > 48 else current
-
-        # Get high/low from recent data
-        recent_prices = price_series[-48:] if len(price_series) > 48 else price_series
-        high_4h = max(recent_prices) if recent_prices else current
-        low_4h = min(recent_prices) if recent_prices else current
-
+        high_4h, low_4h = self._get_price_range(market_data, 48)
         oi_data = market_data.get("open_interest", {})
 
         return self.pain_trade_analyzer.analyze_squeeze_potential(
@@ -260,8 +183,8 @@ class MultiCoinPromptService:
             open_interest=oi_data.get("latest", 0),
             avg_open_interest=oi_data.get("average", 1),
             current_price=current,
-            price_1h_ago=price_1h_ago,
-            price_4h_ago=price_4h_ago,
+            price_1h_ago=self._get_price_at_offset(market_data, 12),
+            price_4h_ago=self._get_price_at_offset(market_data, 48),
             high_4h=high_4h,
             low_4h=low_4h,
         )
@@ -272,30 +195,18 @@ class MultiCoinPromptService:
         """Generate alpha setup for a symbol."""
         current = market_data.get("current_price", 0)
         price_series = market_data.get("price_series", [])
-
-        # Extract historical prices
-        price_1h_ago = price_series[-12] if len(price_series) > 12 else current
-        price_4h_ago = price_series[-48] if len(price_series) > 48 else current
-        price_24h_ago = price_series[0] if price_series else current
-
-        recent_prices = price_series[-48:] if len(price_series) > 48 else price_series
-        high_4h = max(recent_prices) if recent_prices else current
-        low_4h = min(recent_prices) if recent_prices else current
+        high_4h, low_4h = self._get_price_range(market_data, 48)
         high_24h = max(price_series) if price_series else current
         low_24h = min(price_series) if price_series else current
-
-        # Get technicals
-        tech_5m = market_data.get("technical_indicators", {}).get("5m", {})
         tech_1h = market_data.get("technical_indicators", {}).get("1h", {})
-
         oi_data = market_data.get("open_interest", {})
 
         return self.alpha_setup_generator.generate_setup(
             symbol=symbol,
             current_price=current,
-            price_1h_ago=price_1h_ago,
-            price_4h_ago=price_4h_ago,
-            price_24h_ago=price_24h_ago,
+            price_1h_ago=self._get_price_at_offset(market_data, 12),
+            price_4h_ago=self._get_price_at_offset(market_data, 48),
+            price_24h_ago=price_series[0] if price_series else current,
             high_4h=high_4h,
             low_4h=low_4h,
             high_24h=high_24h,
@@ -311,50 +222,293 @@ class MultiCoinPromptService:
         )
 
     def _analyze_fvg(self, symbol: str, market_data: Dict) -> str:
-        """
-        Analyze Fair Value Gaps for a symbol.
-
-        Converts OHLCV data to dict format and runs FVG detection.
-        Returns formatted string for prompt injection.
-        """
+        """Analyze Fair Value Gaps for a symbol."""
         ohlcv_data = market_data.get("ohlcv", [])
-
         if not ohlcv_data or len(ohlcv_data) < 3:
             return f"### FVG Analysis ({symbol})\nInsufficient data for FVG detection.\n"
 
-        # Convert OHLCV objects to dict format for FVG detector
-        candles = []
-        for candle in ohlcv_data:
-            candles.append(
-                {
-                    "open": float(candle.open),
-                    "high": float(candle.high),
-                    "low": float(candle.low),
-                    "close": float(candle.close),
-                    "timestamp": candle.datetime.isoformat(),
-                }
-            )
+        candles = [
+            {
+                "open": float(c.open),
+                "high": float(c.high),
+                "low": float(c.low),
+                "close": float(c.close),
+                "timestamp": c.datetime.isoformat(),
+            }
+            for c in ohlcv_data
+        ]
 
-        # Get price range for Premium/Discount zone calculation
         price_series = market_data.get("price_series", [])
         if price_series and len(price_series) > 20:
-            range_high = max(price_series[-20:])
-            range_low = min(price_series[-20:])
+            range_high, range_low = max(price_series[-20:]), min(price_series[-20:])
         else:
             range_high = max(c["high"] for c in candles[-20:])
             range_low = min(c["low"] for c in candles[-20:])
 
-        # Run FVG detection
-        timeframe = market_data.get("timeframe", "1h")
-        fvgs = self.fvg_detector.detect_fvgs(symbol, candles, timeframe)
-
-        # Update mitigation status with current price
+        self.fvg_detector.detect_fvgs(symbol, candles, market_data.get("timeframe", "1h"))
         current_price = market_data.get("current_price", 0)
         if current_price > 0:
             self.fvg_detector.update_mitigation(symbol, current_price)
 
-        # Format for prompt
         return self.fvg_detector.format_for_prompt(symbol, range_high, range_low)
+
+    def _format_position(self, pos) -> List[str]:
+        """Format a single position for the prompt."""
+        lines = []
+        if hasattr(pos, "symbol"):
+            coin = self.coin_mapping.get(pos.symbol, pos.symbol)
+            side = getattr(pos, "side", "UNKNOWN").upper()
+            qty = float(getattr(pos, "quantity", 0))
+            entry = float(getattr(pos, "entry_price", 0))
+            current = float(getattr(pos, "current_price", entry))
+            sl = float(getattr(pos, "stop_loss", 0))
+            tp = float(getattr(pos, "take_profit", 0))
+
+            if side == "LONG":
+                pnl = (current - entry) * qty
+                sl_dist = ((sl - current) / current * 100) if current > 0 else 0
+                tp_dist = ((tp - current) / current * 100) if current > 0 else 0
+            else:
+                pnl = (entry - current) * qty
+                sl_dist = ((current - sl) / current * 100) if current > 0 else 0
+                tp_dist = ((current - tp) / current * 100) if current > 0 else 0
+            pnl_pct = (pnl / (entry * qty) * 100) if entry * qty > 0 else 0
+
+            hold_hours = 0.0
+            if hasattr(pos, "opened_at") and pos.opened_at:
+                hold_hours = (datetime.utcnow() - pos.opened_at).total_seconds() / 3600
+
+            lines.extend([
+                f"**{coin}** ({pos.symbol}):",
+                f"  - Side: {side} | Qty: {qty:.6f}",
+                f"  - Entry: ${entry:,.2f} -> Current: ${current:,.2f}",
+                f"  - **Unrealized P&L: ${pnl:+,.2f} ({pnl_pct:+.2f}%)**",
+                f"  - SL: ${sl:,.2f} ({sl_dist:+.1f}% away) | TP: ${tp:,.2f} ({tp_dist:+.1f}% away)",
+                f"  - Hold time: {hold_hours:.1f} hours",
+                "  - **DECIDE: HOLD or CLOSE this position?**",
+                "",
+            ])
+        elif isinstance(pos, dict):
+            symbol = pos.get("symbol", "UNKNOWN")
+            coin = self.coin_mapping.get(symbol, symbol)
+            lines.append(f"- **{coin}**: {pos.get('side', 'LONG').upper()} @ ${pos.get('entry_price', 0):,.2f}")
+        return lines
+
+    def _get_directional_bias_text(self, sentiment: Optional[MarketSentiment]) -> List[str]:
+        """Generate directional trading bias section based on sentiment."""
+        lines = ["## DIRECTIONAL TRADING STRATEGY", ""]
+
+        if sentiment and hasattr(sentiment, "fear_greed_value"):
+            fg = sentiment.fear_greed_value
+            if fg < 35:
+                lines.extend([
+                    "### MANDATORY SHORT BIAS (Fear & Greed < 35)",
+                    "",
+                    "**CRITICAL: You MUST prioritize SHORT trades!**",
+                    "",
+                    "The market is in FEAR mode. Historical data shows:",
+                    "- 70% of price action is DOWN in Fear markets",
+                    "- LONG trades have a much lower win rate now",
+                    "- SHORT trades are the profitable play",
+                    "",
+                    "**MANDATORY RULES:**",
+                    "1. DO NOT open new LONG positions (buy_to_enter)",
+                    "2. LOOK for SHORT entries (sell_to_enter)",
+                    "3. RSI > 55 = SHORT opportunity (not just > 70)",
+                    "4. Any bounce to EMA20/50 = SHORT entry point",
+                    "5. Price below EMA50 = stay SHORT biased",
+                    "",
+                    "**If you recommend buy_to_enter in Fear market,",
+                    "you are going AGAINST the market = BAD TRADE.**",
+                    "",
+                ])
+            elif fg > 65:
+                lines.extend([
+                    "### BULLISH BIAS ACTIVE (Fear & Greed > 65)",
+                    "**PRIORITY: Look for LONG opportunities!**",
+                    "- Market is greedy -> momentum favors longs",
+                    "- RSI < 40 on any coin = potential LONG entry",
+                    "- Dips are buying opportunities",
+                ])
+            else:
+                lines.extend([
+                    "### NEUTRAL MARKET (Fear & Greed 35-65)",
+                    "**Use both LONG and SHORT based on technicals:**",
+                    "- RSI > 70 = SHORT signal (overbought)",
+                    "- RSI < 30 = LONG signal (oversold)",
+                    "- Trade the range, not the trend",
+                ])
+        else:
+            lines.append("### Directional Bias: NEUTRAL (no sentiment data)")
+
+        lines.extend([
+            "",
+            "### SHORT Entry Criteria (sell_to_enter):",
+            "- RSI(14) > 55 on 1H timeframe (lower threshold in Fear)",
+            "- Price at or near resistance (EMA20/50)",
+            "- Negative funding or neutral",
+            "- Fear & Greed < 50 preferred",
+            "- Use signal: `sell_to_enter` with leverage <= 3x",
+            "",
+            "### LONG Entry Criteria (buy_to_enter):",
+            "- RSI(14) < 30 on 1H timeframe (oversold)",
+            "- Price bouncing from strong support",
+            "- Fear & Greed > 50 (not in fear mode)",
+            "- Use signal: `buy_to_enter` with leverage up to 5x",
+            "",
+            "**THE BOT MUST NOT ONLY GO LONG!**",
+            "**In Fear markets, SHORT trades are the PROFITABLE ones.**",
+            "**Going LONG in a falling market = LOSING MONEY.**",
+            "",
+        ])
+        return lines
+
+    def _get_decision_framework_text(self) -> List[str]:
+        """Generate the decision framework section."""
+        return [
+            "## DECISION FRAMEWORK",
+            "",
+            "**IMPORTANT: Analyze EACH symbol independently. Having an open position on one symbol should NOT prevent entries on other symbols if there is available capital.**",
+            "",
+            "### For OPEN positions:",
+            "1. Is there DANGER detected? (incoming crash, major resistance, bad news)",
+            "2. Is position LOSING money? (protection mode)",
+            "3. Is profit SIGNIFICANT? (>=2.0% unrealized PnL)",
+            "4. Is stop loss/take profit about to trigger?",
+            "",
+            "**EXIT RULES:**",
+            "-> If LOSING (PnL < 0%) AND danger detected: **CLOSE** (protection)",
+            "-> If profit >= 2.0% AND target reached: **CLOSE** (profit-taking)",
+            "-> If profit < 2.0%: **HOLD** - let the profit run! Never exit micro-profits.",
+            "-> If no danger AND losing < 2%: **HOLD** - give it time to develop",
+            "",
+            "**ANTI-OVERTRADING: NEVER exit recent positions prematurely!**",
+            "- A position opened < 1 hour ago should NOT be closed unless:",
+            "  1. SL/TP is about to be hit",
+            "  2. MAJOR danger detected (crash, black swan event)",
+            "- Let trades BREATHE. Markets fluctuate. Be patient.",
+            "- TIME is not a reason to exit. Only MARKET CONDITIONS matter.",
+            "",
+            "**NEVER recommend CLOSE for small profits (<2.0%)! This is wasteful.**",
+            "",
+            "### For symbols WITHOUT position:",
+            "",
+            "**FEE AWARENESS & ECONOMIC VIABILITY:**",
+            "",
+            "**Fee Structure:**",
+            "- Round-trip fees: 0.10% (0.05% entry + 0.05% exit)",
+            "- Example: 35% position @ 5x leverage = $17,500 notional = ~$17.50 in fees",
+            "- Minimum move to break even: 0.10% / leverage",
+            "",
+            "**YOUR DECISION FRAMEWORK:**",
+            "",
+            "You are the expert trader. The system will reject trades that LOSE money after fees,",
+            "but otherwise trusts YOUR judgment on risk/reward.",
+            "",
+            "**Consider:**",
+            "- Is the expected profit > fees? (Required to execute)",
+            "- Is the profit worth the risk given your confidence level?",
+            "- Small profit (0.8%) with 85% confidence? Your call.",
+            "- Large profit (3%) with 50% confidence? Your call.",
+            "- Better opportunity might come later? Wait.",
+            "",
+            "**Quality over quantity:**",
+            "It's better to make 0 trades than a bad trade.",
+            "If uncertain, the answer is HOLD. Wait for a clear edge.",
+            "",
+            "**Recommended entry criteria (not mandatory):**",
+            "- Clear edge with confidence >= 0.65",
+            "- R:R ratio >= 1.5 (reward at least 1.5x the risk)",
+            "- Sufficient capital available",
+            "- Trade makes strategic sense based on your market analysis",
+            "",
+            "**QUALITY OVER QUANTITY:**",
+            "It is BETTER to make 0 trades than to make a bad trade.",
+            "If unsure, the answer is HOLD. Wait for a better setup.",
+            "",
+            "### SHOW YOUR CALCULATIONS:",
+            "- Margin = confidence_tier x available_capital",
+            "- Notional = margin x leverage",
+            "- Quantity = notional / entry_price",
+            "- Stop Distance = entry_price x risk_factor",
+            "- R:R = target_distance / stop_distance",
+            "",
+        ]
+
+    def _get_response_format_text(self, symbols: List[str]) -> List[str]:
+        """Generate the response format section."""
+        lines = [
+            "## RESPONSE FORMAT",
+            "",
+            f"**MANDATORY: Analyze ALL {len(symbols)} symbols: {', '.join(symbols)}**",
+            "",
+            "### Step 1: CHAIN OF THOUGHT (Required)",
+            "Before making decisions, reason through each symbol:",
+            "- What is the current trend? (bullish/bearish/neutral)",
+            "- Is there a clear edge? (funding, OI, technicals)",
+            "- What is the expected profit after fees?",
+            "- What is my confidence level and why?",
+            "",
+            "### Step 2: OUTPUT YOUR DECISIONS",
+            "After your analysis, output a JSON object with your decisions.",
+            "",
+            "**IMPORTANT RULES:**",
+            "- `signal` must be EXACTLY ONE OF: `hold`, `buy_to_enter`, `sell_to_enter`, `close`",
+            "- `confidence` must be a DECIMAL NUMBER like `0.75`, NOT a range",
+            "- For `hold`: only signal, confidence, justification needed",
+            "- For entries: include entry_price, stop_loss, take_profit, leverage, quantity, **invalidation_condition**",
+            "",
+            "**`invalidation_condition` (REQUIRED for all entries)**",
+            "",
+            "For EVERY new trade (buy_to_enter / sell_to_enter), you MUST provide:",
+            '- `"invalidation_condition"`: A clear, specific condition that invalidates your thesis',
+            "",
+            "**Rules for invalidation_condition:**",
+            "1. Must be CONTEXT-AWARE (based on current market structure)",
+            "2. Must describe WHEN to exit even if SL/TP not hit",
+            "3. Should reference price levels, funding changes, or market events",
+            "",
+            "**Examples of GOOD invalidation_condition:**",
+            '- "Price breaks above $68,000 invalidating bearish structure"',
+            '- "Funding rate flips positive above +0.01% signaling long squeeze risk"',
+            '- "Price closes below $3,000 on 4H chart breaking support zone"',
+            '- "RSI divergence disappears or breaks above 70 indicating momentum shift"',
+            "",
+            "**Examples of BAD invalidation_condition (too vague):**",
+            '- "Market turns bearish"',
+            '- "Trade goes against me"',
+            '- "Conditions change"',
+            "",
+            "**Example for 2 symbols (adapt to your analysis):**",
+            "```json",
+            "{",
+            f'  "{symbols[0]}": {{',
+            '    "signal": "hold",',
+            '    "confidence": 0.60,',
+            '    "justification": "No clear edge, RSI neutral at 52"',
+            "  },",
+        ]
+        if len(symbols) > 1:
+            lines.extend([
+                f'  "{symbols[1]}": {{',
+                '    "signal": "buy_to_enter",',
+                '    "confidence": 0.78,',
+                '    "justification": "Strong support bounce with bullish FVG",',
+                '    "entry_price": 3150.00,',
+                '    "stop_loss": 3045.00,',
+                '    "take_profit": 3400.00,',
+                '    "leverage": 5,',
+                '    "quantity": 0.5,',
+                '    "invalidation_condition": "Price breaks below $3,000 support or funding turns negative below -0.01%"',
+                "  }",
+            ])
+        lines.extend([
+            "}",
+            "```",
+            "",
+            "**DO NOT copy the example values! Use YOUR OWN analysis.**",
+        ])
+        return lines
 
     def _build_comprehensive_prompt(
         self,
@@ -371,443 +525,149 @@ class MultiCoinPromptService:
         sentiment: Optional[MarketSentiment] = None,
     ) -> str:
         """Build the complete 0xBot-style prompt."""
-        lines = []
-
-        # Header
         now = datetime.utcnow()
-        lines.append("# CURRENT STATE OF MARKETS")
-        lines.append(f"It is {now.strftime('%Y-%m-%d')} {now.strftime('%H:%M')} UTC.")
-        lines.append("")
+        lines = [
+            "# CURRENT STATE OF MARKETS",
+            f"It is {now.strftime('%Y-%m-%d')} {now.strftime('%H:%M')} UTC.",
+            "",
+        ]
 
-        # Section 0: Market Sentiment Context (Fear & Greed, Global Data)
+        # Section 0: Market Sentiment
         if sentiment:
             lines.append(self.sentiment_service.format_for_prompt(sentiment))
         else:
-            lines.append("## 0. MARKET SENTIMENT CONTEXT")
-            lines.append("")
-            lines.append("*Sentiment data unavailable*")
-            lines.append("")
+            lines.extend(["## 0. MARKET SENTIMENT CONTEXT", "", "*Sentiment data unavailable*", ""])
 
         # Section 1: Raw Data Dashboard
-        lines.append("## 1. RAW DATA DASHBOARD")
-        lines.append("")
-
+        lines.extend(["## 1. RAW DATA DASHBOARD", ""])
         for symbol in symbols:
             if symbol not in all_coins_data:
                 continue
-
             data = all_coins_data[symbol]
             coin_name = self.coin_mapping.get(symbol, symbol.split("/")[0])
-
             current = data.get("current_price", 0)
             funding = data.get("funding_rate", 0)
             oi = data.get("open_interest", {}).get("latest", 0)
-
-            tech_5m = data.get("technical_indicators", {}).get("5m", {})
             tech_1h = data.get("technical_indicators", {}).get("1h", {})
+            high_4h, low_4h = self._get_price_range(data, 48)
 
-            # Price structure
-            price_series = data.get("price_series", [])
-            recent = price_series[-48:] if len(price_series) > 48 else price_series
-            high_4h = max(recent) if recent else current
-            low_4h = min(recent) if recent else current
+            lines.extend([
+                f"### {coin_name} ({symbol})",
+                f"- **Price**: ${current:,.2f} (4H Range: ${low_4h:,.2f} - ${high_4h:,.2f})",
+                f"- **Net Funding**: {funding:+.4f}% / 8h",
+                f"- **Open Interest**: {oi:,.0f}",
+                f"- **RSI(14)**: {tech_1h.get('rsi14', 50):.1f} | **EMA20**: ${tech_1h.get('ema20', 0):,.2f} | **EMA50**: ${tech_1h.get('ema50', 0):,.2f}",
+                f"- **Vol Ratio**: {self._calc_volume_ratio(data):.2f}x average",
+                "",
+            ])
 
-            lines.append(f"### {coin_name} ({symbol})")
-            lines.append(
-                f"- **Price**: ${current:,.2f} (4H Range: ${low_4h:,.2f} - ${high_4h:,.2f})"
-            )
-            lines.append(f"- **Net Funding**: {funding:+.4f}% / 8h")
-            lines.append(f"- **Open Interest**: {oi:,.0f}")
-            lines.append(
-                f"- **RSI(14)**: {tech_1h.get('rsi14', 50):.1f} | **EMA20**: ${tech_1h.get('ema20', 0):,.2f} | **EMA50**: ${tech_1h.get('ema50', 0):,.2f}"
-            )
-            lines.append(f"- **Vol Ratio**: {self._calc_volume_ratio(data):.2f}x average")
-            lines.append("")
-
-        # Section 2: Narrative vs Reality
+        # Sections 2-4: Analyses from services
         lines.append(self.narrative_analyzer.format_for_prompt(analyzed_news))
-
-        # Section 3: Pain Trade Analysis
         lines.append(self.pain_trade_analyzer.format_for_prompt(squeeze_analyses, crowded_trades))
-
-        # Section 4: Alpha Setups
         lines.append(self.alpha_setup_generator.format_for_prompt(alpha_setups))
 
-        # Section 4.5: FVG Analysis (ICT-style Fair Value Gaps)
-        lines.append("## 4.5 FAIR VALUE GAP (FVG) ANALYSIS")
-        lines.append("")
+        # Section 4.5: FVG Analysis
+        lines.extend(["## 4.5 FAIR VALUE GAP (FVG) ANALYSIS", ""])
         for symbol in symbols:
             if symbol in fvg_analyses:
                 lines.append(fvg_analyses[symbol])
         lines.append("")
 
         # Section 5: Portfolio State
-        lines.append("## 5. CURRENT PORTFOLIO STATE")
-        lines.append("")
-
+        lines.extend(["## 5. CURRENT PORTFOLIO STATE", ""])
         if portfolio_state:
-            lines.append(f"- **Available Capital**: ${float(portfolio_state.get('cash', 0)):,.2f}")
-            lines.append(f"- **Total NAV**: ${float(portfolio_state.get('total_value', 0)):,.2f}")
-            lines.append(
-                f"- **Unrealized PnL**: ${float(portfolio_state.get('unrealized_pnl', 0)):+,.2f}"
-            )
+            lines.extend([
+                f"- **Available Capital**: ${float(portfolio_state.get('cash', 0)):,.2f}",
+                f"- **Total NAV**: ${float(portfolio_state.get('total_value', 0)):,.2f}",
+                f"- **Unrealized PnL**: ${float(portfolio_state.get('unrealized_pnl', 0)):+,.2f}",
+            ])
         else:
             lines.append("- Portfolio state not provided")
         lines.append("")
 
-        # Open Positions - Enhanced for LLM exit analysis
+        # Open Positions
         if all_positions:
-            lines.append("### Open Positions (ANALYZE EACH FOR EXIT)")
-            lines.append("")
+            lines.extend(["### Open Positions (ANALYZE EACH FOR EXIT)", ""])
             for pos in all_positions:
-                if hasattr(pos, "symbol"):
-                    coin = self.coin_mapping.get(pos.symbol, pos.symbol)
-                    side = pos.side.upper() if hasattr(pos, "side") else "UNKNOWN"
-                    qty = float(pos.quantity) if hasattr(pos, "quantity") else 0
-                    entry = float(pos.entry_price) if hasattr(pos, "entry_price") else 0
-                    current = float(pos.current_price) if hasattr(pos, "current_price") else entry
-                    sl = float(pos.stop_loss) if hasattr(pos, "stop_loss") else 0
-                    tp = float(pos.take_profit) if hasattr(pos, "take_profit") else 0
-
-                    # Calculate P&L
-                    if side == "LONG":
-                        pnl = (current - entry) * qty
-                        sl_dist = ((sl - current) / current * 100) if current > 0 else 0
-                        tp_dist = ((tp - current) / current * 100) if current > 0 else 0
-                    else:
-                        pnl = (entry - current) * qty
-                        sl_dist = ((current - sl) / current * 100) if current > 0 else 0
-                        tp_dist = ((current - tp) / current * 100) if current > 0 else 0
-                    pnl_pct = (pnl / (entry * qty) * 100) if entry * qty > 0 else 0
-
-                    # Calculate hold time
-                    hold_hours = 0.0
-                    if hasattr(pos, "opened_at") and pos.opened_at:
-                        hold_duration = datetime.utcnow() - pos.opened_at
-                        hold_hours = hold_duration.total_seconds() / 3600
-
-                    lines.append(f"**{coin}** ({pos.symbol}):")
-                    lines.append(f"  - Side: {side} | Qty: {qty:.6f}")
-                    lines.append(f"  - Entry: ${entry:,.2f} → Current: ${current:,.2f}")
-                    lines.append(f"  - **Unrealized P&L: ${pnl:+,.2f} ({pnl_pct:+.2f}%)**")
-                    lines.append(
-                        f"  - SL: ${sl:,.2f} ({sl_dist:+.1f}% away) | TP: ${tp:,.2f} ({tp_dist:+.1f}% away)"
-                    )
-                    lines.append(f"  - Hold time: {hold_hours:.1f} hours")
-                    lines.append(f"  - **⚠️ DECIDE: HOLD or CLOSE this position?**")
-                    lines.append("")
-                elif isinstance(pos, dict):
-                    symbol = pos.get("symbol", "UNKNOWN")
-                    coin = self.coin_mapping.get(symbol, symbol)
-                    lines.append(
-                        f"- **{coin}**: {pos.get('side', 'LONG').upper()} @ ${pos.get('entry_price', 0):,.2f}"
-                    )
+                lines.extend(self._format_position(pos))
             lines.append("")
         else:
-            lines.append("### No Open Positions")
-            lines.append("")
+            lines.extend(["### No Open Positions", ""])
 
-        # Section 5.5: Directional Trading Rules (NEW - for market independence)
-        lines.append("## DIRECTIONAL TRADING STRATEGY")
-        lines.append("")
-
-        # Add bias based on Fear & Greed
-        if sentiment and hasattr(sentiment, "fear_greed_value"):
-            fg_value = sentiment.fear_greed_value
-            if fg_value < 35:
-                lines.append("### 🔴 MANDATORY SHORT BIAS (Fear & Greed < 35)")
-                lines.append("")
-                lines.append("**⚠️ CRITICAL: You MUST prioritize SHORT trades!**")
-                lines.append("")
-                lines.append("The market is in FEAR mode. Historical data shows:")
-                lines.append("- 70% of price action is DOWN in Fear markets")
-                lines.append("- LONG trades have a much lower win rate now")
-                lines.append("- SHORT trades are the profitable play")
-                lines.append("")
-                lines.append("**MANDATORY RULES:**")
-                lines.append("1. ❌ DO NOT open new LONG positions (buy_to_enter)")
-                lines.append("2. ✅ LOOK for SHORT entries (sell_to_enter)")
-                lines.append("3. RSI > 55 = SHORT opportunity (not just > 70)")
-                lines.append("4. Any bounce to EMA20/50 = SHORT entry point")
-                lines.append("5. Price below EMA50 = stay SHORT biased")
-                lines.append("")
-                lines.append("**If you recommend buy_to_enter in Fear market,")
-                lines.append("you are going AGAINST the market = BAD TRADE.**")
-                lines.append("")
-            elif fg_value > 65:
-                lines.append("### 🟢 BULLISH BIAS ACTIVE (Fear & Greed > 65)")
-                lines.append("**PRIORITY: Look for LONG opportunities!**")
-                lines.append("- Market is greedy → momentum favors longs")
-                lines.append("- RSI < 40 on any coin = potential LONG entry")
-                lines.append("- Dips are buying opportunities")
-            else:
-                lines.append("### ⚪ NEUTRAL MARKET (Fear & Greed 35-65)")
-                lines.append("**Use both LONG and SHORT based on technicals:**")
-                lines.append("- RSI > 70 = SHORT signal (overbought)")
-                lines.append("- RSI < 30 = LONG signal (oversold)")
-                lines.append("- Trade the range, not the trend")
-        else:
-            lines.append("### Directional Bias: NEUTRAL (no sentiment data)")
-
-        lines.append("")
-        lines.append("### SHORT Entry Criteria (sell_to_enter):")
-        lines.append("- RSI(14) > 55 on 1H timeframe (lower threshold in Fear)")
-        lines.append("- Price at or near resistance (EMA20/50)")
-        lines.append("- Negative funding or neutral")
-        lines.append("- Fear & Greed < 50 preferred")
-        lines.append("- Use signal: `sell_to_enter` with leverage ≤ 3x")
-        lines.append("")
-        lines.append("### LONG Entry Criteria (buy_to_enter):")
-        lines.append("- RSI(14) < 30 on 1H timeframe (oversold)")
-        lines.append("- Price bouncing from strong support")
-        lines.append("- Fear & Greed > 50 (not in fear mode)")
-        lines.append("- Use signal: `buy_to_enter` with leverage up to 5x")
-        lines.append("")
-        lines.append("**⚠️ THE BOT MUST NOT ONLY GO LONG!**")
-        lines.append("**In Fear markets, SHORT trades are the PROFITABLE ones.**")
-        lines.append("**Going LONG in a falling market = LOSING MONEY.**")
-        lines.append("")
-
-        # Section 6: Decision Framework
-        lines.append("## DECISION FRAMEWORK")
-        lines.append("")
-        lines.append(
-            "**IMPORTANT: Analyze EACH symbol independently. Having an open position on one symbol should NOT prevent entries on other symbols if there is available capital.**"
-        )
-        lines.append("")
-        lines.append("### For OPEN positions:")
-        lines.append("1. Is there DANGER detected? (incoming crash, major resistance, bad news)")
-        lines.append("2. Is position LOSING money? (protection mode)")
-        lines.append("3. Is profit SIGNIFICANT? (≥2.0% unrealized PnL)")
-        lines.append("4. Is stop loss/take profit about to trigger?")
-        lines.append("")
-        lines.append("**EXIT RULES:**")
-        lines.append("→ If LOSING (PnL < 0%) AND danger detected: **CLOSE** (protection)")
-        lines.append("→ If profit ≥ 2.0% AND target reached: **CLOSE** (profit-taking)")
-        lines.append("→ If profit < 2.0%: **HOLD** - let the profit run! Never exit micro-profits.")
-        lines.append("→ If no danger AND losing < 2%: **HOLD** - give it time to develop")
-        lines.append("")
-        lines.append("**⚠️ ANTI-OVERTRADING: NEVER exit recent positions prematurely!**")
-        lines.append("- A position opened < 1 hour ago should NOT be closed unless:")
-        lines.append("  1. SL/TP is about to be hit")
-        lines.append("  2. MAJOR danger detected (crash, black swan event)")
-        lines.append("- Let trades BREATHE. Markets fluctuate. Be patient.")
-        lines.append("- TIME is not a reason to exit. Only MARKET CONDITIONS matter.")
-        lines.append("")
-        lines.append("**⚠️ NEVER recommend CLOSE for small profits (<2.0%)! This is wasteful.**")
-        lines.append("")
-        lines.append("### For symbols WITHOUT position:")
-        lines.append("")
-        lines.append("**🧮 TRADE ECONOMICS CHECK (MANDATORY BEFORE ANY ENTRY):**")
-        lines.append("")
-        lines.append("Before recommending ANY entry, you MUST calculate:")
-        lines.append("")
-        lines.append("1. **Break-even calculation:**")
-        lines.append("   - Total fees = 0.05% entry + 0.05% exit = 0.10%")
-        lines.append("   - Minimum move to break even = 0.10% / leverage")
-        lines.append("   - Example: 5x leverage → need 0.02% move just to cover fees")
-        lines.append("")
-        lines.append("2. **Minimum expected profit:**")
-        lines.append("   - Round-trip fees with 35% position @ 5x = ~$17.50")
-        lines.append("   - Expected profit MUST be > $20 (covers fees + buffer)")
-        lines.append("   - Expected profit % MUST be > 2.0% after fees")
-        lines.append("   - If expected profit < $20: DO NOT TRADE")
-        lines.append("")
-        lines.append("3. **Is this trade WORTH IT?**")
-        lines.append("   - Will this trade meaningfully impact the portfolio?")
-        lines.append("   - Is the expected move large enough to justify the risk?")
-        lines.append("   - Would a better opportunity come later?")
-        lines.append("")
-        lines.append("**❌ REJECT trades that:**")
-        lines.append("- Have expected profit < $20 (after fees)")
-        lines.append("- Target < 2.0% profit after fees")
-        lines.append("- Are based on minor price fluctuations")
-        lines.append("- Would result in fees eating the profit")
-        lines.append("")
-        lines.append("**✅ ONLY ENTER if:**")
-        lines.append("1. Clear edge with confidence >= 0.65")
-        lines.append("2. Expected profit > $35 AND > 2% after fees")
-        lines.append("3. R:R ratio >= 1.5 (target at least 1.5x the stop distance)")
-        lines.append("4. Sufficient capital available")
-        lines.append("5. Trade makes STRATEGIC sense, not just technical")
-        lines.append("")
-        lines.append("**💡 QUALITY OVER QUANTITY:**")
-        lines.append("It is BETTER to make 0 trades than to make a bad trade.")
-        lines.append("If unsure, the answer is HOLD. Wait for a better setup.")
-        lines.append("")
-        lines.append("### SHOW YOUR CALCULATIONS:")
-        lines.append("- Margin = confidence_tier × available_capital")
-        lines.append("- Notional = margin × leverage")
-        lines.append("- Quantity = notional / entry_price")
-        lines.append("- Stop Distance = entry_price × risk_factor")
-        lines.append("- R:R = target_distance / stop_distance")
-        lines.append("")
-
-        # Response Format - Structured Text (not JSON template to avoid copying)
-        lines.append("## RESPONSE FORMAT")
-        lines.append("")
-        lines.append(f"**⚠️ MANDATORY: Analyze ALL {len(symbols)} symbols: {', '.join(symbols)}**")
-        lines.append("")
-        lines.append("### Step 1: CHAIN OF THOUGHT (Required)")
-        lines.append("Before making decisions, reason through each symbol:")
-        lines.append("- What is the current trend? (bullish/bearish/neutral)")
-        lines.append("- Is there a clear edge? (funding, OI, technicals)")
-        lines.append("- What is the expected profit after fees?")
-        lines.append("- What is my confidence level and why?")
-        lines.append("")
-        lines.append("### Step 2: OUTPUT YOUR DECISIONS")
-        lines.append("After your analysis, output a JSON object with your decisions.")
-        lines.append("")
-        lines.append("**IMPORTANT RULES:**")
-        lines.append(
-            "- `signal` must be EXACTLY ONE OF: `hold`, `buy_to_enter`, `sell_to_enter`, `close`"
-        )
-        lines.append("- `confidence` must be a DECIMAL NUMBER like `0.75`, NOT a range")
-        lines.append("- For `hold`: only signal, confidence, justification needed")
-        lines.append(
-            "- For entries: include entry_price, stop_loss, take_profit, leverage, quantity"
-        )
-        lines.append("")
-        lines.append("**Example for 2 symbols (adapt to your analysis):**")
-        lines.append("```json")
-        lines.append("{")
-        lines.append(f'  "{symbols[0]}": {{')
-        lines.append('    "signal": "hold",')
-        lines.append('    "confidence": 0.60,')
-        lines.append('    "justification": "No clear edge, RSI neutral at 52"')
-        lines.append("  },")
-        if len(symbols) > 1:
-            lines.append(f'  "{symbols[1]}": {{')
-            lines.append('    "signal": "buy_to_enter",')
-            lines.append('    "confidence": 0.78,')
-            lines.append('    "justification": "Strong support bounce with bullish FVG",')
-            lines.append('    "entry_price": 3150.00,')
-            lines.append('    "stop_loss": 3045.00,')
-            lines.append('    "take_profit": 3400.00,')
-            lines.append('    "leverage": 5,')
-            lines.append('    "quantity": 0.5')
-            lines.append("  }")
-        lines.append("}")
-        lines.append("```")
-        lines.append("")
-        lines.append("**⚠️ DO NOT copy the example values! Use YOUR OWN analysis.**")
+        # Directional Strategy, Decision Framework, Response Format
+        lines.extend(self._get_directional_bias_text(sentiment))
+        lines.extend(self._get_decision_framework_text())
+        lines.extend(self._get_response_format_text(symbols))
 
         return "\n".join(lines)
+
+    def _extract_json(self, text: str) -> Optional[Dict]:
+        """Extract JSON from response text."""
+        text = text.strip()
+        if text.startswith("{"):
+            return json.loads(text)
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end > start:
+            return json.loads(text[start:end + 1])
+        return None
+
+    def _create_fallback_response(self, symbols: List[str], reason: str = "default HOLD") -> Dict:
+        """Create fallback HOLD response for all symbols."""
+        return {
+            symbol: {"signal": "hold", "confidence": 0.50, "justification": reason}
+            for symbol in symbols
+        }
 
     def parse_multi_coin_response(
         self, response_text: str, target_symbols: Optional[List[str]] = None
     ) -> Dict:
-        """
-        Parse LLM response for multi-coin decisions.
-        """
-        if target_symbols is None:
-            target_symbols = list(self.coin_mapping.keys())
+        """Parse LLM response for multi-coin decisions."""
+        target_symbols = target_symbols or list(self.coin_mapping.keys())
 
         try:
-            data = None
+            data = self._extract_json(response_text)
+            if not data:
+                logger.error(f"Could not find JSON in response: {response_text[:100]}...")
+                return self._create_fallback_response(target_symbols, "JSON parse error")
 
-            # Try direct JSON parse
-            if response_text.strip().startswith("{"):
-                data = json.loads(response_text)
-            else:
-                # Extract JSON from response
-                start_brace = response_text.find("{")
-                end_brace = response_text.rfind("}")
+            decisions = data.get("decisions", data)
+            missing = [s for s in target_symbols if s not in decisions]
+            if missing:
+                logger.warning(f"LLM response missing {len(missing)} symbols: {missing}")
+                for sym in missing:
+                    decisions[sym] = {"signal": "hold", "confidence": 0.50, "justification": "Missing from response"}
+                logger.info(f"Auto-filled {len(missing)} missing symbols with HOLD")
 
-                if start_brace != -1 and end_brace != -1 and end_brace > start_brace:
-                    json_part = response_text[start_brace : end_brace + 1]
-                    data = json.loads(json_part)
-                else:
-                    logger.error(f"Could not find JSON in response: {response_text[:100]}...")
-                    return self._create_fallback_response(target_symbols)
-
-            # Validate all target symbols are present
-            if data:
-                # Check if it's a nested 'decisions' format
-                decisions_data = data.get("decisions", data)
-
-                # Count how many target symbols we got
-                found_symbols = [s for s in target_symbols if s in decisions_data]
-                missing_symbols = [s for s in target_symbols if s not in decisions_data]
-
-                if missing_symbols:
-                    logger.warning(
-                        f"⚠️ LLM response missing {len(missing_symbols)} symbols: "
-                        f"{missing_symbols}"
-                    )
-                    # Auto-fill missing symbols with HOLD
-                    for sym in missing_symbols:
-                        decisions_data[sym] = {
-                            "signal": "hold",
-                            "confidence": 0.50,
-                            "justification": "Symbol missing from LLM response - auto HOLD",
-                        }
-
-                    logger.info(f"✅ Auto-filled {len(missing_symbols)} missing symbols with HOLD")
-
-                # Update data with filled decisions
-                if "decisions" in data:
-                    data["decisions"] = decisions_data
-                else:
-                    data = decisions_data
-
-            return data
+            return decisions if "decisions" not in data else data
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response: {e}")
-            return self._create_fallback_response(target_symbols)
+            return self._create_fallback_response(target_symbols, "JSON parse error")
         except Exception as e:
             logger.error(f"Unexpected error parsing response: {e}")
-            return self._create_fallback_response(target_symbols)
-
-    def _create_fallback_response(self, symbols: List[str]) -> Dict:
-        """Create fallback HOLD response for all symbols."""
-        return {
-            symbol: {
-                "signal": "hold",
-                "confidence": 0.50,
-                "justification": "JSON parse error fallback - default HOLD",
-            }
-            for symbol in symbols
-        }
+            return self._create_fallback_response(target_symbols, "Parse error")
 
     def get_decision_for_symbol(self, symbol: str, response_text: str) -> Dict:
         """Extract decision for a specific symbol from LLM response."""
+        default = {"action": "hold", "confidence": 0.6, "reasoning": f"Default HOLD for {symbol}"}
         if not response_text.strip():
-            return {
-                "action": "hold",
-                "confidence": 0.6,
-                "reasoning": f"Empty LLM response for {symbol}, default HOLD",
-            }
+            return {**default, "reasoning": f"Empty LLM response for {symbol}"}
 
         try:
             decisions = self.parse_multi_coin_response(response_text, [symbol])
-
-            if symbol in decisions:
-                decision = decisions[symbol]
-                return {
-                    "action": decision.get("signal", "hold"),
-                    "confidence": decision.get("confidence", 0.6),
-                    "reasoning": decision.get(
-                        "justification", decision.get("reasoning", f"Decision for {symbol}")
-                    ),
-                }
-            else:
-                return {
-                    "action": "hold",
-                    "confidence": 0.6,
-                    "reasoning": f"Symbol {symbol} not found in LLM response, default HOLD",
-                }
-        except Exception as e:
-            logger.warning(f"Error parsing {symbol}: {e}, fallback HOLD")
+            if symbol not in decisions:
+                return {**default, "reasoning": f"Symbol {symbol} not in response"}
+            d = decisions[symbol]
             return {
-                "action": "hold",
-                "confidence": 0.6,
-                "reasoning": f"Parsing error for {symbol}, default HOLD",
+                "action": d.get("signal", "hold"),
+                "confidence": d.get("confidence", 0.6),
+                "reasoning": d.get("justification", d.get("reasoning", f"Decision for {symbol}")),
             }
+        except Exception as e:
+            logger.warning(f"Error parsing {symbol}: {e}")
+            return {**default, "reasoning": f"Parsing error for {symbol}"}
 
-    def parse_simple_response(
-        self, response_text: str, symbol: str, current_market_price: float = 0
-    ) -> Dict:
+    def parse_simple_response(self, response_text: str, symbol: str, current_market_price: float = 0) -> Dict:
         """Compatibility method for SimpleLLMPromptService interface."""
         return self.get_decision_for_symbol(symbol, response_text)

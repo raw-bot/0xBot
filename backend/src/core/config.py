@@ -1,59 +1,47 @@
-"""Configuration centralisée pour le bot de trading."""
+"""Configuration centralisee pour le bot de trading."""
 
 import os
 from decimal import Decimal
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from dotenv import load_dotenv
 
-# Load .env from the backend directory (project root)
 env_path = Path(__file__).resolve().parents[3] / ".env"
 load_dotenv(dotenv_path=env_path)
 
 
 class TradingConfig:
-    """Configuration centralisée pour le trading bot."""
+    """Configuration centralisee pour le trading bot."""
 
     # LLM Configuration
     FORCED_MODEL_DEEPSEEK: str = os.getenv("FORCE_DEEPSEEK_MODEL", "deepseek-chat")
 
-    # News API (CryptoCompare)
+    # News API
     CRYPTOCOMPARE_API_KEY = os.getenv("CRYPTOCOMPARE_API_KEY", "")
-    NEWS_FETCH_INTERVAL: int = 300  # 5 minutes (aligned with cycle)
+    NEWS_FETCH_INTERVAL: int = 300
 
-    # Trading Parameters - Quality over Quantity (Optimized for fee efficiency)
-    MIN_CONFIDENCE_ENTRY: float = 0.70  # 70% - test mode, allows more trades
-    MIN_CONFIDENCE_EXIT_EARLY: float = 0.60  # 60%
-    MIN_CONFIDENCE_EXIT_NORMAL: float = 0.70  # 70%
-    MAX_NEW_ENTRIES_PER_CYCLE: int = 2  # Max 2 new positions per cycle
+    # Trading Parameters
+    MIN_CONFIDENCE_ENTRY: float = 0.70
+    MIN_CONFIDENCE_EXIT_EARLY: float = 0.60
+    MIN_CONFIDENCE_EXIT_NORMAL: float = 0.70
+    MAX_NEW_ENTRIES_PER_CYCLE: int = 2
 
-    # Smart Exit Protection - Prevents micro-profit exits
-    # Exit is ALWAYS allowed if position is losing (protection mode)
-    # Exit only allowed if PnL >= this threshold when position is profitable
-    MIN_PNL_PCT_FOR_PROFIT_EXIT: float = 2.0  # 2.0% min profit to exit (covers fees + buffer)
+    # Risk Management
+    DEFAULT_STOP_LOSS_PCT: float = 0.035
+    DEFAULT_TAKE_PROFIT_PCT: float = 0.08
+    DEFAULT_POSITION_SIZE_PCT: float = 0.35
+    DEFAULT_LEVERAGE: float = 5.0
 
-    # Position Management (DEPRECATED - no longer used for exit decisions)
-    # These values are kept for reference but LLM decides exits based on
-    # market conditions, not arbitrary time limits (changed 2026-01-08)
-    MAX_POSITION_AGE_SECONDS: int = 14400  # Unused
-    MIN_POSITION_AGE_FOR_EXIT_SECONDS: int = 7200  # Unused
+    # SHORT-specific settings
+    SHORT_MAX_LEVERAGE: float = 3.0
+    SHORT_MIN_CONFIDENCE: float = 0.65
+    SHORT_POSITION_SIZE_PCT: float = 0.25
 
-    # Risk Management - Optimized for fee efficiency (higher targets)
-    DEFAULT_STOP_LOSS_PCT: float = 0.035  # 3.5% SL (slightly wider)
-    DEFAULT_TAKE_PROFIT_PCT: float = 0.08  # 8% TP (more ambitious, covers fees)
-    DEFAULT_POSITION_SIZE_PCT: float = 0.35  # 35% position (larger to overcome fees)
-    DEFAULT_LEVERAGE: float = 5.0  # 5x Leverage for LONG
+    # Trading Fees (Binance Futures Taker)
+    PAPER_TRADING_FEE_PCT: float = 0.0005
 
-    # SHORT-specific settings (safer due to unlimited loss potential)
-    SHORT_MAX_LEVERAGE: float = 3.0  # 3x max for SHORT
-    SHORT_MIN_CONFIDENCE: float = 0.65  # Lower threshold
-    SHORT_POSITION_SIZE_PCT: float = 0.25  # 25% size (larger to overcome fees)
-
-    # Trading Fees (Binance Futures Taker fee)
-    PAPER_TRADING_FEE_PCT: float = 0.0005  # 0.05% per trade (real Binance rate)
-
-    # Security: Allowed trading symbols whitelist (majors only)
+    # Allowed symbols whitelist
     ALLOWED_SYMBOLS: List[str] = [
         "BTC/USDT",
         "ETH/USDT",
@@ -63,17 +51,16 @@ class TradingConfig:
     ]
 
     # Rate Limiting
-    LLM_CALLS_PER_MINUTE: int = 10  # Max LLM API calls per minute
+    LLM_CALLS_PER_MINUTE: int = 10
 
     # Performance
-    CYCLE_INTERVAL_SECONDS: int = 300  # 5 minutes
+    CYCLE_INTERVAL_SECONDS: int = 300
 
     @classmethod
     def validate_config(cls) -> tuple[bool, List[str]]:
-        """Valide la configuration actuelle."""
+        """Validate configuration values."""
         errors = []
 
-        # Valider les pourcentages
         if not 0 < cls.MIN_CONFIDENCE_ENTRY < 1:
             errors.append("MIN_CONFIDENCE_ENTRY must be between 0 and 1")
 
@@ -83,22 +70,12 @@ class TradingConfig:
         if not 0 < cls.DEFAULT_TAKE_PROFIT_PCT < 1:
             errors.append("DEFAULT_TAKE_PROFIT_PCT must be between 0 and 1")
 
-        # Valider les temps
-        if cls.MIN_POSITION_AGE_FOR_EXIT_SECONDS < 0:
-            errors.append("MIN_POSITION_AGE_FOR_EXIT_SECONDS must be positive")
-
-        if cls.MAX_POSITION_AGE_SECONDS <= cls.MIN_POSITION_AGE_FOR_EXIT_SECONDS:
-            errors.append(
-                "MAX_POSITION_AGE_SECONDS must be greater than MIN_POSITION_AGE_FOR_EXIT_SECONDS"
-            )
-
         return len(errors) == 0, errors
 
     @classmethod
     def get_decimal_config(cls, key: str) -> Decimal:
-        """Obtenir une configuration en Decimal."""
+        """Get a configuration value as Decimal."""
         return Decimal(str(getattr(cls, key, 0)))
 
 
-# Instance globale
 config = TradingConfig()

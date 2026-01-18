@@ -1,9 +1,9 @@
 """Position service for managing trading positions."""
 
-import uuid
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +24,7 @@ class PositionOpen:
         stop_loss: Optional[Decimal] = None,
         take_profit: Optional[Decimal] = None,
         leverage: Decimal = Decimal(str(config.DEFAULT_LEVERAGE)),
+        invalidation_condition: Optional[str] = None,
     ):
         self.symbol = symbol
         self.side = side
@@ -32,6 +33,7 @@ class PositionOpen:
         self.stop_loss = stop_loss
         self.take_profit = take_profit
         self.leverage = leverage
+        self.invalidation_condition = invalidation_condition
 
 
 class PositionService:
@@ -40,49 +42,21 @@ class PositionService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def open_position(self, bot_id: uuid.UUID, data: PositionOpen) -> Position:
-        """
-        Open a new trading position.
+    async def open_position(self, bot_id: UUID, data: PositionOpen) -> Position:
+        """Open a new trading position."""
+        self._validate_position_data(data)
 
-        Args:
-            bot_id: ID of the bot opening the position
-            data: Position data
-
-        Returns:
-            Created position instance
-
-        Raises:
-            ValueError: If validation fails
-        """
-        # Validate side
-        valid_sides = [s.value for s in PositionSide]
-        if data.side not in valid_sides:
-            raise ValueError(f"Invalid side. Must be one of: {valid_sides}")
-
-        # Validate quantities and prices
-        if data.quantity <= 0:
-            raise ValueError("Quantity must be positive")
-
-        if data.entry_price <= 0:
-            raise ValueError("Entry price must be positive")
-
-        if data.stop_loss is not None and data.stop_loss <= 0:
-            raise ValueError("Stop loss must be positive")
-
-        if data.take_profit is not None and data.take_profit <= 0:
-            raise ValueError("Take profit must be positive")
-
-        # Create position
         position = Position(
             bot_id=bot_id,
             symbol=data.symbol,
             side=data.side,
             quantity=data.quantity,
             entry_price=data.entry_price,
-            current_price=data.entry_price,  # Initially same as entry
+            current_price=data.entry_price,
             stop_loss=data.stop_loss,
             take_profit=data.take_profit,
             leverage=data.leverage,
+            invalidation_condition=data.invalidation_condition,
             status=PositionStatus.OPEN,
             opened_at=datetime.utcnow(),
         )
@@ -90,138 +64,85 @@ class PositionService:
         self.db.add(position)
         await self.db.commit()
         await self.db.refresh(position)
-
         return position
 
+    def _validate_position_data(self, data: PositionOpen) -> None:
+        """Validate position data before opening."""
+        valid_sides = [s.value for s in PositionSide]
+        if data.side not in valid_sides:
+            raise ValueError(f"Invalid side. Must be one of: {valid_sides}")
+        if data.quantity <= 0:
+            raise ValueError("Quantity must be positive")
+        if data.entry_price <= 0:
+            raise ValueError("Entry price must be positive")
+        if data.stop_loss is not None and data.stop_loss <= 0:
+            raise ValueError("Stop loss must be positive")
+        if data.take_profit is not None and data.take_profit <= 0:
+            raise ValueError("Take profit must be positive")
+
     async def close_position(
-        self, position_id: uuid.UUID, exit_price: Decimal, reason: str = "manual_close"
+        self, position_id: UUID, exit_price: Decimal, reason: str = "manual_close"
     ) -> Optional[Position]:
-        """
-        Close a trading position.
-
-        Args:
-            position_id: Position ID
-            exit_price: Price at which position is closed
-            reason: Reason for closing (manual_close, stop_loss, take_profit)
-
-        Returns:
-            Closed position or None if not found
-
-        Raises:
-            ValueError: If position already closed or invalid price
-        """
+        """Close a trading position."""
         position = await self.get_position(position_id)
         if not position:
             return None
-
         if position.status == PositionStatus.CLOSED:
             raise ValueError("Position is already closed")
-
         if exit_price <= 0:
             raise ValueError("Exit price must be positive")
 
-        # Update position
         position.current_price = exit_price
         position.status = PositionStatus.CLOSED
         position.closed_at = datetime.utcnow()
 
         await self.db.commit()
         await self.db.refresh(position)
-
         return position
 
-    async def update_current_price(
-        self, position_id: uuid.UUID, price: Decimal
-    ) -> Optional[Position]:
-        """
-        Update the current price of an open position.
-
-        Args:
-            position_id: Position ID
-            price: New current price
-
-        Returns:
-            Updated position or None if not found
-
-        Raises:
-            ValueError: If position is closed or invalid price
-        """
+    async def update_current_price(self, position_id: UUID, price: Decimal) -> Optional[Position]:
+        """Update the current price of an open position."""
         position = await self.get_position(position_id)
         if not position:
             return None
-
         if position.status == PositionStatus.CLOSED:
             raise ValueError("Cannot update price of closed position")
-
         if price <= 0:
             raise ValueError("Price must be positive")
 
         position.current_price = price
-
         await self.db.commit()
         await self.db.refresh(position)
-
         return position
 
-    async def get_position(self, position_id: uuid.UUID) -> Optional[Position]:
-        """
-        Get a position by ID.
-
-        Args:
-            position_id: Position ID
-
-        Returns:
-            Position instance or None if not found
-        """
+    async def get_position(self, position_id: UUID) -> Optional[Position]:
+        """Get a position by ID."""
         query = select(Position).where(Position.id == position_id)
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
     async def get_open_positions(
-        self, bot_id: uuid.UUID, symbol: Optional[str] = None
+        self, bot_id: UUID, symbol: Optional[str] = None
     ) -> list[Position]:
-        """
-        Get all open positions for a bot.
-
-        Args:
-            bot_id: Bot ID
-            symbol: Optional symbol filter
-
-        Returns:
-            List of open positions
-        """
+        """Get all open positions for a bot."""
         query = select(Position).where(
             Position.bot_id == bot_id, Position.status == PositionStatus.OPEN
         )
-
         if symbol:
             query = query.where(Position.symbol == symbol)
-
         query = query.order_by(Position.opened_at.desc())
 
         result = await self.db.execute(query)
         return list(result.scalars().all())
 
     async def get_all_positions(
-        self, bot_id: uuid.UUID, limit: int = 100, offset: int = 0
+        self, bot_id: UUID, limit: int = 100, offset: int = 0
     ) -> tuple[list[Position], int]:
-        """
-        Get all positions for a bot with pagination.
-
-        Args:
-            bot_id: Bot ID
-            limit: Maximum number of positions to return
-            offset: Number of positions to skip
-
-        Returns:
-            Tuple of (positions list, total count)
-        """
-        # Get total count
+        """Get all positions for a bot with pagination."""
         count_query = select(Position).where(Position.bot_id == bot_id)
         count_result = await self.db.execute(count_query)
         total = len(list(count_result.scalars().all()))
 
-        # Get paginated positions
         query = (
             select(Position)
             .where(Position.bot_id == bot_id)
@@ -229,58 +150,33 @@ class PositionService:
             .limit(limit)
             .offset(offset)
         )
-
         result = await self.db.execute(query)
-        positions = list(result.scalars().all())
-
-        return positions, total
+        return list(result.scalars().all()), total
 
     async def check_stop_loss_take_profit(
         self, position: Position, current_price: Decimal
     ) -> Optional[str]:
-        """
-        Check if stop loss or take profit is hit.
-
-        Args:
-            position: Position to check
-            current_price: Current market price
-
-        Returns:
-            "stop_loss" or "take_profit" if hit, None otherwise
-        """
+        """Check if stop loss or take profit is hit."""
         if position.status == PositionStatus.CLOSED:
             return None
 
-        # Check stop loss
+        is_long = position.side == PositionSide.LONG
+
         if position.stop_loss:
-            if position.side == PositionSide.LONG and current_price <= position.stop_loss:
-                return "stop_loss"
-            elif position.side == PositionSide.SHORT and current_price >= position.stop_loss:
+            sl_hit = (is_long and current_price <= position.stop_loss) or \
+                     (not is_long and current_price >= position.stop_loss)
+            if sl_hit:
                 return "stop_loss"
 
-        # Check take profit
         if position.take_profit:
-            if position.side == PositionSide.LONG and current_price >= position.take_profit:
-                return "take_profit"
-            elif position.side == PositionSide.SHORT and current_price <= position.take_profit:
+            tp_hit = (is_long and current_price >= position.take_profit) or \
+                     (not is_long and current_price <= position.take_profit)
+            if tp_hit:
                 return "take_profit"
 
         return None
 
-    async def get_total_exposure(self, bot_id: uuid.UUID) -> Decimal:
-        """
-        Calculate total market exposure (sum of position values).
-
-        Args:
-            bot_id: Bot ID
-
-        Returns:
-            Total exposure value
-        """
+    async def get_total_exposure(self, bot_id: UUID) -> Decimal:
+        """Calculate total market exposure (sum of position values)."""
         positions = await self.get_open_positions(bot_id)
-
-        total = Decimal("0")
-        for pos in positions:
-            total += pos.position_value
-
-        return total
+        return sum((pos.position_value for pos in positions), Decimal("0"))

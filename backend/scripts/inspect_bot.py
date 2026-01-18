@@ -1,29 +1,35 @@
+#!/usr/bin/env python3
+"""Inspect a bot's details including risk parameters."""
 import asyncio
 import sys
 import uuid
-from pathlib import Path
 
 from sqlalchemy import select
-from src.core.database import AsyncSessionLocal
+
+from utils import DBSession, print_bot_info, YELLOW, NC
+
 from src.models.bot import Bot
 
-# Add backend to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
+async def inspect_bot(bot_id: str):
+    try:
+        bot_uuid = uuid.UUID(bot_id)
+    except ValueError:
+        print(f"{YELLOW}Invalid UUID: {bot_id}{NC}")
+        return
 
-async def inspect_bot_risk():
-    bot_id = uuid.UUID("88e3df10-eb6e-4f13-8f3a-de24788944dd")
-
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(select(Bot).where(Bot.id == bot_id))
+    async with DBSession() as db:
+        result = await db.execute(select(Bot).where(Bot.id == bot_uuid))
         bot = result.scalar_one_or_none()
 
         if bot:
-            print(f"Bot: {bot.name}")
-            print(f"Risk Params: {bot.risk_params}")
+            print_bot_info(bot, detailed=True)
         else:
-            print("Bot not found")
+            print(f"{YELLOW}Bot not found{NC}")
 
 
 if __name__ == "__main__":
-    asyncio.run(inspect_bot_risk())
+    if len(sys.argv) < 2:
+        print("Usage: python inspect_bot.py <bot_id>")
+        sys.exit(1)
+    asyncio.run(inspect_bot(sys.argv[1]))

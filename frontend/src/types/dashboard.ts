@@ -1,8 +1,3 @@
-/**
- * TypeScript types for Dashboard API responses
- * Matches backend/src/routes/dashboard.py schemas
- */
-
 export interface DashboardBot {
   id: string;
   name: string;

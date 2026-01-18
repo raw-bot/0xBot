@@ -1,45 +1,40 @@
+#!/usr/bin/env python3
+"""Add leverage column to positions table if missing."""
 import asyncio
 import logging
 
 from sqlalchemy import text
 from src.core.database import engine
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 async def patch_database():
-    """Add leverage column to positions table if it doesn't exist."""
-    logger.info("Starting database patch...")
+    logger.info("Checking database schema...")
 
     async with engine.begin() as conn:
-        try:
-            # Check if column exists
-            logger.info("Checking if 'leverage' column exists in 'positions' table...")
-            result = await conn.execute(
-                text(
-                    "SELECT column_name FROM information_schema.columns WHERE table_name='positions' AND column_name='leverage'"
-                )
+        result = await conn.execute(
+            text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name='positions' AND column_name='leverage'"
             )
-            column_exists = result.scalar() is not None
+        )
 
-            if column_exists:
-                logger.info("Column 'leverage' already exists. Skipping.")
-            else:
-                logger.info("Adding 'leverage' column to 'positions' table...")
-                await conn.execute(
-                    text(
-                        "ALTER TABLE positions ADD COLUMN leverage NUMERIC(10, 2) DEFAULT 10.0 NOT NULL"
-                    )
-                )
-                logger.info("Column added successfully.")
+        if result.scalar() is not None:
+            logger.info("Column 'leverage' already exists")
+            return
 
-        except Exception as e:
-            logger.error(f"Error patching database: {e}")
-            raise
-        finally:
-            await engine.dispose()
+        logger.info("Adding 'leverage' column...")
+        await conn.execute(
+            text(
+                "ALTER TABLE positions ADD COLUMN leverage "
+                "NUMERIC(10, 2) DEFAULT 10.0 NOT NULL"
+            )
+        )
+        logger.info("Column added successfully")
+
+    await engine.dispose()
 
 
 if __name__ == "__main__":

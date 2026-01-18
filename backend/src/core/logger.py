@@ -11,45 +11,47 @@ from typing import Any, Dict, Optional
 from fastapi import Request
 
 
-# ANSI color codes for terminal output
 class Colors:
-    """ANSI color codes for prettier console output."""
-
+    """ANSI color codes for terminal output."""
     RESET = "\033[0m"
     BOLD = "\033[1m"
     DIM = "\033[2m"
+    DEBUG = "\033[36m"
+    INFO = "\033[32m"
+    WARNING = "\033[33m"
+    ERROR = "\033[31m"
+    CRITICAL = "\033[35m"
+    TIMESTAMP = "\033[90m"
+    LOGGER = "\033[94m"
+    KEY = "\033[96m"
 
-    # Level colors
-    DEBUG = "\033[36m"  # Cyan
-    INFO = "\033[32m"  # Green
-    WARNING = "\033[33m"  # Yellow
-    ERROR = "\033[31m"  # Red
-    CRITICAL = "\033[35m"  # Magenta
 
-    # Component colors
-    TIMESTAMP = "\033[90m"  # Gray
-    LOGGER = "\033[94m"  # Light blue
-    LOCATION = "\033[90m"  # Gray
-    KEY = "\033[96m"  # Light cyan
+LEVEL_COLORS = {
+    "DEBUG": Colors.DEBUG,
+    "INFO": Colors.INFO,
+    "WARNING": Colors.WARNING,
+    "ERROR": Colors.ERROR,
+    "CRITICAL": Colors.CRITICAL,
+}
+
+LOGGER_ABBREVIATIONS = {
+    "trading_engine_service": "BOT",
+    "trade_executor_service": "TRADE",
+    "market_data_service": "DATA",
+    "market_analysis_service": "ANALYSIS",
+    "llm_prompt_service": "LLM",
+    "position_service": "POSITION",
+    "risk_manager_service": "RISK",
+    "bot_service": "SERVICE",
+    "exchange_client": "EXCHANGE",
+    "indicator_service": "INDICATOR",
+}
 
 
 class JSONFormatter(logging.Formatter):
-    """
-    Custom JSON formatter for structured logging.
-
-    Outputs logs in JSON format for easier parsing and analysis.
-    """
+    """JSON formatter for structured logging."""
 
     def format(self, record: logging.LogRecord) -> str:
-        """
-        Format log record as JSON.
-
-        Args:
-            record: Log record
-
-        Returns:
-            JSON-formatted log string
-        """
         log_data: Dict[str, Any] = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "level": record.levelname,
@@ -57,23 +59,16 @@ class JSONFormatter(logging.Formatter):
             "message": record.getMessage(),
         }
 
-        # Add request ID if available
-        if hasattr(record, "request_id"):
-            log_data["request_id"] = record.request_id
+        for attr in ("request_id", "user_id"):
+            if hasattr(record, attr):
+                log_data[attr] = getattr(record, attr)
 
-        # Add user ID if available
-        if hasattr(record, "user_id"):
-            log_data["user_id"] = record.user_id
-
-        # Add extra fields
         if hasattr(record, "extra"):
             log_data["extra"] = record.extra
 
-        # Add exception info if present
         if record.exc_info:
             log_data["exception"] = self.formatException(record.exc_info)
 
-        # Add file location
         log_data["location"] = {
             "file": record.pathname,
             "line": record.lineno,
@@ -84,324 +79,154 @@ class JSONFormatter(logging.Formatter):
 
 
 class HumanReadableFormatter(logging.Formatter):
-    """
-    Human-readable formatter with colors and better structure.
-
-    Perfect for development and debugging.
-    """
+    """Human-readable formatter with optional colors."""
 
     def __init__(self, use_colors: bool = True):
-        """
-        Initialize formatter.
-
-        Args:
-            use_colors: Whether to use ANSI colors
-        """
         super().__init__()
         self.use_colors = use_colors
 
     def format(self, record: logging.LogRecord) -> str:
-        """
-        Format log record in a human-readable way.
+        c = Colors if self.use_colors else type("NoColors", (), {k: "" for k in dir(Colors) if not k.startswith("_")})()
 
-        Args:
-            record: Log record
-
-        Returns:
-            Formatted log string
-        """
-        # Color setup
-        if self.use_colors:
-            level_colors = {
-                "DEBUG": Colors.DEBUG,
-                "INFO": Colors.INFO,
-                "WARNING": Colors.WARNING,
-                "ERROR": Colors.ERROR,
-                "CRITICAL": Colors.CRITICAL,
-            }
-            level_color = level_colors.get(record.levelname, Colors.RESET)
-            reset = Colors.RESET
-            dim = Colors.DIM
-            bold = Colors.BOLD
-            timestamp_color = Colors.TIMESTAMP
-            logger_color = Colors.LOGGER
-            key_color = Colors.KEY
-        else:
-            level_color = reset = dim = bold = timestamp_color = logger_color = key_color = ""
-
-        # Format timestamp (only time, no milliseconds for cleaner look)
         timestamp = datetime.fromtimestamp(record.created).strftime("%H:%M:%S")
+        level_color = LEVEL_COLORS.get(record.levelname, c.RESET) if self.use_colors else ""
 
-        # Abbreviate logger names for cleaner output
-        logger_abbrev = {
-            "trading_engine_service": "🤖 BOT",
-            "trade_executor_service": "💰 TRADE",
-            "market_data_service": "📊 DATA",
-            "market_analysis_service": "📈 ANALYSIS",
-            "llm_prompt_service": "🧠 LLM",
-            "position_service": "📍 POSITION",
-            "risk_manager_service": "⚠️  RISK",
-            "bot_service": "🔧 SERVICE",
-            "exchange_client": "🔗 EXCHANGE",
-            "indicator_service": "📉 INDICATOR",
-        }
+        short_logger = record.name.split(".")[-1]
 
-        # Extract short logger name (last part)
-        logger_parts = record.name.split(".")
-        short_logger = logger_parts[-1] if logger_parts else record.name
-
-        # Use abbreviation or show only for warnings/errors
         if record.levelno >= logging.WARNING:
-            # Show full context for errors/warnings
-            aligned_logger = logger_abbrev.get(short_logger, f"⚡ {short_logger[:8].upper()}")
-            log_line_prefix = (
-                f"{timestamp_color}{timestamp}{reset} | {level_color}{aligned_logger}{reset} | "
-            )
+            abbrev = LOGGER_ABBREVIATIONS.get(short_logger, short_logger[:8].upper())
+            prefix = f"{c.TIMESTAMP}{timestamp}{c.RESET} | {level_color}{abbrev}{c.RESET} | "
         else:
-            # For INFO/DEBUG, just timestamp
-            log_line_prefix = f"{timestamp_color}{timestamp}{reset} | "
+            prefix = f"{c.TIMESTAMP}{timestamp}{c.RESET} | "
 
-        # Color based on level
-        if record.levelno >= logging.ERROR:
-            msg_color = Colors.ERROR
-        elif record.levelno >= logging.WARNING:
-            msg_color = Colors.WARNING
-        else:
-            msg_color = ""
+        msg_color = c.ERROR if record.levelno >= logging.ERROR else (c.WARNING if record.levelno >= logging.WARNING else "")
+        log_line = f"{prefix}{msg_color}{record.getMessage()}{c.RESET}"
 
-        # Build main log line
-        log_line = f"{log_line_prefix}{msg_color}{record.getMessage()}{reset}"
-
-        # Add extra fields if present
+        # Add extras
         extras = []
-
-        if hasattr(record, "request_id"):
-            extras.append(f"{key_color}request_id{reset}={record.request_id}")
-
-        if hasattr(record, "user_id"):
-            extras.append(f"{key_color}user_id{reset}={record.user_id}")
+        for attr in ("request_id", "user_id"):
+            if hasattr(record, attr):
+                extras.append(f"{c.KEY}{attr}{c.RESET}={getattr(record, attr)}")
 
         if hasattr(record, "extra") and record.extra:
             for key, value in record.extra.items():
-                # Format value based on type
-                if isinstance(value, (int, float)):
-                    formatted_value = f"{value}"
-                elif isinstance(value, str):
-                    formatted_value = f'"{value}"'
-                else:
-                    formatted_value = str(value)
-                extras.append(f"{key_color}{key}{reset}={formatted_value}")
+                formatted = f'"{value}"' if isinstance(value, str) else str(value)
+                extras.append(f"{c.KEY}{key}{c.RESET}={formatted}")
 
         if extras:
-            log_line += f"\n  {dim}└─ {' · '.join(extras)}{reset}"
+            log_line += f"\n  {c.DIM}|- {' . '.join(extras)}{c.RESET}"
 
-        # Add exception if present
         if record.exc_info:
-            exc_text = self.formatException(record.exc_info)
-            log_line += f"\n{Colors.ERROR}{exc_text}{reset}"
+            log_line += f"\n{c.ERROR}{self.formatException(record.exc_info)}{c.RESET}"
 
-        # Add location in dim for debug
         if record.levelno <= logging.DEBUG:
-            location = f"{record.filename}:{record.lineno} in {record.funcName}()"
-            log_line += f"\n  {dim}📍 {location}{reset}"
+            log_line += f"\n  {c.DIM}@ {record.filename}:{record.lineno} in {record.funcName}(){c.RESET}"
 
         return log_line
 
 
 class NoiseFilter(logging.Filter):
-    """
-    Filter out noisy/repetitive log messages.
+    """Filter out noisy log messages."""
 
-    Filters out common patterns like "Fetching", "Created", etc.
-    """
-
-    def __init__(self):
-        """Initialize filter with patterns to exclude."""
-        super().__init__()
-        self.excluded_patterns = [
-            "Fetching",
-            "Created order",
-            "Closing database connection",
-            "Opening database connection",
-            "Connection pool",
-            "HTTP Request:",
-            "HTTP Response:",
-        ]
+    EXCLUDED = [
+        "fetching", "created order", "closing database", "opening database",
+        "connection pool", "http request:", "http response:",
+    ]
 
     def filter(self, record: logging.LogRecord) -> bool:
-        """
-        Determine if record should be logged.
-
-        Args:
-            record: Log record
-
-        Returns:
-            True if should be logged, False otherwise
-        """
-        message = record.getMessage()
-
-        # Check if message contains any excluded pattern
-        for pattern in self.excluded_patterns:
-            if pattern.lower() in message.lower():
-                return False
-
-        return True
+        message = record.getMessage().lower()
+        return not any(pattern in message for pattern in self.EXCLUDED)
 
 
 class RequestLogger:
-    """
-    Logger wrapper with request context.
-
-    Automatically includes request ID and user ID in logs.
-    """
+    """Logger wrapper with request context."""
 
     def __init__(self, logger: logging.Logger, request: Optional[Request] = None):
-        """
-        Initialize request logger.
-
-        Args:
-            logger: Base logger
-            request: Optional request object
-        """
         self.logger = logger
         self.request = request
 
     def _add_context(self, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Add request context to log extras."""
         context = extra or {}
-
         if self.request:
-            if hasattr(self.request.state, "request_id"):
-                context["request_id"] = self.request.state.request_id
-
-            if hasattr(self.request.state, "user_id"):
-                context["user_id"] = self.request.state.user_id
-
+            for attr in ("request_id", "user_id"):
+                if hasattr(self.request.state, attr):
+                    context[attr] = getattr(self.request.state, attr)
         return context
 
     def debug(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
-        """Log debug message."""
         self.logger.debug(message, extra=self._add_context(extra))
 
     def info(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
-        """Log info message."""
         self.logger.info(message, extra=self._add_context(extra))
 
     def warning(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
-        """Log warning message."""
         self.logger.warning(message, extra=self._add_context(extra))
 
     def error(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
-        """Log error message."""
         self.logger.error(message, extra=self._add_context(extra))
 
     def critical(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
-        """Log critical message."""
         self.logger.critical(message, extra=self._add_context(extra))
 
 
 def setup_logging(log_level: str = "INFO", use_json: bool = False) -> None:
-    """
-    Configure application logging.
-
-    Args:
-        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-        use_json: Use JSON formatter instead of human-readable (default: False for dev)
-    """
-    # Check environment variable for format preference
+    """Configure application logging."""
     log_format = os.getenv("LOG_FORMAT", "human" if not use_json else "json").lower()
+    level = getattr(logging, log_level.upper())
 
-    # Create root logger
     root_logger = logging.getLogger()
-    root_logger.setLevel(getattr(logging, log_level.upper()))
+    root_logger.setLevel(level)
 
-    # Remove existing handlers
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
 
-    # Create console handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(getattr(logging, log_level.upper()))
-
-    # Add noise filter to reduce clutter
     noise_filter = NoiseFilter()
+
+    # Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(level)
     console_handler.addFilter(noise_filter)
 
-    # Choose formatter based on configuration
     if log_format == "json":
-        formatter = JSONFormatter()
+        console_handler.setFormatter(JSONFormatter())
     else:
-        # Use human-readable formatter by default (better for development)
-        use_colors = sys.stdout.isatty()  # Auto-detect if terminal supports colors
-        formatter = HumanReadableFormatter(use_colors=use_colors)
+        console_handler.setFormatter(HumanReadableFormatter(use_colors=sys.stdout.isatty()))
 
-    console_handler.setFormatter(formatter)
+    root_logger.addHandler(console_handler)
 
-    # Create file handler for persistent logging (JSON - structured)
-    # Get project root (3 levels up from this file: backend/src/core/logger.py)
+    # File handlers
     project_root = Path(__file__).parent.parent.parent.parent
     log_dir = project_root / "logs"
     log_dir.mkdir(exist_ok=True)
 
-    # JSON log file (structured for parsing)
-    log_file = log_dir / "bot.log"
-    file_handler = logging.FileHandler(str(log_file))
-    file_handler.setLevel(getattr(logging, log_level.upper()))
-    file_handler.addFilter(noise_filter)
-    json_formatter = JSONFormatter()
-    file_handler.setFormatter(json_formatter)
-    root_logger.addHandler(file_handler)
+    # JSON log file
+    json_handler = logging.FileHandler(str(log_dir / "bot.log"))
+    json_handler.setLevel(level)
+    json_handler.addFilter(noise_filter)
+    json_handler.setFormatter(JSONFormatter())
+    root_logger.addHandler(json_handler)
 
-    # Human-readable log file (for easy reading)
-    readable_log = log_dir / "bot_console.log"
-    readable_handler = logging.FileHandler(str(readable_log))
-    readable_handler.setLevel(getattr(logging, log_level.upper()))
+    # Human-readable log file
+    readable_handler = logging.FileHandler(str(log_dir / "bot_console.log"))
+    readable_handler.setLevel(level)
     readable_handler.addFilter(noise_filter)
-    readable_formatter = HumanReadableFormatter(use_colors=False)  # No ANSI in file
-    readable_handler.setFormatter(readable_formatter)
+    readable_handler.setFormatter(HumanReadableFormatter(use_colors=False))
     root_logger.addHandler(readable_handler)
 
-    # Add console handler to root logger
-    root_logger.addHandler(console_handler)
-
-    # Silence noisy loggers - keep only important messages
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-    logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("asyncio").setLevel(logging.WARNING)
-    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
-    logging.getLogger("sqlalchemy.pool").setLevel(logging.WARNING)
+    # Silence noisy loggers
+    for name in ["uvicorn.access", "uvicorn.error", "httpx", "httpcore",
+                 "urllib3", "asyncio", "sqlalchemy.engine", "sqlalchemy.pool"]:
+        logging.getLogger(name).setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> logging.Logger:
-    """
-    Get logger instance.
-
-    Args:
-        name: Logger name (usually __name__)
-
-    Returns:
-        Logger instance
-    """
+    """Get logger instance."""
     return logging.getLogger(name)
 
 
 def get_request_logger(name: str, request: Optional[Request] = None) -> RequestLogger:
-    """
-    Get request-aware logger.
-
-    Args:
-        name: Logger name
-        request: Optional request object
-
-    Returns:
-        Request logger instance
-    """
-    logger = logging.getLogger(name)
-    return RequestLogger(logger, request)
+    """Get request-aware logger."""
+    return RequestLogger(logging.getLogger(name), request)
 
 
-# Initialize logging on module import
 setup_logging()

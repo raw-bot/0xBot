@@ -1,0 +1,202 @@
+# Docker MCP Server Configuration for 0xBot
+# This configuration sets up a unified MCP gateway that aggregates multiple MCP servers
+# Reduces context consumption from 20,000+ tokens to <2000 tokens (90% reduction)
+
+version: "1.0"
+
+# MCP Gateway Configuration
+gateway:
+  name: "0xBot-MCP-Hub"
+  description: "Unified MCP gateway for 0xBot AI Trading Agent"
+  port: 3001
+  host: "localhost"
+
+  # Logging configuration
+  logging:
+    level: "info"
+    format: "json"
+
+# MCP Servers from Docker Catalog
+# These are containerized MCP servers that run isolated from the main application
+mcp_servers:
+  # Database servers for trading data
+  - name: "mongodb"
+    docker_image: "docker.io/mcp/mongodb:latest"
+    enabled: true
+    description: "MongoDB integration for bot trading data"
+    environment:
+      MONGODB_URI: "mongodb://localhost:27017"
+      DATABASE_NAME: "trading_bot"
+    capabilities:
+      - database_query
+      - data_retrieval
+      - transaction_management
+    context_weight: 150  # tokens allocated to this server
+
+  - name: "postgres"
+    docker_image: "docker.io/mcp/postgres:latest"
+    enabled: true
+    description: "PostgreSQL integration for trading positions and history"
+    environment:
+      DATABASE_URL: "postgresql://bot:bot123@localhost:5432/trading_bot"
+    capabilities:
+      - database_query
+      - schema_introspection
+      - transaction_support
+    context_weight: 150
+
+  # File system and code servers
+  - name: "filesystem"
+    docker_image: "docker.io/mcp/filesystem:latest"
+    enabled: true
+    description: "File system access for logs, configs, and data files"
+    capabilities:
+      - file_read
+      - file_write
+      - directory_listing
+      - file_search
+    context_weight: 100
+    mount_volumes:
+      - "/Users/cube/Documents/00-code/0xBot:/app"
+
+  - name: "git"
+    docker_image: "docker.io/mcp/git:latest"
+    enabled: true
+    description: "Git repository operations for version control"
+    environment:
+      REPO_PATH: "/app"
+    capabilities:
+      - repo_clone
+      - commit_history
+      - branch_management
+      - diff_operations
+    context_weight: 120
+
+  # API and HTTP servers
+  - name: "fetch"
+    docker_image: "docker.io/mcp/fetch:latest"
+    enabled: true
+    description: "HTTP requests for external API calls (OKX, market data)"
+    capabilities:
+      - http_get
+      - http_post
+      - json_parsing
+      - header_management
+    context_weight: 100
+
+  # Development and execution servers
+  - name: "python"
+    docker_image: "docker.io/mcp/python:latest"
+    enabled: true
+    description: "Python code execution for trading algorithms"
+    environment:
+      PYTHON_PATH: "/app"
+      PYTHONUNBUFFERED: "1"
+    capabilities:
+      - code_execution
+      - script_running
+      - library_import
+      - stdout_capture
+    context_weight: 180
+
+  - name: "bash"
+    docker_image: "docker.io/mcp/bash:latest"
+    enabled: true
+    description: "Bash shell commands for system operations"
+    environment:
+      SHELL_PATH: "/bin/bash"
+    capabilities:
+      - command_execution
+      - script_execution
+      - system_commands
+    context_weight: 100
+
+# Workflow Execution Configuration
+# JavaScript-based workflows that run within MCP Gateway (no context leakage)
+workflows:
+  enabled: true
+  executor: "node"
+  timeout: 300  # seconds
+
+# Tool Aggregation Rules
+# The gateway intelligently selects which tools to expose based on context
+aggregation:
+  strategy: "smart_selection"  # Only expose relevant tools for current task
+  cache_results: true
+  cache_ttl: 3600
+
+  # Context allocation strategy
+  context_budgeting:
+    total_context_tokens: 2000  # vs 20,000+ with direct MCP integration
+    server_distribution:
+      database: 300
+      filesystem: 150
+      api: 200
+      execution: 400
+      utilities: 100
+      cache: 850
+
+# Security Configuration
+security:
+  authentication:
+    enabled: true
+    method: "token"
+    token_env: "MCP_AUTH_TOKEN"
+
+  network_isolation: true
+  container_limits:
+    memory: "512m"
+    cpu: "1"
+    max_runtime: "60s"
+
+# Discovery Configuration
+# Automatically discover and update servers from Docker Catalog
+discovery:
+  enabled: true
+  registry: "https://hub.docker.com/mcp"
+  refresh_interval: 86400  # Update available servers daily
+  auto_update: false
+
+# Monitoring and Analytics
+monitoring:
+  enabled: true
+  metrics_export: "prometheus"
+  trace_calls: true
+
+  alerts:
+    - metric: "context_usage"
+      threshold: 80  # Alert if using >80% of allocated context
+    - metric: "server_error_rate"
+      threshold: 5  # Alert if error rate exceeds 5%
+    - metric: "response_time"
+      threshold: 5000  # Alert if response >5 seconds
+
+# Client Configuration for Claude Code
+client:
+  type: "claude-code"
+  connection_type: "stdio"
+
+  # Auto-discovery settings
+  discovery:
+    enabled: true
+    polling_interval: 5000
+
+  # Tool filtering for Claude
+  tool_filter:
+    max_tools_per_request: 10  # Reduce tools shown to model at once
+    relevance_threshold: 0.7
+    group_by_category: true
+
+# Logging and Debugging
+logging:
+  gateway:
+    level: "info"
+    file: "/app/.mcp/logs/gateway.log"
+
+  server_logs:
+    storage_path: "/app/.mcp/logs/servers"
+    retention_days: 7
+
+  context_tracking:
+    enabled: true
+    file: "/app/.mcp/logs/context-usage.log"

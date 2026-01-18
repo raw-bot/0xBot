@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .core.config import config
 from .core.database import close_db
 from .core.redis_client import close_redis, init_redis
 from .core.scheduler import start_scheduler, stop_scheduler
@@ -29,6 +30,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     # Startup
     print("🚀 Starting AI Trading Agent API...")
+
+    # Validate configuration
+    is_valid, errors = config.validate_config()
+    if not is_valid:
+        error_msg = f"Configuration validation failed:\n" + "\n".join(errors)
+        print(f"❌ {error_msg}")
+        raise RuntimeError(error_msg)
+    print("✅ Configuration validated")
 
     # Initialize Redis
     await init_redis()

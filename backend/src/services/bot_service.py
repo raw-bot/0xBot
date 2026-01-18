@@ -1,10 +1,10 @@
 """Bot service for managing AI trading agents."""
 
 import os
-import uuid
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from ..models.bot import Bot, BotStatus, ModelName
 
-FORCED_MODEL_DEEPSEEK = 'deepseek-chat'
+FORCED_MODEL_DEEPSEEK = "deepseek-chat"
 
 
 class BotCreate:
@@ -25,7 +25,7 @@ class BotCreate:
         capital: Decimal,
         trading_symbols: Optional[list[str]] = None,
         risk_params: Optional[dict] = None,
-        paper_trading: bool = True
+        paper_trading: bool = True,
     ):
         self.name = name
         self.model_name = model_name
@@ -34,7 +34,7 @@ class BotCreate:
         self.risk_params = risk_params or {
             "max_position_pct": 0.08,  # Harmonized with prompt LLM (8% max position)
             "max_drawdown_pct": 0.15,  # Reduced from 0.20 to 0.15 (tighter risk control)
-            "max_trades_per_day": 20   # Reduced from 50 to 20 (more selective)
+            "max_trades_per_day": 20,  # Reduced from 50 to 20 (more selective)
         }
         self.paper_trading = paper_trading
 
@@ -48,7 +48,7 @@ class BotUpdate:
         capital: Optional[Decimal] = None,
         trading_symbols: Optional[list[str]] = None,
         risk_params: Optional[dict] = None,
-        status: Optional[str] = None
+        status: Optional[str] = None,
     ):
         self.name = name
         self.capital = capital
@@ -63,7 +63,7 @@ class BotService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create_bot(self, user_id: uuid.UUID, data: BotCreate) -> Bot:
+    async def create_bot(self, user_id: UUID, data: BotCreate) -> Bot:
         """
         Create a new trading bot.
 
@@ -102,7 +102,7 @@ class BotService:
             trading_symbols=data.trading_symbols,
             risk_params=data.risk_params,
             paper_trading=data.paper_trading,
-            status=BotStatus.INACTIVE
+            status=BotStatus.INACTIVE,
         )
 
         self.db.add(bot)
@@ -111,11 +111,7 @@ class BotService:
 
         return bot
 
-    async def get_bot(
-        self,
-        bot_id: uuid.UUID,
-        load_relations: bool = False
-    ) -> Optional[Bot]:
+    async def get_bot(self, bot_id: UUID, load_relations: bool = False) -> Optional[Bot]:
         """
         Get a bot by ID.
 
@@ -130,19 +126,13 @@ class BotService:
 
         if load_relations:
             query = query.options(
-                selectinload(Bot.positions),
-                selectinload(Bot.trades),
-                selectinload(Bot.decisions)
+                selectinload(Bot.positions), selectinload(Bot.trades), selectinload(Bot.decisions)
             )
 
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def update_bot(
-        self,
-        bot_id: uuid.UUID,
-        data: BotUpdate
-    ) -> Optional[Bot]:
+    async def update_bot(self, bot_id: UUID, data: BotUpdate) -> Optional[Bot]:
         """
         Update bot configuration.
 
@@ -194,7 +184,7 @@ class BotService:
 
         return bot
 
-    async def delete_bot(self, bot_id: uuid.UUID) -> bool:
+    async def delete_bot(self, bot_id: UUID) -> bool:
         """
         Delete a bot (soft delete by setting status to stopped).
 
@@ -216,11 +206,7 @@ class BotService:
 
         return True
 
-    async def get_user_bots(
-        self,
-        user_id: uuid.UUID,
-        include_stopped: bool = False
-    ) -> list[Bot]:
+    async def get_user_bots(self, user_id: UUID, include_stopped: bool = False) -> list[Bot]:
         """
         Get all bots for a user.
 
@@ -296,9 +282,9 @@ class BotService:
         for symbol in trading_symbols:
             if not isinstance(symbol, str):
                 raise ValueError(f"Symbol must be string: {symbol}")
-            if '/' not in symbol:
+            if "/" not in symbol:
                 raise ValueError(f"Invalid symbol format (should be BASE/QUOTE): {symbol}")
-            parts = symbol.split('/')
+            parts = symbol.split("/")
             if len(parts) != 2:
                 raise ValueError(f"Invalid symbol format: {symbol}")
             if not parts[0] or not parts[1]:

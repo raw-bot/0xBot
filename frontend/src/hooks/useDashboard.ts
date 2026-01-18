@@ -1,22 +1,27 @@
-/**
- * React hook for fetching dashboard data
- */
 import { useCallback, useEffect, useState } from 'react';
-import type { DashboardData, Period, SentimentData } from '../types/dashboard';
+import type { DashboardData, Period, SentimentData } from '../types/dashboard.js';
 
 const API_BASE = '/api';
 
+interface DashboardState {
+  data: DashboardData | null;
+  sentiment: SentimentData | null;
+  loading: boolean;
+  error: string | null;
+}
+
 export function useDashboard(period: Period = '24h') {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [sentiment, setSentiment] = useState<SentimentData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [state, setState] = useState<DashboardState>({
+    data: null,
+    sentiment: null,
+    loading: true,
+    error: null,
+  });
 
   const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
+    setState((prev) => ({ ...prev, loading: true, error: null }));
 
+    try {
       const [dashboardRes, sentimentRes] = await Promise.all([
         fetch(`${API_BASE}/dashboard?period=${period}`),
         fetch(`${API_BASE}/dashboard/sentiment`),
@@ -26,17 +31,16 @@ export function useDashboard(period: Period = '24h') {
         throw new Error(`Dashboard API error: ${dashboardRes.status}`);
       }
 
-      const dashboardData: DashboardData = await dashboardRes.json();
-      setData(dashboardData);
+      const data: DashboardData = await dashboardRes.json();
+      const sentiment: SentimentData | null = sentimentRes.ok ? await sentimentRes.json() : null;
 
-      if (sentimentRes.ok) {
-        const sentimentData: SentimentData = await sentimentRes.json();
-        setSentiment(sentimentData);
-      }
+      setState({ data, sentiment, loading: false, error: null });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        error: err instanceof Error ? err.message : 'Unknown error',
+      }));
     }
   }, [period]);
 
@@ -44,11 +48,5 @@ export function useDashboard(period: Period = '24h') {
     fetchData();
   }, [fetchData]);
 
-  return {
-    data,
-    sentiment,
-    loading,
-    error,
-    refresh: fetchData,
-  };
+  return { ...state, refresh: fetchData };
 }

@@ -1,10 +1,4 @@
-"""Block: Portfolio - Manages portfolio state and equity tracking.
-
-This block is responsible for:
-- Getting current portfolio state (cash, positions, equity)
-- Calculating unrealized PnL
-- Recording equity snapshots for dashboard
-"""
+"""Block: Portfolio - Manages portfolio state and equity tracking."""
 
 import uuid
 from dataclasses import dataclass
@@ -43,51 +37,21 @@ class PortfolioBlock:
         self.bot_id = bot_id
 
     async def get_state(self, db: Optional[AsyncSession] = None) -> PortfolioState:
-        """
-        Get current portfolio state.
-
-        Returns:
-            PortfolioState with cash, equity, positions
-        """
-        close_session = False
-        if db is None:
+        """Get current portfolio state."""
+        should_close = db is None
+        if should_close:
             db = AsyncSessionLocal()
-            close_session = True
 
         try:
-            # Get bot
-            query = select(Bot).where(Bot.id == self.bot_id)
-            result = await db.execute(query)
-            bot = result.scalar_one()
+            bot = await self._get_bot(db)
+            positions = await self._get_open_positions(db)
 
-            # Get open positions
-            pos_query = select(Position).where(
-                Position.bot_id == self.bot_id, Position.status == PositionStatus.OPEN
-            )
-            pos_result = await db.execute(pos_query)
-            positions = list(pos_result.scalars().all())
-
-            # Calculate values
             cash = Decimal(str(bot.capital))
             initial = Decimal(str(bot.initial_capital))
 
-            # Margin locked in positions
-            invested = sum(
-                (
-                    (p.entry_price * p.quantity / p.leverage)
-                    if p.leverage
-                    else (p.entry_price * p.quantity)
-                )
-                for p in positions
-            )
-
-            # Unrealized PnL
+            invested = sum(self._calculate_margin(p) for p in positions)
             unrealized_pnl = sum(p.unrealized_pnl for p in positions)
-
-            # Total equity
             equity = cash + invested + unrealized_pnl
-
-            # Return percentage
             return_pct = float((equity - initial) / initial * 100) if initial > 0 else 0
 
             return PortfolioState(
@@ -99,9 +63,8 @@ class PortfolioBlock:
                 return_pct=return_pct,
                 open_positions=positions,
             )
-
         finally:
-            if close_session:
+            if should_close:
                 await db.close()
 
     async def record_snapshot(self) -> None:
@@ -109,7 +72,6 @@ class PortfolioBlock:
         try:
             async with AsyncSessionLocal() as db:
                 state = await self.get_state(db)
-
                 snapshot = EquitySnapshot(
                     bot_id=self.bot_id,
                     equity=state.equity,
@@ -120,21 +82,41 @@ class PortfolioBlock:
                 await db.commit()
 
                 logger.info(
-                    f"📊 Equity: ${float(state.equity):,.2f} "
-                    f"(cash: ${float(state.cash):,.2f}, "
-                    f"unrealized: ${float(state.unrealized_pnl):,.2f})"
+                    f"Equity: ${float(state.equity):,.2f} "
+                    f"(cash: ${float(state.cash):,.2f}, unrealized: ${float(state.unrealized_pnl):,.2f})"
                 )
-
         except Exception as e:
             logger.error(f"Error recording equity snapshot: {e}")
 
     async def get_positions_by_symbol(self, symbol: str) -> List[Position]:
         """Get open positions for a specific symbol."""
         async with AsyncSessionLocal() as db:
-            query = select(Position).where(
+            result = await db.execute(
+                select(Position).where(
+                    Position.bot_id == self.bot_id,
+                    Position.symbol == symbol,
+                    Position.status == PositionStatus.OPEN,
+                )
+            )
+            return list(result.scalars().all())
+
+    async def _get_bot(self, db: AsyncSession) -> Bot:
+        """Get bot from database."""
+        result = await db.execute(select(Bot).where(Bot.id == self.bot_id))
+        return result.scalar_one()
+
+    async def _get_open_positions(self, db: AsyncSession) -> List[Position]:
+        """Get all open positions for this bot."""
+        result = await db.execute(
+            select(Position).where(
                 Position.bot_id == self.bot_id,
-                Position.symbol == symbol,
                 Position.status == PositionStatus.OPEN,
             )
-            result = await db.execute(query)
-            return list(result.scalars().all())
+        )
+        return list(result.scalars().all())
+
+    def _calculate_margin(self, position: Position) -> Decimal:
+        """Calculate margin locked in a position."""
+        if position.leverage:
+            return position.entry_price * position.quantity / position.leverage
+        return position.entry_price * position.quantity

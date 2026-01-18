@@ -7,13 +7,13 @@ export default function HomePage() {
         <div className="space-x-4 pt-8">
           <a 
             href="/login" 
-            className="inline-block px-8 py-3 bg-white text-blue-600 font-semibold rounded-lg hover:bg-gray-100 transition"
+            className="inline-block px-8 py-3 bg-white text-blue-600 font-semibold rounded-sm hover:bg-gray-100 transition"
           >
             Sign In
           </a>
           <a 
             href="/register" 
-            className="inline-block px-8 py-3 bg-transparent border-2 border-white text-white font-semibold rounded-lg hover:bg-white hover:text-blue-600 transition"
+            className="inline-block px-8 py-3 bg-transparent border-2 border-white text-white font-semibold rounded-sm hover:bg-white hover:text-blue-600 transition"
           >
             Get Started
           </a>

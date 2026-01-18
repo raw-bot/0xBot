@@ -164,7 +164,7 @@
         .main {
             margin-left: 200px;
             flex: 1;
-            padding: 24px 32px;
+            padding: 24px 32px 50px 32px;
             max-width: 1400px;
         }
 
@@ -764,13 +764,14 @@
             overflow: hidden;
             backdrop-filter: blur(8px);
             box-shadow: var(--shadow-sm);
+            margin-bottom: 50px;
         }
 
         .trades-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 16px 20px;
+            padding: 16px 20px 16px 45px;
             border-bottom: 1px solid rgba(0,0,0,0.04);
             background: rgba(255,255,255,0.5);
         }
@@ -778,6 +779,11 @@
         .trades-table {
             width: 100%;
             border-collapse: collapse;
+        }
+
+        .trades-table th:first-child,
+        .trades-table td:first-child {
+            padding-left: 45px;
         }
 
         .trades-table th {
@@ -1236,7 +1242,6 @@
         <div class="trades-card">
             <div class="trades-header">
                 <span class="section-title" style="margin:0">
-                    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                     Trade History
                 </span>
             </div>
@@ -1259,6 +1264,7 @@
                 </tbody>
             </table>
         </div>
+        <div style="height: 50px;"></div>
     </main>
 
     <script>
@@ -1617,7 +1623,7 @@
                         <td>${new Date(t.timestamp+'Z').toLocaleTimeString('fr-FR')}</td>
                     </tr>
                 `;
-            }).join('');
+            }).join('') + '<tr><td colspan="9" style="height: 50px; border: none;"></td></tr>';
         }
 
         // Time buttons
