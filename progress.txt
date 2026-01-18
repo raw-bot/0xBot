@@ -9,7 +9,7 @@
 
 ## Iteration Progress
 
-- [ ] Task 1: Architecture & Design Patterns Analysis
+- [x] Task 1: Architecture & Design Patterns Analysis
 - [ ] Task 2: Code Quality & Type Safety Analysis
 - [ ] Task 3: Test Coverage & Testing Strategy
 - [ ] Task 4: Performance & Scalability Analysis
@@ -24,15 +24,66 @@
 
 ---
 
+## Iteration 1 - Architecture & Design Patterns Analysis
+
+### What Was Implemented
+- Complete architectural analysis of 0xBot codebase
+- Documented 12 key design patterns (blocks, services, DI, middleware, ORM, etc.)
+- Analyzed overall project structure (backend: 77 Python files, frontend: 24 TS files)
+- Created architectural diagrams and data flow documentation
+- Identified strengths (modularity, async, type-safe) and weaknesses (no distributed scaling, single process)
+- Documented 10 notable architectural decisions with rationale
+
+### Files Changed
+- No code files modified (analysis only)
+- Output: Created comprehensive architecture analysis document
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered
+- **Block Orchestration:** Trading logic divided into composable blocks (MarketData → Portfolio → Decision → Risk → Execution)
+- **Pluggable Decision Modes:** Multiple strategies can be selected per bot (indicator, trinity confluence, LLM-based)
+- **Service Layer:** 23+ service classes provide business logic separation from routes
+- **Async Throughout:** FastAPI + asyncio + async SQLAlchemy for concurrent operation
+- **Memory Integration:** Optional DeepMem provider for bots to learn from profitable setups
+
+#### Gotchas to Avoid
+- **Single Process Constraint:** All bots run in one scheduler instance - cannot scale to multiple servers without refactoring
+- **API-First Design:** REST endpoints (no GraphQL), simple CRUD operations
+- **Paper Trading Default:** Trades are simulated in memory, switching to live requires OKX API keys
+- **No Distributed Caching:** Redis only used for pub/sub, not for state caching
+- **Frontend/Backend Coupling:** Frontend depends on specific REST API contract
+
+#### Useful Context for Future Iterations
+- Main orchestration: `backend/src/blocks/orchestrator.py` (300+ lines)
+- Core infrastructure: `backend/src/core/` (config, database, Redis, exchange client, LLM client)
+- Decision block selection: Configurable per bot via `bot.model_name` field
+- Frontend data flow: Components use `useDashboard` hook which polls `/api/dashboard` every 5s
+- Database models: 8 core entities (User, Bot, Position, Trade, EquitySnapshot, Signal, Alert, LLMDecision)
+
+---
+
 ## Learnings & Patterns (Updated Per Iteration)
 
 ### Architecture Patterns to Preserve
-(Will be updated as discovered)
+1. **Block Orchestration Pattern:** Maintain separation of trading concerns (MarketData, Portfolio, Decision, Risk, Execution)
+2. **Service Layer Abstraction:** Keep business logic in services, not routes
+3. **Async-First:** All I/O operations should use async/await
+4. **Type Safety:** Maintain type hints in Python, TypeScript on frontend
+5. **Pluggable Decision Modes:** Allow strategy selection without code changes
 
 ### Common Gotchas to Avoid
-(Will be updated as discovered)
+1. **Distributed Scaling:** Any changes assuming single process only
+2. **Synchronous Operations:** Blocking I/O in async context
+3. **Tight Coupling:** Services should be injectable, not hard-coded imports
+4. **Paper Trading Assumption:** Always document when code assumes simulated trades
+5. **Frontend Polling:** Real-time updates only via polling (5s interval), no WebSocket implementation
 
 ### Useful Context for Future Iterations
-(Will be updated as discovered)
+- Scheduler runs every ~300s per bot cycle
+- Decision blocks must return decisions in standard format: {symbol, side, size_pct, entry_price, stop_loss, take_profit}
+- Memory system is optional (DeepMem provider if available, else DummyMemoryProvider)
+- Database uses TimescaleDB for time-series optimization
+- CORS is permissive (allows all origins) due to local development setup
 
 ---
