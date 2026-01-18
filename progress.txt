@@ -486,3 +486,64 @@
 - **Supported Timeframes:** Service tested with common timeframes (1h, 4h) but works with any CCXT-supported timeframe
 
 ---
+
+## Iteration 16 - Task 4: Risk Manager Service Testing (COMPLETE)
+
+### What Was Implemented
+- **test_risk_manager_service.py**: Created comprehensive test suite with 53 tests across 9 test classes:
+  * Helper function: Tests for `_to_decimal()` conversion (4 tests)
+  * Entry validation: 19 tests covering position sizing, margin, prices, risk/reward, profitability
+  * Drawdown checks: 5 tests for limits, approaching, exceeding, zero/profit scenarios
+  * Trade frequency: 4 tests for within limit, approaching, at limit, exceeded
+  * Leverage validation: 6 tests for positive/zero/negative/max values
+  * Position sizing: 7 tests with leverage, confidence adjustment, edge cases
+  * Stop loss/take profit: 6 tests for long/short price calculations
+  * Complete decision validation: 6 tests for sequential validation chain
+
+### Files Changed
+- Created: `/backend/tests/services/test_risk_manager_service.py` (653 lines, 53 tests)
+- Modified: `/PRD.md` (marked Task 4 complete)
+
+### Test Coverage
+- **risk_manager_service.py**: 92% coverage (146 statements, 12 missed in error paths)
+- **All tests passing**: 53/53 ✅
+- **Execution time**: ~1.46 seconds
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered
+- **Risk Validation Layers:** Service implements 3-layer validation (frequency → drawdown → entry) with early exit on failure
+- **Entry Validation Pipeline:** Position size → Margin → Existing symbol → Prices → Distance → Risk/reward → Net profit → Min size
+- **Decimal Precision:** All monetary calculations use Decimal to avoid floating-point errors
+- **Price Relationship Logic:** Long requires SL < Entry < TP, Short requires TP < Entry < SL
+- **Risk/Reward Minimum:** Requires 2.0 ratio (TP_pct / SL_pct >= 2.0) regardless of side
+- **Margin Calculation:** Entry margin = capital × size_pct, checked against 95% max exposure
+- **Confidence Scaling:** 0.3-0.9 range maps to 50%-120% position size (linear interpolation between points)
+- **Drawdown Tiering:** 80% of max_drawdown triggers warning, 100% blocks trading
+- **Stop Loss Distance:** Minimum 1.5% to avoid noise/whipsaws
+- **Net Profit Threshold:** $5 minimum profit after 0.10% round-trip fees
+
+#### Gotchas to Avoid
+- **Risk/Reward Calculation:** Takes take_profit_pct / stop_loss_pct (not prices), must ensure denominator > 0
+- **Short Position Prices:** Top-down order for short (TP < Entry < SL), opposite of long
+- **Confidence Edge Cases:** Values < 0.3 clamp to 0.5x, values > 0.9 clamp to 1.2x (not continuous at edges)
+- **Margin Exposure Dual Check:** Checks both individual position size AND total exposure against 95% capital
+- **Leverage Default:** Uses config.DEFAULT_LEVERAGE for all validation (typically 1.0 for spot)
+- **Error Handling:** validate_entry() catches all exceptions and returns (False, error message) - never raises
+- **Missing Price Fields:** Falls back to current_price if entry_price not provided
+- **Default Side:** Defaults to "long" if side not specified or invalid value
+- **Frequency Check Default:** max_trades_per_day defaults to 10 if not in risk_params
+
+#### Useful Context for Future Iterations
+- **Test Organization:** 9 test classes group related validation methods
+- **Fixture Pattern:** bot_with_capital fixture provides fully initialized bot with risk_params
+- **Mock Requirements:** Only Bot model needed; all other dependencies injected as parameters
+- **Database Not Required:** Service is stateless - validates against rules, not persistence
+- **Capital Field:** Bot.capital tracks available capital (reduced by entry margin, increased by exit pnl)
+- **Risk Params Dictionary:** Contains max_position_pct, max_drawdown_pct, max_trades_per_day
+- **Position Status:** Tests only validate against OPEN positions (closed excluded from margin calc)
+- **Missing Error Cases:** Lines 68, 113-115, 132-134, 150-152, 189, 191 are error paths (2% of coverage)
+- **Key Methods Tested:** validate_entry, check_drawdown, check_trade_frequency, validate_leverage, calculate_position_size, calculate_stop_loss_price, calculate_take_profit_price, validate_complete_decision
+- **Edge Case Coverage:** Zero capital, negative capital, zero portfolio value, extreme confidence values, invalid leverage
+
+---

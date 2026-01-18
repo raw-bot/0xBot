@@ -133,7 +133,7 @@
 
 ---
 
-### [ ] Task 4: Risk Manager Service Testing
+### [x] Task 4: Risk Manager Service Testing
 
 **Objective**: Test risk validation logic.
 
