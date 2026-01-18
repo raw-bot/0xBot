@@ -165,12 +165,14 @@ class RiskManagerService:
                 f"   💰 Entry: ${entry_price:,.2f} | SL: ${stop_loss_price:,.2f} ({stop_loss_pct:.3%}) | TP: ${take_profit_price:,.2f} ({take_profit_pct:.3%}) | Side: {side.upper()}"
             )
 
-            # Risk/reward ratio should be reasonable (min 1:1.3)
+            # Risk/reward ratio - SAFETY CHECK ONLY
+            # We use 1.0 minimum (break-even after fees) - LLM intelligence determines actual R/R
+            # Previously 1.3 was arbitrarily blocking valid trades
             risk_reward = take_profit_pct / stop_loss_pct if stop_loss_pct > 0 else 0
-            if risk_reward < 1.3:  # Légèrement plus permissif
+            if risk_reward < 1.0:  # Absolute minimum: at least break-even potential
                 return (
                     False,
-                    f"Risk/reward ratio {risk_reward:.2f} too low (min 1.3)",
+                    f"Risk/reward ratio {risk_reward:.2f} below 1.0 (unprofitable trade)",
                 )
 
             # 6. CRITICAL: Fee protection - reject trades that don't cover fees
@@ -205,9 +207,9 @@ class RiskManagerService:
                 f"(fees: ${total_fees_dollar:.2f}) ✅"
             )
 
-            # 7. Check minimum position size (at least $50 for meaningful trades)
-            if new_margin < Decimal("50"):
-                return False, f"Position size ${new_margin:,.2f} below minimum $50"
+            # 7. Check minimum position size (at least $100 for meaningful trades)
+            if new_margin < Decimal("100"):
+                return False, f"Position size ${new_margin:,.2f} below minimum $100"
 
             logger.info(f"   ✅ Entry validation passed for {symbol}")
             return True, "Validation passed"

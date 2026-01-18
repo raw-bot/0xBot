@@ -230,11 +230,20 @@ async def get_dashboard_data(
             notional = qty * entry_p
             margin = notional / lev if lev > 0 else notional
 
+            # For exit trades, show the POSITION side (long/short), not the trade side
+            # Trade side is confusing: closing a LONG = SELL trade, closing a SHORT = BUY trade
+            if is_exit and position:
+                display_side = position.side  # "long" or "short" from the position
+            else:
+                # For entry trades, derive position side from trade side
+                # BUY trade = opening LONG, SELL trade = opening SHORT
+                display_side = "long" if trade.side.lower() == "buy" else "short"
+
             trade_history.append(
                 TradeHistoryItem(
                     timestamp=trade.executed_at.isoformat(),
                     symbol=symbol,
-                    side=trade.side,
+                    side=display_side,
                     pnl=pnl,
                     cumulative_pnl=cumulative_by_symbol[symbol],
                     entry_price=entry_p,

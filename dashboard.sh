@@ -21,7 +21,7 @@ NC='\033[0m'
 
 # Configuration des ports (mémorisés)
 BACKEND_PORT=8020
-FRONTEND_PORT=5173
+FRONTEND_PORT=3030
 
 # Aller à la racine du projet
 cd "$(dirname "$0")"
@@ -60,17 +60,21 @@ cleanup() {
     if [ -f "$PID_FILE" ]; then
         while read -r pid; do
             if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-                kill "$pid" 2>/dev/null || true
+                kill -9 "$pid" 2>/dev/null || true
             fi
         done < "$PID_FILE"
         rm -f "$PID_FILE"
     fi
 
-    # Kill les ports au cas où
+    # Force kill des ports pour s'assurer qu'ils sont libres
     kill_port $BACKEND_PORT
     kill_port $FRONTEND_PORT
 
-    info "Dashboard arrêté proprement"
+    # Double vérification avec pkill
+    pkill -9 -f "serve -l $FRONTEND_PORT" 2>/dev/null || true
+    pkill -9 -f "uvicorn.*$BACKEND_PORT" 2>/dev/null || true
+
+    info "Dashboard arrêté - ports $BACKEND_PORT et $FRONTEND_PORT libérés"
     exit 0
 }
 
@@ -180,37 +184,36 @@ done
 cd "$PROJECT_ROOT"
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 4. DÉMARRAGE DU FRONTEND
+# 4. DÉMARRAGE DU FRONTEND (React/Vite Application)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 echo ""
-header "4️⃣  Démarrage du Dashboard Frontend..."
+header "4️⃣  Démarrage du Dashboard Frontend (React)..."
 
 cd "$PROJECT_ROOT/frontend"
 
+# Install dependencies if needed
 if [ ! -d "node_modules" ]; then
     warn "Installation des dépendances npm..."
-    npm install
+    npm install > /dev/null 2>&1
 fi
 
-# Lancer le frontend en arrière-plan
-npm run dev > "$PROJECT_ROOT/frontend.log" 2>&1 &
+# Start Vite dev server on port 3030 (with API proxy configured in vite.config.ts)
+npm run dev -- --port $FRONTEND_PORT > "$PROJECT_ROOT/frontend.log" 2>&1 &
 FRONTEND_PID=$!
 echo "$FRONTEND_PID" >> "$PID_FILE"
 
-# Attendre que le frontend soit prêt
-echo -n "   Attente du dashboard"
-for i in {1..20}; do
+# Wait for frontend to be ready
+echo -n "   Attente du dashboard React"
+for i in {1..30}; do
     if curl -s "http://localhost:$FRONTEND_PORT" > /dev/null 2>&1; then
         echo ""
-        info "Dashboard prêt (PID: $FRONTEND_PID)"
+        info "Dashboard React prêt sur port $FRONTEND_PORT (PID: $FRONTEND_PID)"
         break
     fi
     echo -n "."
     sleep 1
 done
-
-cd "$PROJECT_ROOT"
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 5. AUTO-START DU BOT
@@ -240,7 +243,7 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 echo -e "${GREEN}  ✅ 0xBot Dashboard OPÉRATIONNEL     ${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "  ${CYAN}📊 Dashboard:${NC}  http://localhost:$FRONTEND_PORT"
+echo -e "  ${CYAN}📊 Dashboard:${NC}  http://localhost:$FRONTEND_PORT/dashboard.html"
 echo -e "  ${CYAN}🔧 API Docs:${NC}   http://localhost:$BACKEND_PORT/docs"
 echo -e "  ${CYAN}💾 Config:${NC}     $CONFIG_FILE"
 echo ""

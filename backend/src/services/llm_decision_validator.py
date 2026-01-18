@@ -1,7 +1,9 @@
 """
 LLM Decision Validator Service
 Validates LLM trading decisions BEFORE execution.
-Option B: Fallback to default SL/TP when LLM values are invalid.
+
+PHILOSOPHY: Trust the LLM's intelligence. Only apply SAFETY LIMITS, not arbitrary defaults.
+The LLM decides SL/TP based on market structure - we only intervene for extreme values.
 """
 
 from decimal import Decimal
@@ -15,29 +17,39 @@ logger = get_logger(__name__)
 
 class LLMDecisionValidator:
     """
-    Validates LLM decisions for sanity and consistency.
+    Validates LLM decisions for SAFETY only - not to override intelligent decisions.
 
-    Based on research and bot reference logs:
-    - Typical SL: 1-5% (config uses 3.5% per DEFAULT_STOP_LOSS_PCT)
-    - Typical TP: 5-10% (config uses 8% per DEFAULT_TAKE_PROFIT_PCT)
-    - Typical R/R: 1:2 to 1:3 (bot uses ~2.3:1)
+    SAFETY LIMITS (absolute protection, not recommendations):
+    - Max SL: 25% (prevent catastrophic loss)
+    - Max TP: 100% (allows for big moves)
+    - Min SL: 0.3% (prevent accidental stops from spread/slippage)
+    - Min TP: 0.5% (must cover fees)
+
+    These are SAFETY NETS, not defaults. The LLM's values are trusted unless they
+    violate these safety limits.
     """
 
-    # Maximum acceptable distance for SL/TP from entry price
-    MAX_SL_DISTANCE_PCT = 0.15  # 15% max for SL (very wide, but allows for volatile moves)
-    MAX_TP_DISTANCE_PCT = 0.30  # 30% max for TP
-    MIN_SL_DISTANCE_PCT = 0.005  # 0.5% min for SL (avoid too tight)
-    MIN_TP_DISTANCE_PCT = 0.01  # 1% min for TP
-    MIN_RR_RATIO = 1.3  # Minimum risk/reward ratio
+    # SAFETY LIMITS ONLY (not arbitrary recommendations)
+    SAFETY_MAX_SL_PCT = 0.25  # 25% - absolute max loss allowed
+    SAFETY_MAX_TP_PCT = 1.00  # 100% - allow for big runs
+    SAFETY_MIN_SL_PCT = 0.003  # 0.3% - prevent accidental triggers
+    SAFETY_MIN_TP_PCT = 0.005  # 0.5% - must cover fees
+
+    # Only if LLM provides NOTHING, use these fallbacks
+    FALLBACK_SL_PCT = 0.05  # 5% (used only when LLM gives no SL)
+    FALLBACK_TP_PCT = 0.10  # 10% (used only when LLM gives no TP)
 
     @classmethod
     def validate_and_fix_decision(
         cls, decision: dict, current_price: float, symbol: str = "UNKNOWN"
     ) -> Tuple[bool, str, dict]:
         """
-        Validate a single coin decision from LLM and fix if needed.
+        Validate a single coin decision from LLM.
 
-        Option B: If validation fails, return corrected decision with defaults.
+        PHILOSOPHY: Trust LLM decisions, only apply safety limits.
+        - If LLM provides valid SL/TP: USE THEM (even if "unusual")
+        - If LLM provides nothing: Apply fallback
+        - If LLM values violate SAFETY limits: Clamp to safe range
 
         Args:
             decision: LLM decision dict
@@ -46,9 +58,6 @@ class LLMDecisionValidator:
 
         Returns:
             Tuple of (is_valid, reason, fixed_decision)
-            - is_valid: True if original was valid OR was successfully fixed
-            - reason: Explanation of what happened
-            - fixed_decision: The corrected/validated decision
         """
         signal = decision.get("signal", "hold").lower()
 
@@ -62,28 +71,26 @@ class LLMDecisionValidator:
 
         # Validate entry signals
         if signal in ["buy_to_enter", "sell_to_enter", "buy", "sell", "entry"]:
-            return cls._validate_and_fix_entry(decision, current_price, symbol)
+            return cls._validate_entry_with_safety_limits(decision, current_price, symbol)
 
         # Unknown signal - treat as HOLD
         logger.warning(f"⚠️ {symbol} Unknown signal type: {signal}, treating as HOLD")
         fixed = decision.copy()
         fixed["signal"] = "hold"
         fixed["confidence"] = 0.5
-        fixed["_validation_note"] = f"Unknown signal '{signal}' converted to HOLD"
         return True, f"Unknown signal fixed to HOLD", fixed
 
     @classmethod
-    def _validate_and_fix_entry(
+    def _validate_entry_with_safety_limits(
         cls, decision: dict, current_price: float, symbol: str
     ) -> Tuple[bool, str, dict]:
         """
-        Validate entry decision prices and fix if needed.
+        Validate entry decision with SAFETY LIMITS only.
 
-        Option B Implementation: Use defaults when LLM values are invalid.
+        TRUST the LLM's SL/TP unless they violate safety limits.
         """
         fixed = decision.copy()
         validation_notes = []
-        was_fixed = False
 
         # Extract values
         sl = decision.get("stop_loss", 0)
@@ -96,95 +103,106 @@ class LLMDecisionValidator:
             entry = current_price
             fixed["entry_price"] = entry
             validation_notes.append("entry_price set to market")
-            was_fixed = True
 
-        # Check confidence
+        # Check confidence (this is still needed for basic sanity)
         if confidence < 0.5:
             logger.warning(f"⚠️ {symbol} Confidence too low ({confidence:.0%}), skipping")
             fixed["signal"] = "hold"
             fixed["confidence"] = confidence
-            fixed["_validation_note"] = f"Confidence {confidence:.0%} < 50%"
             return False, f"Confidence too low: {confidence:.0%}", fixed
 
         # Determine side from signal
         signal = decision.get("signal", "").lower()
-        if "sell" in signal:
-            side = "short"
+        side = "short" if "sell" in signal else "long"
+
+        # Check if LLM provided SL/TP
+        has_sl = sl and sl > 0
+        has_tp = tp and tp > 0
+
+        # CASE 1: LLM provided nothing - use fallbacks
+        if not has_sl or not has_tp:
+            if not has_sl:
+                if side == "long":
+                    sl = entry * (1 - cls.FALLBACK_SL_PCT)
+                else:
+                    sl = entry * (1 + cls.FALLBACK_SL_PCT)
+                fixed["stop_loss"] = sl
+                validation_notes.append(f"SL fallback applied ({cls.FALLBACK_SL_PCT:.0%})")
+
+            if not has_tp:
+                if side == "long":
+                    tp = entry * (1 + cls.FALLBACK_TP_PCT)
+                else:
+                    tp = entry * (1 - cls.FALLBACK_TP_PCT)
+                fixed["take_profit"] = tp
+                validation_notes.append(f"TP fallback applied ({cls.FALLBACK_TP_PCT:.0%})")
         else:
-            side = "long"
-
-        # Check if SL/TP are missing or invalid
-        prices_valid = cls._check_price_relationships(sl, entry, tp, side)
-
-        if not prices_valid:
-            # Calculate defaults based on config
-            if side == "long":
-                sl = entry * (1 - config.DEFAULT_STOP_LOSS_PCT)  # 3% below
-                tp = entry * (1 + config.DEFAULT_TAKE_PROFIT_PCT)  # 6% above
-            else:  # short
-                sl = entry * (1 + config.DEFAULT_STOP_LOSS_PCT)  # 3% above
-                tp = entry * (1 - config.DEFAULT_TAKE_PROFIT_PCT)  # 6% below
-
+            # CASE 2: LLM provided values - TRUST THEM but apply safety limits
             fixed["stop_loss"] = sl
             fixed["take_profit"] = tp
-            validation_notes.append(
-                f"SL/TP recalculated with defaults (SL:{config.DEFAULT_STOP_LOSS_PCT:.1%}, TP:{config.DEFAULT_TAKE_PROFIT_PCT:.1%})"
-            )
-            was_fixed = True
-            logger.info(f"🔧 {symbol} Fixed SL/TP: SL=${sl:.2f}, TP=${tp:.2f}")
-        else:
-            # Validate distances even if relationship is correct
-            sl_distance, tp_distance = cls._calculate_distances(sl, entry, tp, side)
 
-            # Check if distances are within acceptable range
-            if sl_distance < cls.MIN_SL_DISTANCE_PCT or sl_distance > cls.MAX_SL_DISTANCE_PCT:
-                # Recalculate with default
-                if side == "long":
-                    sl = entry * (1 - config.DEFAULT_STOP_LOSS_PCT)
-                else:
-                    sl = entry * (1 + config.DEFAULT_STOP_LOSS_PCT)
-                fixed["stop_loss"] = sl
-                validation_notes.append(f"SL distance out of range, reset to default")
-                was_fixed = True
-
-            if tp_distance < cls.MIN_TP_DISTANCE_PCT or tp_distance > cls.MAX_TP_DISTANCE_PCT:
-                # Recalculate with default
-                if side == "long":
-                    tp = entry * (1 + config.DEFAULT_TAKE_PROFIT_PCT)
-                else:
-                    tp = entry * (1 - config.DEFAULT_TAKE_PROFIT_PCT)
-                fixed["take_profit"] = tp
-                validation_notes.append(f"TP distance out of range, reset to default")
-                was_fixed = True
-
-        # Final validation of R/R ratio
+        # Calculate actual distances
         sl_final = fixed.get("stop_loss", sl)
         tp_final = fixed.get("take_profit", tp)
         sl_dist, tp_dist = cls._calculate_distances(sl_final, entry, tp_final, side)
 
-        if sl_dist > 0:
-            rr_ratio = tp_dist / sl_dist
-            if rr_ratio < cls.MIN_RR_RATIO:
-                # Adjust TP to meet minimum R/R
-                min_tp_dist = sl_dist * cls.MIN_RR_RATIO
-                if side == "long":
-                    tp_final = entry * (1 + min_tp_dist)
-                else:
-                    tp_final = entry * (1 - min_tp_dist)
-                fixed["take_profit"] = tp_final
-                validation_notes.append(f"TP adjusted for R/R >= {cls.MIN_RR_RATIO}")
-                was_fixed = True
+        # Apply SAFETY LIMITS only (clamp, don't override)
+        safety_applied = False
 
-        # Add validation note
-        if was_fixed:
-            fixed["_validation_note"] = "; ".join(validation_notes)
-            fixed["_original_sl"] = decision.get("stop_loss")
-            fixed["_original_tp"] = decision.get("take_profit", decision.get("profit_target"))
-            logger.info(f"✅ {symbol} Decision fixed: {'; '.join(validation_notes)}")
-            return True, f"Fixed: {'; '.join(validation_notes)}", fixed
+        # SL safety: prevent too tight or too wide
+        if sl_dist < cls.SAFETY_MIN_SL_PCT:
+            # Too tight - clamp to minimum
+            if side == "long":
+                sl_final = entry * (1 - cls.SAFETY_MIN_SL_PCT)
+            else:
+                sl_final = entry * (1 + cls.SAFETY_MIN_SL_PCT)
+            fixed["stop_loss"] = sl_final
+            validation_notes.append(f"SL clamped to min safety ({cls.SAFETY_MIN_SL_PCT:.1%})")
+            safety_applied = True
+        elif sl_dist > cls.SAFETY_MAX_SL_PCT:
+            # Too wide - clamp to maximum
+            if side == "long":
+                sl_final = entry * (1 - cls.SAFETY_MAX_SL_PCT)
+            else:
+                sl_final = entry * (1 + cls.SAFETY_MAX_SL_PCT)
+            fixed["stop_loss"] = sl_final
+            validation_notes.append(f"SL clamped to max safety ({cls.SAFETY_MAX_SL_PCT:.0%})")
+            safety_applied = True
+
+        # TP safety: prevent too tight or too ambitious
+        if tp_dist < cls.SAFETY_MIN_TP_PCT:
+            # Too tight - clamp to minimum
+            if side == "long":
+                tp_final = entry * (1 + cls.SAFETY_MIN_TP_PCT)
+            else:
+                tp_final = entry * (1 - cls.SAFETY_MIN_TP_PCT)
+            fixed["take_profit"] = tp_final
+            validation_notes.append(f"TP clamped to min safety ({cls.SAFETY_MIN_TP_PCT:.1%})")
+            safety_applied = True
+        elif tp_dist > cls.SAFETY_MAX_TP_PCT:
+            # Too ambitious - clamp to maximum
+            if side == "long":
+                tp_final = entry * (1 + cls.SAFETY_MAX_TP_PCT)
+            else:
+                tp_final = entry * (1 - cls.SAFETY_MAX_TP_PCT)
+            fixed["take_profit"] = tp_final
+            validation_notes.append(f"TP clamped to max safety ({cls.SAFETY_MAX_TP_PCT:.0%})")
+            safety_applied = True
+
+        # Verify price relationships (SL/Entry/TP order)
+        if not cls._check_price_relationships(
+            fixed["stop_loss"], entry, fixed["take_profit"], side
+        ):
+            # Swap if inverted
+            fixed["stop_loss"], fixed["take_profit"] = fixed["take_profit"], fixed["stop_loss"]
+            validation_notes.append("SL/TP swapped (were inverted)")
+
+        if validation_notes:
+            logger.info(f"🔧 {symbol} Safety applied: {'; '.join(validation_notes)}")
+            return True, f"Safety applied: {'; '.join(validation_notes)}", fixed
         else:
-            logger.debug(f"✅ {symbol} Decision valid, no fixes needed")
-            return True, "Validation passed", fixed
+            logger.debug(f"✅ {symbol} LLM decision trusted as-is")
+            return True, "LLM decision trusted (no safety limits triggered)", fixed
 
     @classmethod
     def _check_price_relationships(cls, sl: float, entry: float, tp: float, side: str) -> bool:
