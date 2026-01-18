@@ -547,3 +547,172 @@
 - **Edge Case Coverage:** Zero capital, negative capital, zero portfolio value, extreme confidence values, invalid leverage
 
 ---
+
+## Iteration 17 - Task 5: Additional Service Testing - Position Service (PART 1)
+
+### What Was Implemented
+- **test_position_service.py**: Created comprehensive test suite with 40 tests across 9 test classes:
+  * PositionOpen class: Tests for initialization with full/minimal fields (2 tests)
+  * Position validation: 10 tests for side, quantity, prices, stop loss, take profit
+  * Open position: 3 tests for long/short/invalid position opening
+  * Close position: 4 tests for success, not found, already closed, invalid price
+  * Update price: 4 tests for open/closed/not found/invalid price
+  * Get position: 2 tests for found/not found
+  * Get open positions: 4 tests for filtering, symbol filtering, exclusion of closed
+  * Get all positions: 3 tests for pagination and inclusion of closed
+  * Stop loss/take profit: 7 tests for long/short hit detection
+  * Total exposure: 2 tests for single/multiple/zero positions
+
+### Files Changed
+- Created: `/backend/tests/services/test_position_service.py` (561 lines, 40 tests)
+
+### Test Coverage
+- **position_service.py**: 100% coverage (100 statements)
+- **All tests passing**: 40/40 ✅
+- **Execution time**: ~1.64 seconds
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered
+- **CRUD Operations:** Service provides open, close, get, list operations with DB persistence
+- **Validation Pattern:** PositionOpen DTO encapsulates entry data, validated before persistence
+- **Stop Loss/Take Profit Logic:** Different for long vs short (SL hit when price <= SL for long, >= for short)
+- **State Transitions:** OPEN → CLOSED is one-way, attempts to update closed positions fail
+- **Price Updates:** Only allowed on OPEN positions, updates current_price for PnL calculation
+- **Total Exposure:** Calculated as sum of (current_price × quantity) for all open positions
+- **Query Filtering:** Support filtering by symbol, paginated results, includes/excludes closed positions
+
+#### Gotchas to Avoid
+- **Side Validation:** Uses PositionSide enum values (LONG/SHORT), string comparison required
+- **Closed Position Check:** Returns None instead of raising for not-found, but raises for closed + operation
+- **Price Positivity:** All prices (entry, current, exit, SL, TP) validated > 0 (not >= 0)
+- **Stop Loss Hit Logic:** Long: SL_hit = (price <= SL), Short: SL_hit = (price >= SL) - reversed!
+- **Take Profit Logic:** Long: TP_hit = (price >= TP), Short: TP_hit = (price <= TP) - reversed!
+- **DB Persistence:** Must await commit() and refresh() for changes to persist
+- **Closed At Timestamp:** Set to datetime.utcnow() when closing, allows tracking close time
+
+#### Useful Context for Future Iterations
+- **Test Organization:** 9 test classes grouped by method/functionality
+- **Fixture Dependencies:** Uses test_bot, test_position, and db_session from conftest
+- **Database Tests:** Proper async/await pattern, SQLAlchemy integration tests
+- **No External Mocks:** All tests use real database (in-memory SQLite)
+- **Decimal Usage:** Quantities and prices use Decimal for precision
+- **Key Methods Tested:** open_position, close_position, update_current_price, get_position, get_open_positions, get_all_positions, check_stop_loss_take_profit, get_total_exposure
+- **100% Coverage:** All code paths covered, no missing branches
+- **Task 5 Status:** 40 tests complete (13 tests per service target), 2 more services remaining
+
+---
+
+## Session Summary - Iterations 15-17
+
+### Major Achievements
+**151 tests written across 4 complete service test suites**
+- Execution time: 1.58 seconds
+- Average coverage: 98%
+- All tests passing: 151/151 ✅
+
+### Test Distribution
+- Task 2 (Trade Executor): 16 tests → 100% coverage
+- Task 3 (Market Data): 42 tests → 100% coverage  
+- Task 4 (Risk Manager): 53 tests → 92% coverage
+- Task 5 (Position Service): 40 tests → 100% coverage
+- **Total**: 151 tests covering 4 critical services
+
+### Next Steps for Task 5
+- market_analysis_service.py (technical analysis, 13+ tests)
+- kelly_position_sizing_service.py (position sizing, 13+ tests)
+- Target: 40+ total for Task 5 (will reach 66+ after both complete)
+
+### Key Patterns Established
+1. **Service Testing Pattern:** Mock external dependencies, test happy path + error cases, aim for 70%+ coverage
+2. **Database Testing:** Use in-memory SQLite with async fixtures, proper transaction handling
+3. **Validation Testing:** Comprehensive edge cases (zero, negative, invalid values)
+4. **Integration Testing:** Multi-step workflows (entry → exit, fetch → calculate → snapshot)
+5. **Decimal Precision:** Always use Decimal for financial calculations
+
+### Test Quality Metrics
+- No flaky tests (all pass consistently)
+- Tests are isolated and independent
+- Clear test names describing scenarios
+- Comprehensive documentation in docstrings
+- Both happy path and error cases covered
+
+---
+
+## Iteration 18 - Task 5: Additional Service Testing (COMPLETE)
+
+### What Was Implemented
+- **test_market_analysis_service.py**: Created comprehensive test suite with 48 tests across 6 test classes:
+  * Correlation matrix: 6 tests for 2/multiple symbols, edge cases, NaN handling
+  * BTC dominance: 6 tests for calculations with varying market conditions
+  * Market regime detection: 6 tests for risk-on/off/neutral regimes
+  * Market breadth: 6 tests for advancing/declining price analysis
+  * Capital flows: 6 tests for BTC/alt inflow detection
+  * Comprehensive context: 5 tests for complete market analysis generation
+  * Error handling: 5 tests for exception resilience
+  * Edge cases: 5 tests for boundary conditions
+
+- **test_kelly_position_sizing_service.py**: Created comprehensive test suite with 39 tests across 6 test classes:
+  * Kelly calculation: 9 tests for formula with various win/loss scenarios
+  * Trade analysis: 6 tests for extracting statistics from trade history
+  * Position size calculation: 9 tests for Kelly-based sizing with bounds
+  * Recent trades fetching: 5 tests for database queries
+  * Constants: 4 tests for service configuration
+  * Edge cases: 6 tests for boundary conditions and formula verification
+
+### Files Changed
+- Created: `/backend/tests/services/test_market_analysis_service.py` (609 lines, 48 tests)
+- Created: `/backend/tests/services/test_kelly_position_sizing_service.py` (528 lines, 39 tests)
+- Modified: `/PRD.md` (marked Task 5 complete)
+
+### Test Coverage
+- **market_analysis_service.py**: All tests passing (48/48) ✅
+- **kelly_position_sizing_service.py**: All tests passing (39/39) ✅
+- **Total service tests**: 238 passing (1.95 seconds)
+- **Task 5 completion**: 127 tests added (40 position + 48 market analysis + 39 kelly)
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered - MarketAnalysisService
+- **Correlation Calculation:** Uses numpy.corrcoef on returns (not prices), handles NaN by converting to 0.0
+- **Regime Detection:** Combines correlation, volatility, and price performance to classify risk-on/off/neutral
+- **Breadth Analysis:** A/D ratio handles zero declines gracefully (returns 1.0 if no declines)
+- **Capital Flows:** Weighted by volume to determine if money flowing into/out of BTC vs alts
+- **Comprehensive Context:** Aggregates all analyses into single dictionary with timestamp
+
+#### Patterns Discovered - KellyPositionSizingService
+- **Kelly Formula:** f* = (p*W - (1-p)*L) / W where p=win_rate, W=avg_win, L=avg_loss
+- **Safety Fraction:** Uses 1/4 Kelly (KELLY_FRACTION = 0.25) to reduce aggressiveness
+- **Bounds:** MIN_SIZE_PCT = 2%, MAX_SIZE_PCT = 25% regardless of Kelly calculation
+- **Trade Filtering:** Only uses trades with realized_pnl != 0 (closed trades)
+- **Win Rate Detection:** Trades with PnL > 0 counted as wins, < 0 as losses
+- **Fallback Strategy:** Uses base_size_pct when insufficient trades (< 20) for Kelly
+
+#### Gotchas to Avoid - MarketAnalysisService
+- **Correlation Data:** Takes price history (list of floats), calculates returns internally
+- **Period Truncation:** Actual period used is min(requested_period, shortest_price_list)
+- **NaN in Correlation:** Returns 0.0 instead of NaN (safe fallback)
+- **Volatility Threshold:** Default 2% (0.02), configurable per detection
+- **Performance Calculation:** (price[-1] - price[-20]) / price[-20], requires >= 20 data points
+- **BTC Key Finding:** Searches for "BTC" substring in keys (case-sensitive)
+
+#### Gotchas to Avoid - KellyPositionSizingService
+- **Minimum Trades:** Requires MIN_TRADES_FOR_KELLY = 20 before Kelly calculation applied
+- **Zero Win Rate:** Returns base_size * 0.5 if win_rate < 0.30 (bad strategy)
+- **Division Protection:** avg_win_pct and avg_loss_pct must be > 0 or returns 0.10 fallback
+- **Async Database:** _get_recent_trades() is async, uses SQLAlchemy select statement
+- **Trade Properties:** Uses realized_pnl, entry_price, quantity (not executed_at)
+- **Decimal Precision:** All calculations use Decimal type for financial accuracy
+
+#### Useful Context for Future Iterations
+- **Market Analysis Tests:** 48 tests cover all public methods + edge cases
+- **Kelly Tests:** 39 tests cover calculation, trade analysis, position sizing, error handling
+- **Test Organization:** Both services use class-based test organization for clarity
+- **Database Requirements:** Kelly tests use conftest fixtures (test_bot, db_session)
+- **Mock Strategy:** Market analysis uses static data; Kelly uses AsyncMock for database
+- **No External Dependencies:** Both test suites only require numpy for market analysis
+- **Execution Time:** Combined 87 tests run in < 3 seconds
+- **Service Integration:** Both services are stateless, no circular dependencies
+- **Coverage Quality:** All happy paths + error cases + edge cases covered
+
+---
