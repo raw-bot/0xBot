@@ -14,13 +14,62 @@
 - [x] Task 3: Test Coverage & Testing Strategy
 - [x] Task 4: Performance & Scalability Analysis
 - [x] Task 5: Security Posture Deep Dive
-- [ ] Task 6: Error Handling & Reliability
+- [x] Task 6: Error Handling & Reliability
 - [ ] Task 7: Frontend Architecture & Quality
 - [ ] Task 8: Dependencies & Version Management
 - [ ] Task 9: Database & Data Layer
 - [ ] Task 10: DevOps & Deployment Readiness
 - [ ] Task 11: Documentation & Knowledge Management
 - [ ] Task 12: Create Comprehensive Audit Report
+
+## Iteration 6 - Error Handling & Reliability
+
+### What Was Implemented
+- Error handling audit: 171+ except clauses found, 90% are generic `except Exception` (catch-all)
+- Database reliability: ACID supported, transaction rollback present, but no deadlock handling or connection recovery
+- Exchange API reliability: No order confirmation, no retry logic, no partial fill handling - weak at 4/10
+- LLM API reliability: Basic rate limiting exists, fallback to HOLD implemented, but no token budget validation
+- Trading cycle reliability: Database state persists, but no mid-cycle recovery or orphaned order cleanup
+- System recovery: Graceful shutdown works, but no backup procedures or recovery from crashes
+- Monitoring: Good logging (JSON + human-readable), but no alerting system or error rate tracking
+- Risk management: Strong 8/10 - multi-layer safeguards (drawdown limits, daily loss limits, position sizing)
+
+### Files Changed
+- No code files modified (analysis only)
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered
+- **Generic Exception Handling:** 171+ except clauses predominantly use `except Exception` (catch-all) - not specific enough
+- **Database Transactions Strong:** ACID compliance good, automatic rollback on error, but no distributed transaction support
+- **Archive Patterns:** ErrorRecoveryService archived (unused) but has retry logic with exponential backoff that could be resurrected
+- **Risk Management Strong:** Multi-layer safeguards - drawdown limits (20%), daily loss ($100), position sizing (35% max), leverage limits (5x long, 3x short)
+- **State Persistence:** All trade state persisted to DB before execution (good for recovery)
+- **Logging Quality:** Structured JSON logging + human-readable logs, activity.json tracks trading events
+
+#### Gotchas to Avoid
+- **No Retry Logic:** LLM and Exchange calls fail immediately, no exponential backoff implemented
+- **No Order Confirmation:** Trade executor assumes fills without verification on exchange
+- **Generic Catch-All:** 90% of except clauses use `except Exception` instead of specific types
+- **No Circuit Breaker:** System not protected from cascading failures (e.g., repeated API timeouts)
+- **Correlation Not Enforced:** Market analysis calculates correlation, but doesn't block correlated trades
+- **No Mid-Cycle Recovery:** If crash occurs during execution, position state may be inconsistent
+- **Fixed Retry Delay:** Orchestrator uses hardcoded 30s delay (not exponential backoff)
+- **No Alert System:** Failures logged but not triggered (no email/Slack notifications)
+
+#### Useful Context for Future Iterations
+- **Error Handling Score: 5/10** - Generic handlers too common, no custom exceptions
+- **Exchange API Score: 4/10** - No confirmation, retries, or partial fill handling
+- **System Recovery Score: 3/10** - Graceful shutdown works but no crash recovery
+- **Overall Reliability Score: 5.3/10** - Moderate with weak recovery
+- **Risk Management Score: 8/10** - Strong safeguards in place
+- **Exception Patterns:** Most services use try-catch-rollback pattern (good) but rollback only in generic catch
+- **Archived Service:** ErrorRecoveryService has retry logic with exponential backoff (max 5 retries) - could be integrated
+- **Health Checks:** Minimal `/health` endpoint exists but doesn't check dependencies (DB, Redis, Exchange, LLM)
+- **Logging Files:** Activity.json (max 500 entries), bot.log (JSON), bot_console.log (human-readable)
+- **Rate Limiter:** Per-model limits in Redis, 60-second windows, but doesn't differentiate error types
+
+---
 
 ## Iteration 5 - Security Posture Deep Dive
 
