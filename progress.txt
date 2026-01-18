@@ -11,7 +11,7 @@
 
 - [x] Task 1: Architecture & Design Patterns Analysis
 - [x] Task 2: Code Quality & Type Safety Analysis
-- [ ] Task 3: Test Coverage & Testing Strategy
+- [x] Task 3: Test Coverage & Testing Strategy
 - [ ] Task 4: Performance & Scalability Analysis
 - [ ] Task 5: Security Posture Deep Dive
 - [ ] Task 6: Error Handling & Reliability
@@ -21,6 +21,48 @@
 - [ ] Task 10: DevOps & Deployment Readiness
 - [ ] Task 11: Documentation & Knowledge Management
 - [ ] Task 12: Create Comprehensive Audit Report
+
+## Iteration 3 - Test Coverage & Testing Strategy
+
+### What Was Implemented
+- Comprehensive analysis of backend pytest infrastructure (61 tests across 954 LOC)
+- Identified 10 ad-hoc test files at root level with manual test scenarios
+- Analyzed test coverage by component: Blocks 40%, Services 0.01%, Routes 0%, Models 0%
+- Confirmed ZERO frontend tests exist
+- Identified 21 services with only 1 formally tested (5% coverage)
+- Overall test coverage: 0.46% (61 tests / 13,292 LOC backend + 1,770 LOC frontend)
+
+### Files Changed
+- No code files modified (analysis only)
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered
+- **Block-Level Testing:** Risk, Portfolio, Execution blocks well tested (35+ tests, ~40% coverage)
+- **Service Desert:** 21 services with only llm_decision_validator tested (0.01% coverage)
+- **Ad-hoc Testing Pattern:** 10 manual test files at root level for integration/system testing
+- **No Test Infrastructure:** Missing conftest.py, fixtures, factories - each test manual setup
+- **Async-First:** Tests use pytest-asyncio with AsyncMock for async code
+- **Frontend Gap:** Zero test framework configured, no component tests exist
+
+#### Gotchas to Avoid
+- **Test Location Fragmentation:** Tests split between /backend/tests/, /backend/scripts/tests/, and root directory
+- **No Fixtures:** Each test manually creates mock objects (high maintenance, low reuse)
+- **No Database Tests:** All service tests avoid database entirely (doesn't test real ORM behavior)
+- **Coverage Tool Missing:** No pytest-cov configured, coverage unknown for most modules
+- **API Routes Untested:** 930 LOC of routes (auth, bots, dashboard) with 0 tests
+- **Frontend Completely Untested:** 1,770 LOC of React components with no test framework
+
+#### Useful Context for Future Iterations
+- **Test Execution:** `pytest tests/ -v` in backend directory runs all 61 formal tests
+- **Mocking Strategy:** Uses unittest.mock.MagicMock and AsyncMock for dependencies
+- **Well-Tested Modules:** test_risk_block.py (203 LOC, 10+ tests), test_llm_decision_validator.py (192 LOC, 15+ tests)
+- **Critical Gaps:** Services (6,542 LOC, 1 test), Routes (930 LOC, 0 tests), Core infrastructure (1,497 LOC, ~3% tested)
+- **Test Configuration:** pytest.ini with `asyncio_mode = auto`, python_files = test_*.py
+- **Financial Precision:** Tests use Decimal for calculations to avoid floating-point errors
+- **No Edge Cases:** Very few boundary condition tests; missing error scenarios, market data edge cases, liquidation scenarios
+
+---
 
 ## Iteration 2 - Code Quality & Type Safety Analysis
 
