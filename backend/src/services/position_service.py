@@ -56,7 +56,6 @@ class PositionService:
             stop_loss=data.stop_loss,
             take_profit=data.take_profit,
             leverage=data.leverage,
-            invalidation_condition=data.invalidation_condition,
             status=PositionStatus.OPEN,
             opened_at=datetime.utcnow(),
         )
