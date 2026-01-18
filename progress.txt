@@ -40,6 +40,70 @@
 
 ---
 
+## Iteration 13 - Task 1: Testing Infrastructure Setup (COMPLETE)
+
+### What Was Implemented
+- **conftest.py**: Created comprehensive pytest configuration with:
+  * Database fixtures: `test_db_engine` (in-memory SQLite), `db_session` (async session with rollback)
+  * Test data fixtures: `test_user`, `test_bot`, `test_position`, `test_trade`, `test_equity_snapshot`
+  * Mock fixtures: `mock_exchange`, `mock_llm_client`, `mock_redis_client`
+  * Test constants: `TestConstants` class with standard defaults (email, password, symbols, capital, etc.)
+  * pytest_configure hook: Registered custom markers (asyncio, unit, integration, e2e, slow)
+
+- **pytest.ini**: Updated configuration:
+  * asyncio_mode = auto for async/await test support
+  * Added custom markers for test categorization
+  * testpaths, python_files, python_classes already configured
+
+- **requirements.txt**: Added test dependencies:
+  * pytest 7.0.0+, pytest-asyncio 0.21.0+, pytest-cov 4.0.0+, pytest-mock 3.10.0+
+  * httpx 0.24.0+ for API testing
+  * aiosqlite for in-memory SQLite database testing
+
+- **Test directories**: Created proper structure:
+  * tests/services/ (for service layer tests)
+  * tests/routes/ (for API endpoint tests)
+  * Both with __init__.py files and proper documentation
+
+### Files Changed
+- Created: `/backend/tests/conftest.py` (193 lines, comprehensive fixtures)
+- Created: `/backend/tests/services/__init__.py`
+- Created: `/backend/tests/routes/__init__.py`
+- Modified: `/backend/tests/__init__.py` (added documentation)
+- Modified: `/backend/pytest.ini` (added markers configuration)
+- Modified: `/backend/requirements.txt` (added test dependencies)
+- Created: `/PRD.md` (test coverage roadmap, 521 lines)
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered
+- **Fixture Strategy:** Async fixtures with `@pytest_asyncio.fixture` for database operations
+- **Test Data Factory Pattern:** Fixtures create realistic test data with proper relationships (user → bot → position/trade)
+- **Mock Organization:** Separate fixtures for each external dependency (exchange, LLM, Redis)
+- **SQLAlchemy Async Testing:** Use `aiosqlite` with StaticPool for in-memory test database
+- **Constants Extraction:** TestConstants class eliminates magic numbers and provides defaults
+
+#### Gotchas to Avoid
+- **TradeType vs TradeSide:** Model uses `TradeSide` enum (BUY/SELL), not TradeType
+- **Position enums:** Uses `PositionSide` (LONG/SHORT) and `PositionStatus` (OPEN/CLOSED)
+- **Trade fields:** Use `side`, `price`, `quantity`, `fees`, `executed_at` (not entry_price/exit_price)
+- **Position fields:** No `updated_at` field - use `opened_at` and `closed_at` instead
+- **UUID generation:** Models use UUID(as_uuid=True) in SQLAlchemy - test fixtures must use uuid.uuid4()
+- **Async session behavior:** Need proper rollback/cleanup in fixture teardown
+
+#### Useful Context for Future Iterations
+- **Coverage baseline:** 34% overall (6,835 statements total)
+- **Current tests:** 50 passing, 6 pre-existing failures (unrelated to infrastructure)
+- **Test execution:** ~1.85 seconds for full suite
+- **Fixture usage:** Fixtures are automatically discovered by pytest in conftest.py
+- **Database in tests:** In-memory SQLite is fast enough for unit/integration tests
+- **Async pattern:** All fixtures follow pytest-asyncio async pattern with proper session management
+- **Model imports:** All models properly typed with Mapped[T] annotations
+- **Risk parameters:** Default risk_params includes max_position_pct, max_drawdown_pct, max_trades_per_day, stop_loss_pct, take_profit_pct
+- **Trading symbols:** Default symbols ["BTC/USDT", "ETH/USDT"] - easily customizable in fixtures
+
+---
+
 ## Iteration 6 - Error Handling & Reliability
 
 ### What Was Implemented
