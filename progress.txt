@@ -385,3 +385,104 @@
 - CORS is permissive (allows all origins) due to local development setup
 
 ---
+
+## Iteration 14 - Task 2: Critical Service Testing (Trade Executor)
+
+### What Was Implemented
+- **test_trade_executor_service.py**: Created comprehensive test suite with 16 tests
+  * Entry/exit tests: Long and short positions, paper trading mode
+  * Error handling: Invalid stop loss, take profit, zero capital
+  * Database integration: Position and trade record verification
+  * Complete workflow: Entry -> Exit with profit/loss scenarios
+  * Position sizing: Confidence level affects size (0.5x - 1.2x adjustment)
+  * Capital tracking: Profit increases capital, loss decreases capital
+  * Trade record validation: All required fields present and accurate
+
+### Files Changed
+- Created: `/backend/tests/services/test_trade_executor_service.py` (580 lines, 16 tests)
+- Fixed: `/backend/src/services/position_service.py` (removed invalidation_condition bug from Position instantiation)
+- Modified: `/PRD.md` (marked Task 2 complete)
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered
+- **Entry/Exit Pattern:** TradeExecutorService manages both open and close operations through execute_entry() and execute_exit()
+- **Paper Trading:** Bot.paper_trading flag controls whether to hit real exchange or simulate orders
+- **Capital Management:** Entry reduces capital by (price × quantity / leverage + fees), exit returns (margin_released + realized_pnl)
+- **Confidence Adjustment:** Position sizing scales 0.5x to 1.2x based on confidence level (0.3-0.9 range)
+- **Leverage Settings:** Different leverage for long (DEFAULT_LEVERAGE) vs short (SHORT_MAX_LEVERAGE)
+- **Position Relationships:** Each trade links to a position, position tracks multiple trades
+
+#### Gotchas to Avoid
+- **Bug Found:** PositionService.open_position() was passing invalidation_condition to Position constructor, but Position model doesn't have this field
+- **Short Position Side:** Exit of short position is TradeSide.BUY (buying to close), not SELL
+- **Margin Calculation:** Entry subtracts (price × qty / leverage + fees), Exit adds (entry_price × qty / leverage + pnl)
+- **Leverage Required:** Position.leverage must be set, defaults to config.DEFAULT_LEVERAGE
+- **Test Bot Capital:** test_bot capital changes after entries/exits, track initial_capital before operations
+- **Paper Trading Fees:** Paper trading calculates fees as (price × qty × PAPER_TRADING_FEE_PCT), not from mock exchange
+
+#### Useful Context for Future Iterations
+- **Test Execution:** All 16 tests pass in ~1.2 seconds
+- **Test Categories:** 12 unit tests, 2 integration tests, 2 trade validation tests
+- **Mock Requirements:** Exchange client not required for paper trading tests
+- **Async Operations:** All tests use async/await with pytest-asyncio
+- **Database:** Tests verify records persist in in-memory SQLite database
+- **Entry Decision Format:** {symbol, side, size_pct, entry_price, stop_loss, take_profit, confidence}
+- **Risk Parameters:** Tested with default risk_params (max_position_pct=0.25, max_drawdown_pct=0.20)
+- **Coverage Target:** These tests cover execute_entry() and execute_exit() methods comprehensively
+
+---
+
+
+## Iteration 15 - Task 3: Market Data Service Testing (COMPLETE)
+
+### What Was Implemented
+- **test_market_data_service.py**: Created comprehensive test suite with 42 tests across 5 test classes:
+  * Helper functions: Tests for `_safe_decimal()` (8 tests) and `_get_last_valid()` (5 tests)
+  * OHLCV class: Tests for initialization, datetime conversion, and repr (3 tests)
+  * Ticker class: Tests for full/minimal data, volume fallback, missing timestamp, repr (5 tests)
+  * MarketDataService class: Tests for OHLCV/ticker fetch, prices, funding rate, open interest, snapshots (20 tests)
+  * Edge cases: Empty lists, error handling, fallback behavior, multi-timeframe data
+
+### Files Changed
+- Created: `/backend/tests/services/test_market_data_service.py` (610 lines, 42 tests)
+- Modified: `/PRD.md` (marked Task 3 complete)
+
+### Test Coverage
+- **market_data_service.py**: 100% coverage (140 statements)
+- **All tests passing**: 42/42 ✅
+- **Execution time**: ~1.1 seconds
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered
+- **Decimal Handling:** Service uses `_safe_decimal()` helper to safely convert API responses to Decimal (handles None, empty strings, invalid values)
+- **OHLCV Data Structure:** Candlestick data automatically converts timestamp to datetime object
+- **Ticker Fallbacks:** Handles missing fields gracefully (bid/ask can be None, volume fallback to 'volume' field)
+- **Error Resilience:** Fetch methods raise exceptions but higher-level methods like `get_funding_rate()` and `get_open_interest()` return safe defaults (0.0)
+- **Async Pattern:** All fetch operations are async, snapshot generation composes multiple async calls
+- **Indicator Integration:** `get_market_snapshot()` automatically calculates EMA, RSI, MACD, ATR indicators using IndicatorService
+- **Multi-timeframe Support:** `get_market_data_multi_timeframe()` gracefully handles missing long timeframe data by falling back to short data
+
+#### Gotchas to Avoid
+- **Decimal vs Float:** Service uses Decimal for OHLCV and Ticker fields but returns float for extracted closes/highs/lows/volumes
+- **Timestamp Units:** OHLCV timestamps in milliseconds (divide by 1000 for datetime conversion), ticker timestamps also in milliseconds
+- **Volume Ambiguity:** Exchange API returns either 'baseVolume' or 'volume' field - service checks baseVolume first
+- **None Handling in Indicators:** Indicator series can contain None values (especially early in series when period not met)
+- **Last Valid Logic:** `_get_last_valid()` scans backwards to skip None values - important for indicators with None in middle
+- **Error Suppression:** get_funding_rate() and get_open_interest() suppress exceptions and return 0.0 - tests must account for this
+- **Async Side Effects:** Mock exchange calls return raw data; service converts to objects (OHLCV, Ticker)
+- **Multi-timeframe Error Fallback:** If long timeframe fetch fails, entire operation continues with short timeframe data - not a hard error
+
+#### Useful Context for Future Iterations
+- **Test Categories:** 8 unit tests (helpers), 5 class tests (OHLCV/Ticker), 25 service method tests, 4 edge case tests
+- **Mock Requirements:** Only exchange_client needed; all other dependencies resolved through async operations
+- **Database Not Required:** Market data service is stateless - no DB interactions in tests
+- **Indicator Service:** Imported dynamically inside methods to avoid circular imports
+- **Fixture Usage:** mock_exchange fixture from conftest.py works perfectly
+- **Key Methods Tested:** fetch_ohlcv, fetch_ticker, get_current_price, get_funding_rate, get_open_interest, get_market_snapshot, get_market_data_multi_timeframe
+- **Extract Methods:** All extract_* methods tested (closes, highs, lows, volumes) with both data and empty lists
+- **Technical Indicators:** Snapshot includes EMA20, EMA50, RSI7, RSI14, MACD, ATR3, ATR14
+- **Supported Timeframes:** Service tested with common timeframes (1h, 4h) but works with any CCXT-supported timeframe
+
+---
