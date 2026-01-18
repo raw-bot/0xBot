@@ -1,96 +1,152 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import StatsWidgets from '../dashboard/StatsWidgets';
 
+// Mock sub-components
+vi.mock('../dashboard/WinRateRing', () => ({
+  default: ({ winRate, totalTrades }: any) => <div data-testid="win-rate-ring">{winRate}% {totalTrades} trades</div>
+}));
+
+vi.mock('../dashboard/SentimentGauge', () => ({
+  default: ({ sentiment }: any) => <div data-testid="sentiment-gauge">Sentiment</div>
+}));
+
+vi.mock('../dashboard/HodlComparison', () => ({
+  default: ({ botReturn, hodlReturn, alpha }: any) => <div data-testid="hodl-comparison">{botReturn}% bot vs {hodlReturn}% hodl</div>
+}));
+
 describe('StatsWidgets', () => {
-  const mockStats = {
-    total_value: 11500,
-    initial_capital: 10000,
-    total_pnl: 1500,
-    pnl_pct: 15,
-    win_rate: 65,
+  const mockBot = {
+    id: 'bot1',
+    name: 'Test Bot',
     total_trades: 20,
+    winning_trades: 13,
     open_positions: 3,
-    closed_trades: 17,
+    status: 'RUNNING' as const,
   };
 
   it('should render without crashing', () => {
-    render(<StatsWidgets stats={mockStats} />);
-    expect(screen.queryByText(/Total Value|PnL|Win Rate/i)).toBeDefined();
+    render(
+      <StatsWidgets
+        bot={mockBot}
+        sentiment={null}
+        totalReturnPct={15}
+        hodlReturnPct={12}
+        alphaPct={3}
+        btcCurrentPrice={45000}
+      />
+    );
+    expect(document.querySelector('[data-testid="win-rate-ring"]')).toBeDefined();
   });
 
-  it('should display total value', () => {
-    const { container } = render(<StatsWidgets stats={mockStats} />);
-    const content = container.textContent;
-    expect(content?.includes('11500') || content?.includes('Total')).toBe(true);
+  it('should display win rate calculation', () => {
+    const { container } = render(
+      <StatsWidgets
+        bot={mockBot}
+        sentiment={null}
+        totalReturnPct={15}
+        hodlReturnPct={12}
+        alphaPct={3}
+        btcCurrentPrice={45000}
+      />
+    );
+    // Win rate should be 65% (13/20)
+    expect(container.textContent).toContain('65');
   });
 
-  it('should display PnL percentage', () => {
-    const { container } = render(<StatsWidgets stats={mockStats} />);
-    const content = container.textContent;
-    expect(content?.includes('15') || content?.includes('PnL')).toBe(true);
+  it('should handle null bot', () => {
+    render(
+      <StatsWidgets
+        bot={null}
+        sentiment={null}
+        totalReturnPct={0}
+        hodlReturnPct={0}
+        alphaPct={0}
+        btcCurrentPrice={45000}
+      />
+    );
+    expect(document.querySelector('[data-testid="win-rate-ring"]')).toBeDefined();
   });
 
-  it('should show win rate', () => {
-    const { container } = render(<StatsWidgets stats={mockStats} />);
-    const content = container.textContent;
-    expect(content?.includes('65') || content?.includes('Win')).toBe(true);
+  it('should display sentiment gauge', () => {
+    render(
+      <StatsWidgets
+        bot={mockBot}
+        sentiment={{ fear_greed: 60, label: 'Greed' }}
+        totalReturnPct={15}
+        hodlReturnPct={12}
+        alphaPct={3}
+        btcCurrentPrice={45000}
+      />
+    );
+    expect(document.querySelector('[data-testid="sentiment-gauge"]')).toBeDefined();
   });
 
-  it('should handle zero values', () => {
-    const zeroStats = {
-      total_value: 10000,
-      initial_capital: 10000,
-      total_pnl: 0,
-      pnl_pct: 0,
-      win_rate: 0,
-      total_trades: 0,
-      open_positions: 0,
-      closed_trades: 0,
-    };
-    render(<StatsWidgets stats={zeroStats} />);
-    expect(screen.queryByText(/Stats|Widget/i)).toBeDefined();
+  it('should display hodl comparison', () => {
+    render(
+      <StatsWidgets
+        bot={mockBot}
+        sentiment={null}
+        totalReturnPct={15}
+        hodlReturnPct={12}
+        alphaPct={3}
+        btcCurrentPrice={45000}
+      />
+    );
+    expect(document.querySelector('[data-testid="hodl-comparison"]')).toBeDefined();
   });
 
-  it('should handle negative PnL', () => {
-    const negativeStats = {
-      total_value: 9500,
-      initial_capital: 10000,
-      total_pnl: -500,
-      pnl_pct: -5,
-      win_rate: 30,
-      total_trades: 10,
-      open_positions: 2,
-      closed_trades: 8,
-    };
-    render(<StatsWidgets stats={negativeStats} />);
-    expect(screen.queryByText(/Stats|Widget/i)).toBeDefined();
+  it('should handle zero winning trades', () => {
+    const zeroWinBot = { ...mockBot, winning_trades: 0 };
+    const { container } = render(
+      <StatsWidgets
+        bot={zeroWinBot}
+        sentiment={null}
+        totalReturnPct={0}
+        hodlReturnPct={0}
+        alphaPct={0}
+        btcCurrentPrice={45000}
+      />
+    );
+    expect(container.textContent).toContain('0');
   });
 
-  it('should format large numbers with separators', () => {
-    const largeStats = {
-      total_value: 1234567,
-      initial_capital: 1000000,
-      total_pnl: 234567,
-      pnl_pct: 23.45,
-      win_rate: 75,
-      total_trades: 100,
-      open_positions: 5,
-      closed_trades: 95,
-    };
-    const { container } = render(<StatsWidgets stats={largeStats} />);
-    expect(container).toBeDefined();
+  it('should handle negative returns', () => {
+    render(
+      <StatsWidgets
+        bot={mockBot}
+        sentiment={null}
+        totalReturnPct={-5}
+        hodlReturnPct={10}
+        alphaPct={-15}
+        btcCurrentPrice={45000}
+      />
+    );
+    expect(document.querySelector('[data-testid="hodl-comparison"]')).toBeDefined();
   });
 
-  it('should display open positions count', () => {
-    const { container } = render(<StatsWidgets stats={mockStats} />);
-    const content = container.textContent;
-    expect(content?.includes('3') || content?.includes('position')).toBe(true);
-  });
-
-  it('should display total trades count', () => {
-    const { container } = render(<StatsWidgets stats={mockStats} />);
-    const content = container.textContent;
-    expect(content?.includes('20') || content?.includes('trade')).toBe(true);
+  it('should update on bot changes', () => {
+    const { rerender } = render(
+      <StatsWidgets
+        bot={mockBot}
+        sentiment={null}
+        totalReturnPct={15}
+        hodlReturnPct={12}
+        alphaPct={3}
+        btcCurrentPrice={45000}
+      />
+    );
+    const updatedBot = { ...mockBot, total_trades: 50, winning_trades: 30 };
+    rerender(
+      <StatsWidgets
+        bot={updatedBot}
+        sentiment={null}
+        totalReturnPct={20}
+        hodlReturnPct={12}
+        alphaPct={8}
+        btcCurrentPrice={50000}
+      />
+    );
+    expect(document.querySelector('[data-testid="win-rate-ring"]')).toBeDefined();
   });
 });

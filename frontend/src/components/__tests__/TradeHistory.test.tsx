@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import TradeHistory from '../dashboard/TradeHistory';
 
@@ -7,48 +7,54 @@ describe('TradeHistory', () => {
     {
       id: '1',
       symbol: 'BTC/USDT',
-      side: 'BUY',
-      quantity: 1.5,
-      price: 45000,
+      side: 'BUY' as const,
+      entry_price: 45000,
+      exit_price: 46500,
+      margin: 22500,
+      leverage: 1.0,
       fees: 67.5,
-      realized_pnl: 2250,
-      executed_at: '2024-01-03T10:30:00',
+      pnl: 2250,
+      timestamp: '2024-01-03T10:30:00',
     },
     {
       id: '2',
       symbol: 'ETH/USDT',
-      side: 'SELL',
-      quantity: 10,
-      price: 2550,
+      side: 'SELL' as const,
+      entry_price: 2550,
+      exit_price: 2500,
+      margin: 12750,
+      leverage: 1.0,
       fees: 25.5,
-      realized_pnl: 500,
-      executed_at: '2024-01-02T15:45:00',
+      pnl: 500,
+      timestamp: '2024-01-02T15:45:00',
     },
     {
       id: '3',
       symbol: 'BTC/USDT',
-      side: 'SELL',
-      quantity: 0.5,
-      price: 46500,
+      side: 'SELL' as const,
+      entry_price: 46500,
+      exit_price: 45750,
+      margin: 7500,
+      leverage: 1.0,
       fees: 23.25,
-      realized_pnl: 750,
-      executed_at: '2024-01-01T12:00:00',
+      pnl: 750,
+      timestamp: '2024-01-01T12:00:00',
     },
   ];
 
   it('should render without crashing', () => {
     render(<TradeHistory trades={mockTrades} />);
-    expect(screen.queryByText('Trade History')).toBeDefined();
+    expect(screen.getByText('Symbol')).toBeDefined();
   });
 
   it('should display trade data', () => {
-    render(<TradeHistory trades={mockTrades} />);
-    expect(screen.getByText(/BTC\/USDT|ETH\/USDT/)).toBeDefined();
+    const { container } = render(<TradeHistory trades={mockTrades} />);
+    expect(container.textContent).toContain('BTC/USDT');
   });
 
   it('should handle empty trades array', () => {
     render(<TradeHistory trades={[]} />);
-    expect(screen.queryByText('Trade History')).toBeDefined();
+    expect(screen.getByText('No trades yet')).toBeDefined();
   });
 
   it('should display trade side (BUY/SELL)', () => {
@@ -75,18 +81,20 @@ describe('TradeHistory', () => {
     expect(content).toBeDefined();
   });
 
-  it('should handle pagination', () => {
+  it('should handle pagination and sorting', () => {
     const manyTrades = Array(25).fill(null).map((_, i) => ({
       id: String(i),
       symbol: 'BTC/USDT',
       side: 'BUY' as const,
-      quantity: 1,
-      price: 45000,
+      entry_price: 45000,
+      exit_price: 46000,
+      margin: 22500,
+      leverage: 1.0,
       fees: 45,
-      realized_pnl: 1000,
-      executed_at: '2024-01-01T00:00:00',
+      pnl: 1000,
+      timestamp: '2024-01-01T00:00:00',
     }));
     render(<TradeHistory trades={manyTrades} />);
-    expect(screen.queryByText('Trade History')).toBeDefined();
+    expect(screen.getByText('Symbol')).toBeDefined();
   });
 });

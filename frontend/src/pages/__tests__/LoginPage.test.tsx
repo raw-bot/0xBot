@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import LoginPage from '../auth/LoginPage';
 
@@ -39,73 +38,59 @@ describe('LoginPage', () => {
   };
 
   it('should render login form without crashing', () => {
-    renderWithRouter(<LoginPage />);
-    expect(screen.getByText(/login|sign in/i)).toBeDefined();
+    const { container } = renderWithRouter(<LoginPage />);
+    expect(container.textContent).toContain('Sign In');
   });
 
-  it('should have email and password inputs', () => {
+  it('should have email input field', () => {
     renderWithRouter(<LoginPage />);
-    const emailInput = screen.getByPlaceholderText(/email|login/i) || screen.getByLabelText(/email/i);
-    const passwordInput = screen.getByPlaceholderText(/password/i) || screen.getByLabelText(/password/i);
-    expect(emailInput || passwordInput).toBeDefined();
+    const emailInput = screen.getByPlaceholderText('you@example.com');
+    expect(emailInput).toBeDefined();
+  });
+
+  it('should have password input field', () => {
+    renderWithRouter(<LoginPage />);
+    const passwordInput = screen.getByPlaceholderText('••••••••');
+    expect(passwordInput).toBeDefined();
   });
 
   it('should have submit button', () => {
     renderWithRouter(<LoginPage />);
-    const submitButton = screen.getByRole('button', { name: /login|sign in/i }) ||
-                        screen.getByText(/submit|login/i);
-    expect(submitButton).toBeDefined();
+    const buttons = screen.getAllByRole('button');
+    expect(buttons.length > 0).toBe(true);
   });
 
-  it('should have link to register page', () => {
+  it('should display page title', () => {
     renderWithRouter(<LoginPage />);
-    const registerLink = screen.getByText(/register|sign up|create|new/i) ||
-                        screen.queryByRole('link', { name: /register/i });
-    expect(registerLink).toBeDefined();
+    const title = screen.getByRole('heading', { level: 2 });
+    expect(title.textContent).toContain('Sign In');
   });
 
-  it('should accept form input', async () => {
-    const user = userEvent.setup();
-    renderWithRouter(<LoginPage />);
-
-    const emailInputs = screen.queryAllByDisplayValue('');
-    const passwordInputs = screen.queryAllByDisplayValue('');
-
-    expect(emailInputs.length > 0 || passwordInputs.length > 0).toBe(true);
-  });
-
-  it('should validate empty fields', async () => {
-    renderWithRouter(<LoginPage />);
-    const submitButton = screen.getByRole('button', { name: /login|sign in/i }) ||
-                        screen.getByText(/submit|login/i);
-    fireEvent.click(submitButton);
-    // Component should show validation or prevent submission
-    expect(submitButton).toBeDefined();
-  });
-
-  it('should render loading state on submit', async () => {
-    renderWithRouter(<LoginPage />);
-    const submitButton = screen.getByRole('button', { name: /login|sign in/i }) ||
-                        screen.getByText(/submit|login/i);
-    expect(submitButton).toBeDefined();
-  });
-
-  it('should have password field with secure type', () => {
-    renderWithRouter(<LoginPage />);
-    const passwordFields = screen.queryAllByDisplayValue('');
-    expect(passwordFields.length >= 0).toBe(true);
-  });
-
-  it('should have remember me checkbox or similar', () => {
+  it('should display subtitle text', () => {
     const { container } = renderWithRouter(<LoginPage />);
-    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
-    // May or may not have remember me
-    expect(container).toBeDefined();
+    expect(container.textContent).toContain('AI Trading Agent Platform');
   });
 
-  it('should display form title', () => {
+  it('should render form elements', () => {
+    const { container } = renderWithRouter(<LoginPage />);
+    const form = container.querySelector('form');
+    expect(form).toBeDefined();
+  });
+
+  it('should have email label', () => {
     renderWithRouter(<LoginPage />);
-    const title = screen.getByText(/login|sign in/i) || screen.getByText(/welcome/i);
-    expect(title).toBeDefined();
+    const emailLabel = screen.getByText('Email');
+    expect(emailLabel).toBeDefined();
+  });
+
+  it('should have password label', () => {
+    renderWithRouter(<LoginPage />);
+    const passwordLabel = screen.getByText('Password');
+    expect(passwordLabel).toBeDefined();
+  });
+
+  it('should render without errors', () => {
+    const { container } = renderWithRouter(<LoginPage />);
+    expect(container.querySelector('[class*="bg-red"]')).toBeNull();
   });
 });

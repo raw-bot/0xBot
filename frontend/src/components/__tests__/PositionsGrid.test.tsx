@@ -14,6 +14,7 @@ describe('PositionsGrid', () => {
       status: 'OPEN',
       stop_loss: 43650,
       take_profit: 47700,
+      leverage: 1.0,
       unrealized_pnl: 2250,
       unrealized_pnl_pct: 3.3,
     },
@@ -27,30 +28,31 @@ describe('PositionsGrid', () => {
       status: 'OPEN',
       stop_loss: 2425,
       take_profit: 2650,
+      leverage: 1.0,
       unrealized_pnl: 500,
       unrealized_pnl_pct: 2.0,
     },
   ];
 
   it('should render without crashing', () => {
-    render(<PositionsGrid positions={mockPositions} />);
-    expect(screen.queryByText('Positions')).toBeDefined();
+    const { container } = render(<PositionsGrid positions={mockPositions} />);
+    expect(container.textContent).toContain('BTC/USDT');
   });
 
   it('should display positions data', () => {
-    render(<PositionsGrid positions={mockPositions} />);
-    expect(screen.getByText(/BTC\/USDT|ETH\/USDT/)).toBeDefined();
+    const { container } = render(<PositionsGrid positions={mockPositions} />);
+    expect(container.textContent).toContain('ETH/USDT');
   });
 
   it('should handle empty positions array', () => {
     render(<PositionsGrid positions={[]} />);
-    expect(screen.queryByText('Positions')).toBeDefined();
+    expect(screen.getByText('No open positions')).toBeDefined();
   });
 
   it('should display position details', () => {
     const { container } = render(<PositionsGrid positions={mockPositions} />);
-    const rows = container.querySelectorAll('tr');
-    expect(rows.length).toBeGreaterThan(0);
+    const cards = container.querySelectorAll('[class*="bg-white"]');
+    expect(cards.length).toBeGreaterThan(0);
   });
 
   it('should show positive PnL in green', () => {
@@ -60,10 +62,7 @@ describe('PositionsGrid', () => {
   });
 
   it('should format numbers correctly', () => {
-    render(<PositionsGrid positions={mockPositions} />);
-    const element = screen.queryByText((content, element) => {
-      return element?.textContent?.includes('1.5') || false;
-    });
-    expect(element).toBeDefined();
+    const { container } = render(<PositionsGrid positions={mockPositions} />);
+    expect(container.textContent).toContain('1x');
   });
 });

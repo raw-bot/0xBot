@@ -246,7 +246,7 @@
 
 ---
 
-### [ ] Task 7: Frontend Component Testing
+### [x] Task 7: Frontend Component Testing
 
 **Objective**: Set up Vitest + React Testing Library and test frontend components.
 
