@@ -4,6 +4,7 @@ Pytest configuration and fixtures for 0xBot testing.
 Provides reusable fixtures for database, async sessions, test data, and mocked services.
 """
 
+import sys
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -12,16 +13,26 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
+from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from src.core.database import Base
+from src.core.database import Base, get_db
+from src.main import app
 from src.models.bot import Bot, BotStatus, ModelName
 from src.models.user import User
 from src.models.position import Position, PositionStatus, PositionSide
 from src.models.trade import Trade, TradeSide
 from src.models.equity_snapshot import EquitySnapshot
 from src.models.llm_decision import LLMDecision
+
+# Mock bcrypt if backend not available to enable tests
+try:
+    from passlib.hash import bcrypt
+    bcrypt.hash("test")
+    BCRYPT_AVAILABLE = True
+except Exception:
+    BCRYPT_AVAILABLE = False
 
 
 # ==============================================================================
@@ -217,6 +228,35 @@ def mock_redis_client():
     redis.delete = AsyncMock(return_value=1)
     redis.expire = AsyncMock(return_value=True)
     return redis
+
+
+# ==============================================================================
+# API TEST FIXTURES
+# ==============================================================================
+
+
+@pytest_asyncio.fixture
+async def async_client(db_session: AsyncSession, monkeypatch) -> AsyncGenerator[AsyncClient, None]:
+    """Create AsyncClient for testing FastAPI routes with test database."""
+    # Override get_db dependency with test database session
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    # Mock bcrypt if not available
+    if not BCRYPT_AVAILABLE:
+        mock_bcrypt = MagicMock()
+        mock_bcrypt.hash = lambda x: f"hashed_{x}"
+        mock_bcrypt.verify = lambda p, h: h == f"hashed_{p}"
+        monkeypatch.setattr("src.routes.auth.bcrypt", mock_bcrypt)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
+
+    # Clean up overrides
+    app.dependency_overrides.clear()
 
 
 # ==============================================================================

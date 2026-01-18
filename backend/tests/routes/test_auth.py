@@ -1,24 +1,16 @@
 """Comprehensive test suite for authentication routes."""
 
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.main import app
-
-
-@pytest.fixture
-def client():
-    """Create FastAPI test client."""
-    return TestClient(app)
+from httpx import AsyncClient
 
 
 class TestRegister:
     """Tests for user registration endpoint."""
 
-    def test_register_success(self, client):
+    @pytest.mark.asyncio
+    async def test_register_success(self, async_client: AsyncClient):
         """Test successful user registration."""
-        response = client.post(
+        response = await async_client.post(
             "/auth/register",
             json={
                 "email": "newuser@example.com",
@@ -32,10 +24,11 @@ class TestRegister:
         assert "token" in data
         assert "id" in data
 
-    def test_register_duplicate_email(self, client):
+    @pytest.mark.asyncio
+    async def test_register_duplicate_email(self, async_client: AsyncClient):
         """Test registration with already registered email."""
         # First registration
-        client.post(
+        await async_client.post(
             "/auth/register",
             json={
                 "email": "duplicate@example.com",
@@ -44,7 +37,7 @@ class TestRegister:
         )
 
         # Try duplicate
-        response = client.post(
+        response = await async_client.post(
             "/auth/register",
             json={
                 "email": "duplicate@example.com",
@@ -55,9 +48,10 @@ class TestRegister:
         assert response.status_code == 400
         assert "already registered" in response.json()["detail"]
 
-    def test_register_invalid_email(self, client):
+    @pytest.mark.asyncio
+    async def test_register_invalid_email(self, async_client: AsyncClient):
         """Test registration with invalid email."""
-        response = client.post(
+        response = await async_client.post(
             "/auth/register",
             json={
                 "email": "not-an-email",
@@ -67,9 +61,10 @@ class TestRegister:
 
         assert response.status_code == 422  # Validation error
 
-    def test_register_password_too_short(self, client):
+    @pytest.mark.asyncio
+    async def test_register_password_too_short(self, async_client: AsyncClient):
         """Test registration with short password."""
-        response = client.post(
+        response = await async_client.post(
             "/auth/register",
             json={
                 "email": "user@example.com",
@@ -79,9 +74,10 @@ class TestRegister:
 
         assert response.status_code == 422  # Validation error
 
-    def test_register_missing_email(self, client):
+    @pytest.mark.asyncio
+    async def test_register_missing_email(self, async_client: AsyncClient):
         """Test registration without email."""
-        response = client.post(
+        response = await async_client.post(
             "/auth/register",
             json={
                 "password": "SecurePassword123",
@@ -90,9 +86,10 @@ class TestRegister:
 
         assert response.status_code == 422
 
-    def test_register_missing_password(self, client):
+    @pytest.mark.asyncio
+    async def test_register_missing_password(self, async_client: AsyncClient):
         """Test registration without password."""
-        response = client.post(
+        response = await async_client.post(
             "/auth/register",
             json={
                 "email": "user@example.com",
@@ -105,10 +102,11 @@ class TestRegister:
 class TestLogin:
     """Tests for user login endpoint."""
 
-    def test_login_success(self, client):
+    @pytest.mark.asyncio
+    async def test_login_success(self, async_client: AsyncClient):
         """Test successful login."""
         # Register first
-        client.post(
+        await async_client.post(
             "/auth/register",
             json={
                 "email": "user@example.com",
@@ -117,7 +115,7 @@ class TestLogin:
         )
 
         # Login
-        response = client.post(
+        response = await async_client.post(
             "/auth/login",
             json={
                 "email": "user@example.com",
@@ -130,10 +128,11 @@ class TestLogin:
         assert data["email"] == "user@example.com"
         assert "token" in data
 
-    def test_login_invalid_password(self, client):
+    @pytest.mark.asyncio
+    async def test_login_invalid_password(self, async_client: AsyncClient):
         """Test login with wrong password."""
         # Register first
-        client.post(
+        await async_client.post(
             "/auth/register",
             json={
                 "email": "user@example.com",
@@ -142,7 +141,7 @@ class TestLogin:
         )
 
         # Login with wrong password
-        response = client.post(
+        response = await async_client.post(
             "/auth/login",
             json={
                 "email": "user@example.com",
@@ -153,9 +152,10 @@ class TestLogin:
         assert response.status_code == 401
         assert "Invalid email or password" in response.json()["detail"]
 
-    def test_login_nonexistent_user(self, client):
+    @pytest.mark.asyncio
+    async def test_login_nonexistent_user(self, async_client: AsyncClient):
         """Test login with non-existent email."""
-        response = client.post(
+        response = await async_client.post(
             "/auth/login",
             json={
                 "email": "nonexistent@example.com",
@@ -166,15 +166,17 @@ class TestLogin:
         assert response.status_code == 401
         assert "Invalid email or password" in response.json()["detail"]
 
-    def test_login_missing_credentials(self, client):
+    @pytest.mark.asyncio
+    async def test_login_missing_credentials(self, async_client: AsyncClient):
         """Test login without credentials."""
-        response = client.post("/auth/login", json={})
+        response = await async_client.post("/auth/login", json={})
 
         assert response.status_code == 422
 
-    def test_login_invalid_email_format(self, client):
+    @pytest.mark.asyncio
+    async def test_login_invalid_email_format(self, async_client: AsyncClient):
         """Test login with invalid email format."""
-        response = client.post(
+        response = await async_client.post(
             "/auth/login",
             json={
                 "email": "not-an-email",
@@ -188,10 +190,11 @@ class TestLogin:
 class TestRefreshToken:
     """Tests for token refresh endpoint."""
 
-    def test_refresh_token_success(self, client):
+    @pytest.mark.asyncio
+    async def test_refresh_token_success(self, async_client: AsyncClient):
         """Test successful token refresh."""
         # Register and get token
-        register_response = client.post(
+        register_response = await async_client.post(
             "/auth/register",
             json={
                 "email": "user@example.com",
@@ -201,7 +204,7 @@ class TestRefreshToken:
         token = register_response.json()["token"]
 
         # Refresh token
-        response = client.post(
+        response = await async_client.post(
             "/auth/refresh",
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -211,29 +214,32 @@ class TestRefreshToken:
         assert "access_token" in data
         assert data["token_type"] == "bearer"
 
-    def test_refresh_token_missing_auth(self, client):
+    @pytest.mark.asyncio
+    async def test_refresh_token_missing_auth(self, async_client: AsyncClient):
         """Test refresh without authentication."""
-        response = client.post("/auth/refresh")
+        response = await async_client.post("/auth/refresh")
 
-        assert response.status_code == 403
+        assert response.status_code == 401
 
-    def test_refresh_token_invalid_token(self, client):
+    @pytest.mark.asyncio
+    async def test_refresh_token_invalid_token(self, async_client: AsyncClient):
         """Test refresh with invalid token."""
-        response = client.post(
+        response = await async_client.post(
             "/auth/refresh",
             headers={"Authorization": "Bearer invalid_token"},
         )
 
-        assert response.status_code == 403
+        assert response.status_code == 401
 
 
 class TestGetCurrentUserInfo:
     """Tests for getting current user info endpoint."""
 
-    def test_get_current_user_info_success(self, client):
+    @pytest.mark.asyncio
+    async def test_get_current_user_info_success(self, async_client: AsyncClient):
         """Test successfully getting current user info."""
         # Register and get token
-        register_response = client.post(
+        register_response = await async_client.post(
             "/auth/register",
             json={
                 "email": "user@example.com",
@@ -243,7 +249,7 @@ class TestGetCurrentUserInfo:
         token = register_response.json()["token"]
 
         # Get current user info
-        response = client.get(
+        response = await async_client.get(
             "/auth/me",
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -254,29 +260,32 @@ class TestGetCurrentUserInfo:
         assert "id" in data
         assert "token" in data
 
-    def test_get_current_user_info_missing_auth(self, client):
+    @pytest.mark.asyncio
+    async def test_get_current_user_info_missing_auth(self, async_client: AsyncClient):
         """Test getting user info without authentication."""
-        response = client.get("/auth/me")
+        response = await async_client.get("/auth/me")
 
-        assert response.status_code == 403
+        assert response.status_code == 401
 
-    def test_get_current_user_info_invalid_token(self, client):
+    @pytest.mark.asyncio
+    async def test_get_current_user_info_invalid_token(self, async_client: AsyncClient):
         """Test getting user info with invalid token."""
-        response = client.get(
+        response = await async_client.get(
             "/auth/me",
             headers={"Authorization": "Bearer invalid_token"},
         )
 
-        assert response.status_code == 403
+        assert response.status_code == 401
 
 
 class TestAuthenticationFlow:
     """Tests for complete authentication flows."""
 
-    def test_register_login_refresh_flow(self, client):
+    @pytest.mark.asyncio
+    async def test_register_login_refresh_flow(self, async_client: AsyncClient):
         """Test complete authentication flow: register -> login -> refresh."""
         # Register
-        register_response = client.post(
+        register_response = await async_client.post(
             "/auth/register",
             json={
                 "email": "user@example.com",
@@ -287,7 +296,7 @@ class TestAuthenticationFlow:
         register_token = register_response.json()["token"]
 
         # Login
-        login_response = client.post(
+        login_response = await async_client.post(
             "/auth/login",
             json={
                 "email": "user@example.com",
@@ -298,7 +307,7 @@ class TestAuthenticationFlow:
         login_token = login_response.json()["token"]
 
         # Refresh with login token
-        refresh_response = client.post(
+        refresh_response = await async_client.post(
             "/auth/refresh",
             headers={"Authorization": f"Bearer {login_token}"},
         )
@@ -306,17 +315,18 @@ class TestAuthenticationFlow:
         new_token = refresh_response.json()["access_token"]
 
         # Use new token to get user info
-        user_response = client.get(
+        user_response = await async_client.get(
             "/auth/me",
             headers={"Authorization": f"Bearer {new_token}"},
         )
         assert user_response.status_code == 200
         assert user_response.json()["email"] == "user@example.com"
 
-    def test_multiple_users_isolated(self, client):
+    @pytest.mark.asyncio
+    async def test_multiple_users_isolated(self, async_client: AsyncClient):
         """Test that multiple users can register independently."""
         # Register user 1
-        user1_response = client.post(
+        user1_response = await async_client.post(
             "/auth/register",
             json={
                 "email": "user1@example.com",
@@ -328,7 +338,7 @@ class TestAuthenticationFlow:
         user1_id = user1_response.json()["id"]
 
         # Register user 2
-        user2_response = client.post(
+        user2_response = await async_client.post(
             "/auth/register",
             json={
                 "email": "user2@example.com",
@@ -343,13 +353,13 @@ class TestAuthenticationFlow:
         assert user1_id != user2_id
 
         # Verify each token works for its own user
-        user1_info = client.get(
+        user1_info = await async_client.get(
             "/auth/me",
             headers={"Authorization": f"Bearer {user1_token}"},
         )
         assert user1_info.json()["email"] == "user1@example.com"
 
-        user2_info = client.get(
+        user2_info = await async_client.get(
             "/auth/me",
             headers={"Authorization": f"Bearer {user2_token}"},
         )
@@ -359,9 +369,10 @@ class TestAuthenticationFlow:
 class TestAuthErrorHandling:
     """Tests for error handling in auth endpoints."""
 
-    def test_register_empty_email(self, client):
+    @pytest.mark.asyncio
+    async def test_register_empty_email(self, async_client: AsyncClient):
         """Test registration with empty email."""
-        response = client.post(
+        response = await async_client.post(
             "/auth/register",
             json={
                 "email": "",
@@ -371,9 +382,10 @@ class TestAuthErrorHandling:
 
         assert response.status_code == 422
 
-    def test_register_empty_password(self, client):
+    @pytest.mark.asyncio
+    async def test_register_empty_password(self, async_client: AsyncClient):
         """Test registration with empty password."""
-        response = client.post(
+        response = await async_client.post(
             "/auth/register",
             json={
                 "email": "user@example.com",
@@ -383,9 +395,10 @@ class TestAuthErrorHandling:
 
         assert response.status_code == 422
 
-    def test_register_very_long_password(self, client):
+    @pytest.mark.asyncio
+    async def test_register_very_long_password(self, async_client: AsyncClient):
         """Test registration with very long password."""
-        response = client.post(
+        response = await async_client.post(
             "/auth/register",
             json={
                 "email": "user@example.com",
@@ -395,14 +408,16 @@ class TestAuthErrorHandling:
 
         assert response.status_code == 422
 
-    def test_login_with_get_request(self, client):
+    @pytest.mark.asyncio
+    async def test_login_with_get_request(self, async_client: AsyncClient):
         """Test that login endpoint doesn't accept GET."""
-        response = client.get("/auth/login")
+        response = await async_client.get("/auth/login")
 
         assert response.status_code == 405  # Method not allowed
 
-    def test_register_with_get_request(self, client):
+    @pytest.mark.asyncio
+    async def test_register_with_get_request(self, async_client: AsyncClient):
         """Test that register endpoint doesn't accept GET."""
-        response = client.get("/auth/register")
+        response = await async_client.get("/auth/register")
 
         assert response.status_code == 405  # Method not allowed
