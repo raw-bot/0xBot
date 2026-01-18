@@ -13,7 +13,7 @@
 - [x] Task 2: Code Quality & Type Safety Analysis
 - [x] Task 3: Test Coverage & Testing Strategy
 - [x] Task 4: Performance & Scalability Analysis
-- [ ] Task 5: Security Posture Deep Dive
+- [x] Task 5: Security Posture Deep Dive
 - [ ] Task 6: Error Handling & Reliability
 - [ ] Task 7: Frontend Architecture & Quality
 - [ ] Task 8: Dependencies & Version Management
@@ -21,6 +21,51 @@
 - [ ] Task 10: DevOps & Deployment Readiness
 - [ ] Task 11: Documentation & Knowledge Management
 - [ ] Task 12: Create Comprehensive Audit Report
+
+## Iteration 5 - Security Posture Deep Dive
+
+### What Was Implemented
+- Comprehensive authentication/authorization audit: JWT HS256, 7-day expiration (RISK), no RBAC
+- Critical security vulnerabilities identified: Exposed secrets in git (.env with OKX, DeepSeek, CryptoCompare keys), default DB credentials, public database/Redis access without auth
+- API security assessment: CORS too permissive (allow all origins), no CSRF protection, no rate limiting on auth endpoints, no DDoS protection
+- Data protection analysis: No TLS/HTTPS, plaintext database credentials, no encryption at rest
+- Dependency analysis: Multiple outdated packages (FastAPI 0.109, SQLAlchemy, bcrypt 3.2, etc.)
+- Compliance gaps: No AML/KYC, no GDPR mechanisms, audit logging local-only (not centralized)
+
+### Files Changed
+- No code files modified (analysis only)
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered
+- **JWT Too Permissive:** 7-day token expiration is excessive (should be 1 hour with refresh token rotation)
+- **CORS Wildcard Pattern:** `CORS_ORIGINS = ["*"]` with credentials allowed - allows cross-site attacks
+- **Secrets in `.env` Checked into Git:** OKX keys, DeepSeek API key, CryptoCompare API key all exposed in repository
+- **Public Database Access:** PostgreSQL and Redis ports exposed (5432, 6379) without authentication
+- **Permissive CSP:** Using `unsafe-inline` and `unsafe-eval` defeats Content Security Policy protection
+- **No Production Safety Checks:** `reload=True` in uvicorn.run() without environment variable check
+
+#### Gotchas to Avoid
+- **Critical Exposed Keys:** `.env` file contains real OKX API keys, secret key, and passphrase that must be revoked immediately
+- **Default Credentials:** `postgres:postgres` default user/pass in docker-compose exposed database
+- **Public Dashboard:** `/api/dashboard` endpoint returns all bot data without any authentication - exposes all trading data
+- **Outdated Dependencies:** FastAPI (0.109 vs 0.115+), bcrypt (3.2 vs 4.x+), multiple 1-2 major versions behind
+- **No Refresh Token Mechanism:** JWT tokens can't be revoked, only expire after 7 days
+- **Redis Without Auth:** Port 6379 exposed with no `requirepass` configured - public access
+- **Prompt Injection Risk:** News text in prompts unsanitized - could inject malicious instructions
+
+#### Useful Context for Future Iterations
+- **Critical Fixes (Next 24h):** Revoke OKX/DeepSeek/CryptoCompare keys, remove `.env` from git history, change postgres/postgres, add Redis auth, remove port mappings
+- **High Priority (1-2 weeks):** Enable HTTPS/TLS, add CSRF tokens, restrict CORS to known origins, rate limit auth endpoints, reduce JWT to 1 hour
+- **JWT Config:** HS256 algorithm with 10,080 minute (7-day) expiration in auth.py
+- **Database Creds:** Line 25 in docker-compose uses plain `postgres:postgres`, port 5432 exposed
+- **Redis Config:** Port 6379 exposed, no `requirepass` configured in docker-compose
+- **CORS:** Lines in middleware set `CORS_ORIGINS = ["*"]` with `allow_credentials=True` - highly dangerous
+- **CSP Issues:** Middleware uses `script-src 'unsafe-inline' 'unsafe-eval'` - defeats purpose
+- **Audit Logging:** Activity logger writes only to local JSON file (activity.json, max 500 entries) - not centralized
+- **Compliance:** No AML/KYC implemented - if handling real money, violates financial regulations
+
+---
 
 ## Iteration 4 - Performance & Scalability Analysis
 
