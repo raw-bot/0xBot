@@ -134,6 +134,31 @@ class PositionService:
         result = await self.db.execute(query)
         return list(result.scalars().all())
 
+    async def get_open_positions_paginated(
+        self, bot_id: UUID, limit: int = 100, offset: int = 0, symbol: Optional[str] = None
+    ) -> tuple[list[Position], int]:
+        """Get paginated open positions for a bot."""
+        # Build count query
+        count_query = select(Position).where(
+            Position.bot_id == bot_id, Position.status == PositionStatus.OPEN
+        )
+        if symbol:
+            count_query = count_query.where(Position.symbol == symbol)
+
+        count_result = await self.db.execute(count_query)
+        total = len(list(count_result.scalars().all()))
+
+        # Build paginated query
+        query = select(Position).where(
+            Position.bot_id == bot_id, Position.status == PositionStatus.OPEN
+        )
+        if symbol:
+            query = query.where(Position.symbol == symbol)
+        query = query.order_by(Position.opened_at.desc()).limit(limit).offset(offset)
+
+        result = await self.db.execute(query)
+        return list(result.scalars().all()), total
+
     async def get_all_positions(
         self, bot_id: UUID, limit: int = 100, offset: int = 0
     ) -> tuple[list[Position], int]:

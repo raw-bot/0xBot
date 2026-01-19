@@ -227,6 +227,41 @@ class BotService:
         result = await self.db.execute(query)
         return list(result.scalars().all())
 
+    async def get_user_bots_paginated(
+        self, user_id: UUID, include_stopped: bool = False, limit: int = 100, offset: int = 0
+    ) -> tuple[list[Bot], int]:
+        """
+        Get paginated bots for a user.
+
+        Args:
+            user_id: User ID
+            include_stopped: If True, include stopped bots
+            limit: Number of results per page
+            offset: Offset for pagination
+
+        Returns:
+            Tuple of (list of bots, total count)
+        """
+        # Build count query
+        count_query = select(Bot).where(Bot.user_id == user_id)
+        if not include_stopped:
+            count_query = count_query.where(Bot.status != BotStatus.STOPPED)
+
+        count_result = await self.db.execute(count_query)
+        total = len(list(count_result.scalars().all()))
+
+        # Build paginated query
+        query = select(Bot).where(Bot.user_id == user_id)
+        if not include_stopped:
+            query = query.where(Bot.status != BotStatus.STOPPED)
+
+        query = query.order_by(Bot.created_at.desc()).limit(limit).offset(offset)
+
+        result = await self.db.execute(query)
+        bots = list(result.scalars().all())
+
+        return bots, total
+
     async def get_active_bots(self) -> list[Bot]:
         """
         Get all active bots across all users.

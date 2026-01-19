@@ -250,13 +250,23 @@ async def create_bot(
 
 @router.get("", response_model=BotListResponse)
 async def list_bots(
+    page: int = 1,
+    limit: int = 100,
     include_stopped: bool = False,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Validate pagination parameters
+    limit = max(10, min(limit, 1000))  # Enforce min 10, max 1000
+    if page < 1:
+        page = 1
+    offset = (page - 1) * limit
+
     bot_service = BotService(db)
-    bots = await bot_service.get_user_bots(current_user.id, include_stopped)
-    return BotListResponse(bots=[bot_to_response(bot) for bot in bots], total=len(bots))
+    bots, total = await bot_service.get_user_bots_paginated(
+        current_user.id, include_stopped, limit, offset
+    )
+    return BotListResponse(bots=[bot_to_response(bot) for bot in bots], total=total)
 
 
 @router.get("/{bot_id}", response_model=BotResponse)
@@ -378,18 +388,28 @@ async def stop_bot(
 @router.get("/{bot_id}/positions", response_model=PositionListResponse)
 async def get_bot_positions(
     bot_id: str,
+    page: int = 1,
+    limit: int = 100,
     status_filter: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     bot = await get_bot_with_ownership(bot_id, current_user, db)
+
+    # Validate pagination parameters
+    limit = max(10, min(limit, 1000))  # Enforce min 10, max 1000
+    if page < 1:
+        page = 1
+    offset = (page - 1) * limit
+
     position_service = PositionService(db)
 
     if status_filter == "open":
-        positions = await position_service.get_open_positions(bot.id)
-        total = len(positions)
+        positions, total = await position_service.get_open_positions_paginated(
+            bot.id, limit=limit, offset=offset
+        )
     else:
-        positions, total = await position_service.get_all_positions(bot.id, limit=100, offset=0)
+        positions, total = await position_service.get_all_positions(bot.id, limit=limit, offset=offset)
 
     return PositionListResponse(
         positions=[position_to_response(pos) for pos in positions],
@@ -400,12 +420,18 @@ async def get_bot_positions(
 @router.get("/{bot_id}/trades", response_model=TradeListResponse)
 async def get_bot_trades(
     bot_id: str,
-    limit: int = 50,
-    offset: int = 0,
+    page: int = 1,
+    limit: int = 100,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     bot = await get_bot_with_ownership(bot_id, current_user, db)
+
+    # Validate pagination parameters
+    limit = max(10, min(limit, 1000))  # Enforce min 10, max 1000
+    if page < 1:
+        page = 1
+    offset = (page - 1) * limit
 
     count_result = await db.execute(
         select(func.count()).select_from(Trade).where(Trade.bot_id == bot.id)
