@@ -86,6 +86,8 @@ class TradeFilterService:
 
         Returns:
             (win_probability, sample_size)
+
+        Note: Uses batch query to avoid N+1 pattern (was 1 + N queries, now 2 queries)
         """
         db = await self._get_db()
 
@@ -109,13 +111,24 @@ class TradeFilterService:
                 # No history - return neutral probability
                 return Decimal("0.50"), 0
 
-            # Get trades and calculate wins
+            # Batch query: get ALL trades for these positions in one query (not 1 + N)
+            position_ids = [p.id for p in positions]
+            trades_result = await db.execute(
+                select(Trade).where(Trade.position_id.in_(position_ids))
+            )
+            all_trades = trades_result.scalars().all()
+
+            # Group trades by position_id for efficient lookup
+            trades_by_position = {}
+            for trade in all_trades:
+                if trade.position_id not in trades_by_position:
+                    trades_by_position[trade.position_id] = []
+                trades_by_position[trade.position_id].append(trade)
+
+            # Calculate wins
             wins = 0
             for position in positions:
-                trades_result = await db.execute(
-                    select(Trade).where(Trade.position_id == position.id)
-                )
-                trades = trades_result.scalars().all()
+                trades = trades_by_position.get(position.id, [])
                 if any(t.realized_pnl > 0 for t in trades):
                     wins += 1
 

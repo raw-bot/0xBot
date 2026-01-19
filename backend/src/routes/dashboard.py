@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
@@ -227,7 +227,7 @@ async def get_dashboard_data(
     initial_capital = float(bot.initial_capital)
     total_return_pct = ((current_equity - initial_capital) / initial_capital * 100) if initial_capital > 0 else 0.0
 
-    # Get trades with positions
+    # Get trades with positions (using outerjoin to prevent N+1 queries)
     trades_query = (
         select(Trade, Position)
         .outerjoin(Position, Trade.position_id == Position.id)
@@ -239,9 +239,11 @@ async def get_dashboard_data(
     trades_result = await db.execute(trades_query)
     all_trade_rows = list(trades_result.all())
 
-    # Get total trades count
-    total_trades_result = await db.execute(select(Trade).where(Trade.bot_id == bot.id))
-    total_trades = len(list(total_trades_result.scalars().all()))
+    # Get total trades count (use COUNT(*) query instead of fetching all rows)
+    total_trades_result = await db.execute(
+        select(func.count(Trade.id)).where(Trade.bot_id == bot.id)
+    )
+    total_trades = total_trades_result.scalar() or 0
 
     # Build trade history
     cumulative_by_symbol = {}

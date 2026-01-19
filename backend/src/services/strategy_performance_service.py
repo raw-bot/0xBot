@@ -202,12 +202,14 @@ class StrategyPerformanceService:
             if total_losses > 0:
                 metrics.profit_factor = total_wins / total_losses
 
-        # Calculate symbol win rates
+        # Calculate symbol win rates using pre-computed trades
+        # Build set of winning trade positions for efficient lookup
+        winning_position_ids = set(t.position_id for t in trades if (t.realized_pnl or Decimal("0")) > 0)
+
         for symbol, pnl in symbol_pnls.items():
             symbol_count = symbol_trades[symbol]
-            symbol_wins = sum(1 for p in positions if p.symbol == symbol and p.id in [
-                t.position_id for t in trades if (t.realized_pnl or Decimal("0")) > 0
-            ])
+            # Count winning positions for this symbol (O(1) lookup using set)
+            symbol_wins = sum(1 for p in positions if p.symbol == symbol and p.id in winning_position_ids)
             if symbol_count > 0:
                 metrics.symbol_win_rates[symbol] = (
                     Decimal(symbol_wins) / Decimal(symbol_count) * Decimal("100")
@@ -322,7 +324,10 @@ class StrategyPerformanceService:
     async def get_recent_trades_performance(
         self, bot_id: str, limit: int = 10
     ) -> List[Dict]:
-        """Get performance data for the most recent trades."""
+        """Get performance data for the most recent trades.
+
+        Note: Uses batch query to avoid N+1 pattern (was 1 + N queries, now 2 queries)
+        """
         db = await self._get_db()
 
         try:
@@ -340,13 +345,26 @@ class StrategyPerformanceService:
             )
             closed_positions = positions.scalars().all()
 
+            if not closed_positions:
+                return []
+
+            # Batch query: Get ALL trades for these positions in one query (not 1 + N)
+            position_ids = [p.id for p in closed_positions]
+            trades_result = await db.execute(
+                select(Trade).where(Trade.position_id.in_(position_ids))
+            )
+            all_trades = trades_result.scalars().all()
+
+            # Group trades by position_id for efficient lookup
+            trades_by_position = {}
+            for trade in all_trades:
+                if trade.position_id not in trades_by_position:
+                    trades_by_position[trade.position_id] = []
+                trades_by_position[trade.position_id].append(trade)
+
             trades_data = []
             for position in closed_positions:
-                # Get trades for this position
-                trades = await db.execute(
-                    select(Trade).where(Trade.position_id == position.id)
-                )
-                position_trades = trades.scalars().all()
+                position_trades = trades_by_position.get(position.id, [])
 
                 total_pnl = sum(t.realized_pnl for t in position_trades)
                 pnl_pct = (

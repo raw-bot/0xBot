@@ -109,7 +109,7 @@ engine = create_async_engine(
 
 ---
 
-### [  ] Task 3: Implement Eager Loading (selectinload) to Prevent N+1 Queries
+### [x] Task 3: Implement Eager Loading (selectinload) to Prevent N+1 Queries
 
 **Objective**: Eliminate N+1 query problems where accessing related objects triggers additional queries.
 
