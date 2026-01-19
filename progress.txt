@@ -1826,3 +1826,118 @@ Ready to proceed to Task 4: Add Query Profiling and Monitoring
 - Test coverage: Dashboard endpoints (4), pagination (5), query optimization (1), outerjoin patterns (2), metrics (4)
 
 ---
+
+## Iteration 24 - Task 6: Implement Pagination (Default Limit 100) (COMPLETE)
+
+### What was implemented
+
+**Complete pagination infrastructure for all list endpoints (bots, positions, trades).**
+
+1. **Bot List Pagination** (`backend/src/routes/bots.py::list_bots`)
+   - Added `page` and `limit` query parameters
+   - Validates limit between 10-1000, default 100
+   - Calculates offset from page/limit: `(page-1)*limit`
+   - Calls new `get_user_bots_paginated()` service method
+   - Returns pagination-aware BotListResponse with total count
+
+2. **Position List Pagination** (`backend/src/routes/bots.py::get_bot_positions`)
+   - Enhanced with `page` and `limit` query parameters
+   - Supports both `status_filter=open` (open positions) and all positions
+   - For open positions: calls new `get_open_positions_paginated()` method
+   - For all positions: calls existing `get_all_positions()` method with pagination
+   - Returns PositionListResponse with total count
+
+3. **Trade List Pagination** (`backend/src/routes/bots.py::get_bot_trades`)
+   - Updated to use `page` and `limit` instead of raw offset
+   - Maintains existing efficient COUNT(*) query for total
+   - Returns TradeListResponse with total count
+
+4. **Service Layer Pagination Methods**
+   - `BotService.get_user_bots_paginated()`: Gets paginated bots with include_stopped filter support
+   - `PositionService.get_open_positions_paginated()`: Gets paginated open positions only
+   - Both methods return tuple: (list[items], total_count)
+   - Both execute separate count queries for accuracy
+
+5. **Comprehensive Test Suite** (`backend/tests/routes/test_pagination.py`)
+   - 18 tests across 4 test classes
+   - TestBotListPagination (7 tests): First page, second page, partial last page, empty page, all results, include_stopped filtering, custom limit
+   - TestPositionListPagination (5 tests): All positions, open positions, empty, all on first page, partial last page
+   - TestTradeListPagination (3 tests): Structure/logic, second page, empty
+   - TestPaginationParameterValidation (3 tests): Limit enforcement, offset zero, ordering consistency
+
+### Files Changed
+
+**Modified:**
+- `backend/src/routes/bots.py` (3 endpoints)
+  * list_bots: Added page/limit pagination
+  * get_bot_positions: Added page/limit with status filter support
+  * get_bot_trades: Changed from offset to page/limit
+
+- `backend/src/services/bot_service.py`
+  * Added get_user_bots_paginated() method (50 lines)
+
+- `backend/src/services/position_service.py`
+  * Added get_open_positions_paginated() method (37 lines)
+
+- `backend/PRD.md`
+  * Marked Task 6 as [x] complete
+
+**Created:**
+- `backend/tests/routes/test_pagination.py` (490+ lines, 18 tests)
+
+### Test Coverage
+
+- **18 new pagination tests**: ALL PASSING ✅
+- **Integration tests** (7): All passing (bot lifecycle workflows)
+- **Middleware tests** (17): All passing (query profiling)
+- **Performance tests** (16): All passing (dashboard queries)
+- **Total passing**: 66 tests
+
+### Learnings for future iterations
+
+1. **Pagination Pattern**: 
+   - Page/limit is better than offset for APIs (standard REST pattern)
+   - Formula: `offset = (page - 1) * limit` is straightforward to implement
+   - Always enforce min/max limits on client side (10-1000 in this case)
+
+2. **Count Query Optimization**:
+   - Separate COUNT(*) query is necessary to get total count
+   - COUNT(*) is fast and efficient (uses indices on most databases)
+   - Some databases support window functions for combined count + limit queries (e.g., PostgreSQL)
+
+3. **Service Layer Pagination**:
+   - Return tuple `(results, total)` from service methods for clarity
+   - Supports both parametrized and non-parametrized pagination
+   - Services remain independent of HTTP layer (no page/limit logic, just raw offset/limit)
+
+4. **Test Data Factories**:
+   - Use fixture chains: test_user → bot_service.create_bot() → test_bot
+   - Direct model instantiation works for simple queries (Trade model)
+   - Service methods handle complex relationships automatically
+
+5. **Enum Values Matter**:
+   - ModelName: 'claude-4.5-sonnet', 'gpt-4', 'deepseek-chat' (not 'gpt-4o')
+   - PositionSide: 'long', 'short' (lowercase, not uppercase)
+   - Always check enum definitions before writing tests
+
+6. **Include Filter Pattern**:
+   - `include_stopped` filter applied in BOTH count query and paginated query
+   - Ensures total count matches filtered results (important!)
+   - Example: 3 total bots, 1 stopped → total=2 when include_stopped=False
+
+### Performance Impact
+
+- Pagination reduces memory usage for large result sets (100+ items)
+- Query time unchanged (similar query structure)
+- Network payload reduced proportionally to page size
+- Client-side rendering faster with fewer items
+
+### Verification
+
+✅ All 18 pagination tests passing
+✅ No regressions (66 total tests passing)
+✅ Pagination parameters validated properly (min 10, max 1000, default 100)
+✅ Total counts accurate with filters applied
+✅ Consistent ordering across pages (no duplicates)
+✅ Empty pages handled correctly
+

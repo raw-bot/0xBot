@@ -6,6 +6,7 @@ from typing import Optional
 
 from ..core.exchange_client import ExchangeClient, get_exchange_client
 from ..core.logger import get_logger
+from .cache_service import CacheService, get_cache_service
 
 logger = get_logger(__name__)
 
@@ -62,16 +63,41 @@ class Ticker:
 class MarketDataService:
     """Service for fetching and processing market data."""
 
-    def __init__(self, exchange_client: Optional[ExchangeClient] = None):
+    def __init__(
+        self,
+        exchange_client: Optional[ExchangeClient] = None,
+        cache_service: Optional[CacheService] = None,
+    ):
         self.exchange = exchange_client or get_exchange_client()
+        self.cache = cache_service
 
     async def fetch_ohlcv(
         self, symbol: str, timeframe: str = "1h", limit: int = 100
     ) -> list[OHLCV]:
-        """Fetch OHLCV candlestick data."""
+        """Fetch OHLCV candlestick data with caching."""
         try:
+            # Try to get from cache if cache service available
+            if self.cache:
+                cache_key = await self.cache.get_ohlcv_cache_key(symbol, timeframe)
+                cached = await self.cache.get_cached(cache_key)
+                if cached:
+                    logger.debug(f"OHLCV cache hit for {symbol} {timeframe}")
+                    # Deserialize from cached format
+                    return [
+                        OHLCV(
+                            timestamp=candle["timestamp"],
+                            open=candle["open"],
+                            high=candle["high"],
+                            low=candle["low"],
+                            close=candle["close"],
+                            volume=candle["volume"],
+                        )
+                        for candle in cached
+                    ]
+
+            # Fetch from exchange if not cached
             raw_ohlcv = await self.exchange.fetch_ohlcv(symbol, timeframe, limit)
-            return [
+            ohlcv_list = [
                 OHLCV(
                     timestamp=int(candle[0]),
                     open=float(candle[1]),
@@ -82,18 +108,55 @@ class MarketDataService:
                 )
                 for candle in raw_ohlcv
             ]
+
+            # Cache the result
+            if self.cache:
+                cache_data = [
+                    {
+                        "timestamp": ohlcv.timestamp,
+                        "open": float(ohlcv.open),
+                        "high": float(ohlcv.high),
+                        "low": float(ohlcv.low),
+                        "close": float(ohlcv.close),
+                        "volume": float(ohlcv.volume),
+                    }
+                    for ohlcv in ohlcv_list
+                ]
+                cache_key = await self.cache.get_ohlcv_cache_key(symbol, timeframe)
+                await self.cache.set_cached(
+                    cache_key, cache_data, ttl=CacheService.TTL_OHLCV
+                )
+
+            return ohlcv_list
         except Exception as e:
             logger.error(f"Error fetching OHLCV for {symbol}: {e}")
             raise
 
     async def fetch_ticker(self, symbol: str) -> Ticker:
-        """Fetch current ticker data."""
+        """Fetch current ticker data with caching."""
         try:
+            # Try to get from cache if cache service available
+            if self.cache:
+                cache_key = await self.cache.get_ticker_cache_key(symbol)
+                cached = await self.cache.get_cached(cache_key)
+                if cached:
+                    logger.debug(f"Ticker cache hit for {symbol}")
+                    return Ticker(cached)
+
+            # Fetch from exchange if not cached
             ticker_data = await self.exchange.fetch_ticker(symbol)
             if not ticker_data.get("last"):
                 logger.warning(f"Ticker missing last price for {symbol}")
             else:
                 logger.debug(f"Ticker {symbol}: {ticker_data.get('last')}")
+
+            # Cache the result
+            if self.cache:
+                cache_key = await self.cache.get_ticker_cache_key(symbol)
+                await self.cache.set_cached(
+                    cache_key, ticker_data, ttl=CacheService.TTL_TICKER
+                )
+
             return Ticker(ticker_data)
         except Exception as e:
             logger.error(f"Error fetching ticker for {symbol}: {e}")
@@ -105,19 +168,55 @@ class MarketDataService:
         return ticker.last
 
     async def get_funding_rate(self, symbol: str) -> float:
-        """Get current funding rate for perpetual futures."""
+        """Get current funding rate for perpetual futures with caching."""
         try:
-            return await self.exchange.get_funding_rate(symbol)
+            # Try to get from cache if cache service available
+            if self.cache:
+                cache_key = await self.cache.get_funding_rate_cache_key(symbol)
+                cached = await self.cache.get_cached(cache_key)
+                if cached is not None:
+                    logger.debug(f"Funding rate cache hit for {symbol}")
+                    return float(cached)
+
+            # Fetch from exchange if not cached
+            rate = await self.exchange.get_funding_rate(symbol)
+
+            # Cache the result
+            if self.cache:
+                cache_key = await self.cache.get_funding_rate_cache_key(symbol)
+                await self.cache.set_cached(
+                    cache_key, rate, ttl=CacheService.TTL_FUNDING_RATE
+                )
+
+            return rate
         except Exception as e:
             logger.error(f"Error fetching funding rate: {e}")
             return 0.0
 
     async def get_open_interest(self, symbol: str) -> dict:
-        """Get open interest data for perpetual futures."""
+        """Get open interest data for perpetual futures with caching."""
         try:
+            # Try to get from cache if cache service available
+            if self.cache:
+                cache_key = await self.cache.get_open_interest_cache_key(symbol)
+                cached = await self.cache.get_cached(cache_key)
+                if cached:
+                    logger.debug(f"Open interest cache hit for {symbol}")
+                    return cached
+
+            # Fetch from exchange if not cached
             oi_data = await self.exchange.fetch_open_interest(symbol)
             latest = float(oi_data.get("openInterest", 0)) if oi_data else 0
-            return {"latest": latest, "average": latest}
+            result = {"latest": latest, "average": latest}
+
+            # Cache the result
+            if self.cache:
+                cache_key = await self.cache.get_open_interest_cache_key(symbol)
+                await self.cache.set_cached(
+                    cache_key, result, ttl=CacheService.TTL_OPEN_INTEREST
+                )
+
+            return result
         except Exception as e:
             logger.error(f"Error fetching open interest for {symbol}: {e}")
             return {"latest": 0, "average": 0}
