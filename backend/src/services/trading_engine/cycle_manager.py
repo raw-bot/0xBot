@@ -8,17 +8,17 @@ from typing import Dict, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.config import config
-from ...core.llm_client import LLMClient, get_llm_client
+from ...core.llm_client import LLMClient
 from ...core.logger import get_logger
 from ...models.bot import Bot
 from ...models.equity_snapshot import EquitySnapshot
 from ...models.trade import Trade
 from ..market_data_service import MarketDataService
-from ..market_sentiment_service import get_sentiment_service
-from ..multi_coin_prompt_service import MultiCoinPromptService
+from ..market_sentiment_service import MarketSentimentService
+from ..multi_coin_prompt.service import MultiCoinPromptService
 from ..news_service import NewsService
 from ..position_service import PositionService
-from ..trading_memory_service import get_trading_memory
+from ..trading_memory_service import TradingMemoryService
 from sqlalchemy import select
 from ...core.database import AsyncSessionLocal
 from ...core.activity_logger import ActivityLogger
@@ -35,20 +35,24 @@ class TradingCycleManager:
         self,
         bot: Bot,
         db: AsyncSession,
-        llm_client: Optional[LLMClient] = None,
+        llm_client: LLMClient,
+        sentiment_service: MarketSentimentService,
+        market_data_service: MarketDataService,
+        prompt_service: MultiCoinPromptService,
+        trading_memory: TradingMemoryService,
     ):
         self.bot_id = bot.id
         self.bot = bot
         self.db = db
         self.cycle_count = 0
 
-        self.market_data_service = MarketDataService()
+        self.market_data_service = market_data_service
         self.position_service = PositionService(db)
-        self.llm_client = llm_client or get_llm_client()
-        self.sentiment_service = get_sentiment_service()
-        self.prompt_service = MultiCoinPromptService()
+        self.llm_client = llm_client
+        self.sentiment_service = sentiment_service
+        self.prompt_service = prompt_service
         self.news_service = NewsService()
-        self.trading_memory = get_trading_memory(db, bot.id)
+        self.trading_memory = trading_memory
 
         self.trading_symbols = bot.trading_symbols
         self.timeframe = "5m"

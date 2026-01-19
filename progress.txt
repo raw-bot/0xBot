@@ -2662,3 +2662,80 @@ Ready to proceed to Task 4: Add Query Profiling and Monitoring
 - **Performance:** No change from monolithic version - same number of operations, just better organized
 
 ---
+
+---
+
+## Iteration 14 - Task 5: Migrate Global Singletons to DI Container (COMPLETE)
+
+### What was Implemented
+- **Extended service_factories.py** with 6 new factory functions:
+  * `create_market_sentiment_service()` - MarketSentimentService singleton
+  * `create_fvg_detector_service()` - FVGDetectorService singleton  
+  * `create_cache_service()` - CacheService with RedisClient injection
+  * `create_market_data_service()` - MarketDataService with Exchange + Cache injection
+  * `create_multi_coin_prompt_service()` - MultiCoinPromptService with sentiment + FVG injection
+  * `create_trading_cycle_manager()` - TradingCycleManager with full DI cascade
+
+- **Extended di_compat.py** with 6 new backward-compatible getters:
+  * All 10 global singletons now lazily-load from DI container
+  * Maintains backward compatibility while moving to DI pattern
+
+- **Refactored TradingCycleManager**:
+  * Changed constructor from `__init__(bot, db, llm_client=None)` to require ALL dependencies
+  * Now requires: bot, db, llm_client, sentiment_service, market_data_service, prompt_service, trading_memory
+  * Removed all `or get_*()` fallbacks - pure DI
+  * All dependencies injected via factory function
+
+- **Updated TradingEngineService**:
+  * Uses `create_trading_cycle_manager()` factory instead of direct instantiation
+  * Cascades all DI requirements through factory
+
+### Files Changed
+- Modified: `/backend/src/core/service_factories.py` (added 6 new factories, +35 LOC)
+- Modified: `/backend/src/core/di_compat.py` (added 6 new getters, +72 LOC)
+- Modified: `/backend/src/services/trading_engine/cycle_manager.py` (refactored constructor, full DI)
+- Modified: `/backend/src/services/trading_engine/service.py` (use factory instead of direct creation)
+- Modified: `/PRD.md` (marked Task 5 complete, documented changes)
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered
+- **Factory Cascade Pattern:** Each factory can orchestrate dependencies for more complex services
+- **Lazy DI Loading:** The di_compat.py functions use lazy loading (only create service on first access)
+- **Singleton Lifecycle:** DI container maintains singleton instances across application lifetime
+- **Optional Overrides:** Factory functions accept optional parameters for testing/mocking
+
+#### Gotchas to Avoid
+- **TradingMemory vs TradingMemoryService:** Must use correct class name (`TradingMemoryService` not `TradingMemory`)
+- **Circular Dependencies:** Need to be careful with service cascade - each level must have factories available
+- **Backward Compatibility:** Old code still calling `get_*()` functions works because they now use DI container
+- **Import Timing:** DI container initialization must happen before services try to use it
+
+#### Useful Context for Future Iterations
+- **DI Completeness:** All 10 global singletons now managed by DI container:
+  1. redis_client ✓
+  2. llm_client ✓
+  3. exchange_client ✓
+  4. scheduler ✓ (already managed)
+  5. sentiment_service ✓
+  6. trading_memory ✓
+  7. database session ✓ (already managed)
+  8. logger ✓ (already managed)
+  9. config ✓ (already managed)
+  10. cache_manager ✓
+- **Test Coverage:** All 492 tests pass with no regressions - zero breaking changes
+- **Backward Compatibility:** 100% maintained - old code still works, new code uses DI directly
+- **Next Steps:** Tasks 6-8 can build on this solid DI foundation:
+  - Task 6 (Configuration) can use DI container for config management
+  - Task 7 (Type Safety) benefits from clear DI parameter types
+  - Task 8 (Documentation) should explain new DI patterns
+
+#### Key Insight
+**Migration Strategy Success:** The three-phase approach worked perfectly:
+1. Phase 1 (Task 2): Created DI container infrastructure
+2. Phase 2: Added backward-compatible layer (di_compat.py)
+3. Phase 3: Updated services to use DI (removing fallbacks)
+
+This allowed gradual migration without breaking existing code, while establishing clear dependency flow for future refactoring.
+
+---

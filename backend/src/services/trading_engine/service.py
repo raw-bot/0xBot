@@ -7,13 +7,14 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.database import AsyncSessionLocal
-from ...core.llm_client import LLMClient, get_llm_client
+from ...core.llm_client import LLMClient
 from ...core.logger import get_logger
 from ...models.bot import Bot, BotStatus
 from sqlalchemy import select
 from .cycle_manager import TradingCycleManager
 from .decision_executor import DecisionExecutor
 from .position_monitor import PositionMonitor
+from ...core.service_factories import create_trading_cycle_manager
 
 logger = get_logger(__name__)
 
@@ -36,7 +37,7 @@ class TradingEngineService:
         self.cycle_count = 0
         self.session_start = datetime.utcnow()
 
-        self.cycle_manager = TradingCycleManager(bot, db, llm_client)
+        self.cycle_manager = create_trading_cycle_manager(bot, db, llm_client)
         self.decision_executor = DecisionExecutor(db, bot.id)
         self.position_monitor = PositionMonitor(db, bot.id)
 

@@ -129,3 +129,68 @@ def get_query_profiler() -> Any:
         from .service_factories import create_query_profiler
         container.register("query_profiler", create_query_profiler)
     return container.get("query_profiler")
+
+
+def get_market_sentiment_service() -> Any:
+    """
+    Get market sentiment service from DI container.
+
+    DEPRECATED: Use dependency injection instead.
+    """
+    container = get_container()
+    if not container.is_registered("market_sentiment_service"):
+        from .service_factories import create_market_sentiment_service
+        container.register("market_sentiment_service", create_market_sentiment_service)
+    return container.get("market_sentiment_service")
+
+
+def get_fvg_detector_service() -> Any:
+    """
+    Get FVG detector service from DI container.
+
+    DEPRECATED: Use dependency injection instead.
+    """
+    container = get_container()
+    if not container.is_registered("fvg_detector"):
+        from .service_factories import create_fvg_detector_service
+        container.register("fvg_detector", create_fvg_detector_service)
+    return container.get("fvg_detector")
+
+
+def get_cache_service() -> Any:
+    """
+    Get cache service from DI container.
+
+    DEPRECATED: Use dependency injection instead.
+    """
+    container = get_container()
+    if not container.is_registered("cache_service"):
+        from .service_factories import create_cache_service
+        container.register("cache_service", create_cache_service)
+    return container.get("cache_service")
+
+
+def get_market_data_service() -> Any:
+    """
+    Get market data service from DI container.
+
+    DEPRECATED: Use dependency injection instead.
+    """
+    container = get_container()
+    if not container.is_registered("market_data_service"):
+        from .service_factories import create_market_data_service
+        container.register("market_data_service", create_market_data_service)
+    return container.get("market_data_service")
+
+
+def get_multi_coin_prompt_service() -> Any:
+    """
+    Get multi-coin prompt service from DI container.
+
+    DEPRECATED: Use dependency injection instead.
+    """
+    container = get_container()
+    if not container.is_registered("multi_coin_prompt_service"):
+        from .service_factories import create_multi_coin_prompt_service
+        container.register("multi_coin_prompt_service", create_multi_coin_prompt_service)
+    return container.get("multi_coin_prompt_service")
