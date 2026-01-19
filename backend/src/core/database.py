@@ -1,12 +1,15 @@
 """Database session management and configuration."""
 
+import logging
 import os
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import NullPool
 
 from ..models.base import Base
+from .config import config
+
+logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
@@ -16,10 +19,27 @@ DATABASE_URL = os.getenv(
 if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
+logger.info(
+    f"Database pool configured: pool_size={config.DB_POOL_SIZE}, "
+    f"max_overflow={config.DB_MAX_OVERFLOW}, recycle={config.DB_POOL_RECYCLE}s"
+)
+
+# For async engines, SQLAlchemy 2.0 uses asyncpg's built-in connection pooling
+# We pass pool_size and max_overflow as connect_args for asyncpg
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
-    poolclass=NullPool,
+    pool_size=config.DB_POOL_SIZE,
+    max_overflow=config.DB_MAX_OVERFLOW,
+    pool_recycle=config.DB_POOL_RECYCLE,
+    pool_pre_ping=config.DB_POOL_PRE_PING,
+    connect_args={
+        # asyncpg-specific connection pool settings
+        "min_size": config.DB_POOL_SIZE // 2,  # Minimum connections
+        "max_size": config.DB_POOL_SIZE,      # Maximum connections
+        "timeout": 10,                         # Connection timeout
+        "command_timeout": 5,                  # Command timeout
+    },
     future=True
 )
 

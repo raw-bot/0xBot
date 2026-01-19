@@ -56,6 +56,12 @@ class TradingConfig:
     # Performance
     CYCLE_INTERVAL_SECONDS: int = 300
 
+    # Database Connection Pool
+    DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "20"))  # Concurrent connections
+    DB_MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", "80"))  # Queue overflow before blocking
+    DB_POOL_RECYCLE: int = int(os.getenv("DB_POOL_RECYCLE", "3600"))  # Recycle connections after 1 hour
+    DB_POOL_PRE_PING: bool = os.getenv("DB_POOL_PRE_PING", "true").lower() == "true"  # Check connection before use
+
     @classmethod
     def validate_config(cls) -> tuple[bool, List[str]]:
         """Validate configuration values."""
