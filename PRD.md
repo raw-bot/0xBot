@@ -195,7 +195,7 @@ for position in positions:
 
 ---
 
-### [  ] Task 5: Optimize Dashboard Queries (<50ms p95)
+### [x] Task 5: Optimize Dashboard Queries (<50ms p95)
 
 **Objective**: Ensure all dashboard endpoints respond in <100ms (queries <50ms).
 

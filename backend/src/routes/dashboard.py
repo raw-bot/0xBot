@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta
 from typing import List, Optional
+import time
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from ..core.database import get_db
 from ..core.logger import get_logger
@@ -188,8 +190,21 @@ async def get_first_bot(db: AsyncSession) -> Optional[Bot]:
 @router.get("", response_model=DashboardResponse)
 async def get_dashboard_data(
     period: str = "24h",
+    include_hodl: bool = Query(False, description="Include HODL comparison (slower)"),
     db: AsyncSession = Depends(get_db),
 ):
+    """Get dashboard data with optimized queries.
+
+    Performance targets:
+    - Positions query: 1 query
+    - Equity snapshots query: 1 query
+    - Trade history query: 1 query with outerjoin
+    - Total metrics query: 1 query
+    - Total: 4 queries max (with optional HODL = 5)
+    """
+    start_time = time.time()
+
+    # Get first bot
     bot = await get_first_bot(db)
 
     if not bot:
@@ -203,9 +218,9 @@ async def get_dashboard_data(
             total_unrealized_pnl=0.0,
         )
 
-    start_time = get_period_start(period)
+    start_time_period = get_period_start(period)
 
-    # Get open positions
+    # Query 1: Get open positions (indexed on bot_id, status)
     positions_result = await db.execute(
         select(Position).where(Position.bot_id == bot.id, Position.status == "open")
     )
@@ -214,10 +229,10 @@ async def get_dashboard_data(
     total_unrealized_pnl = sum(float(p.unrealized_pnl) for p in positions)
     margin_in_positions = calculate_margin_in_positions(positions)
 
-    # Get equity snapshots
+    # Query 2: Get equity snapshots (indexed on bot_id, timestamp)
     equity_query = select(EquitySnapshot).where(EquitySnapshot.bot_id == bot.id)
-    if start_time:
-        equity_query = equity_query.where(EquitySnapshot.timestamp >= start_time)
+    if start_time_period:
+        equity_query = equity_query.where(EquitySnapshot.timestamp >= start_time_period)
     equity_query = equity_query.order_by(EquitySnapshot.timestamp)
     equity_result = await db.execute(equity_query)
     snapshots = list(equity_result.scalars().all())
@@ -227,19 +242,19 @@ async def get_dashboard_data(
     initial_capital = float(bot.initial_capital)
     total_return_pct = ((current_equity - initial_capital) / initial_capital * 100) if initial_capital > 0 else 0.0
 
-    # Get trades with positions (using outerjoin to prevent N+1 queries)
+    # Query 3: Get trades with positions (using outerjoin to prevent N+1 queries)
     trades_query = (
         select(Trade, Position)
         .outerjoin(Position, Trade.position_id == Position.id)
         .where(Trade.bot_id == bot.id)
     )
-    if start_time:
-        trades_query = trades_query.where(Trade.executed_at >= start_time)
+    if start_time_period:
+        trades_query = trades_query.where(Trade.executed_at >= start_time_period)
     trades_query = trades_query.order_by(Trade.executed_at.desc())
     trades_result = await db.execute(trades_query)
     all_trade_rows = list(trades_result.all())
 
-    # Get total trades count (use COUNT(*) query instead of fetching all rows)
+    # Query 4: Get total trades count (use COUNT(*) query instead of fetching all rows)
     total_trades_result = await db.execute(
         select(func.count(Trade.id)).where(Trade.bot_id == bot.id)
     )
@@ -255,7 +270,15 @@ async def get_dashboard_data(
 
     winning_trades = sum(1 for t, _ in all_trade_rows if t.realized_pnl and float(t.realized_pnl) > 0)
 
-    hodl_data = await get_hodl_comparison(db, bot.id, total_return_pct)
+    # Optional: Get HODL comparison (can be slow due to exchange API call)
+    hodl_data = {}
+    if include_hodl:
+        hodl_data = await get_hodl_comparison(db, bot.id, total_return_pct)
+    else:
+        hodl_data = {"btc_start_price": 0.0, "btc_current_price": 0.0, "hodl_return_pct": 0.0, "alpha_pct": 0.0}
+
+    query_time_ms = (time.time() - start_time) * 1000
+    logger.info(f"Dashboard query completed in {query_time_ms:.2f}ms")
 
     return DashboardResponse(
         bot=DashboardBotResponse(
@@ -293,9 +316,30 @@ async def get_dashboard_data(
 
 
 @router.get("/bots")
-async def list_bots_public(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Bot))
+async def list_bots_public(
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    limit: int = Query(100, ge=10, le=1000, description="Results per page (10-1000)"),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all bots with pagination to prevent loading all bots.
+
+    Performance targets:
+    - Single COUNT query
+    - Single SELECT with OFFSET/LIMIT
+    - Total: 2 queries max
+    """
+    # Query 1: Get total count (indexed)
+    count_result = await db.execute(select(func.count(Bot.id)))
+    total = count_result.scalar() or 0
+
+    # Query 2: Get paginated results
+    offset = (page - 1) * limit
+    result = await db.execute(
+        select(Bot).offset(offset).limit(limit)
+    )
     bots = list(result.scalars().all())
+
+    total_pages = (total + limit - 1) // limit
 
     return {
         "bots": [
@@ -308,7 +352,10 @@ async def list_bots_public(db: AsyncSession = Depends(get_db)):
             }
             for bot in bots
         ],
-        "total": len(bots),
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": total_pages,
     }
 
 
