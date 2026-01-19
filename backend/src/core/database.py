@@ -12,8 +12,7 @@ from .config import config
 logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/trading_agent"
+    "DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/trading_agent"
 )
 
 if DATABASE_URL.startswith("postgresql://"):
@@ -34,21 +33,19 @@ engine = create_async_engine(
     pool_recycle=config.DB_POOL_RECYCLE,
     pool_pre_ping=config.DB_POOL_PRE_PING,
     connect_args={
-        # asyncpg-specific connection pool settings
-        "min_size": config.DB_POOL_SIZE // 2,  # Minimum connections
-        "max_size": config.DB_POOL_SIZE,      # Maximum connections
-        "timeout": 10,                         # Connection timeout
-        "command_timeout": 5,                  # Command timeout
+        # asyncpg-specific connection settings
+        "timeout": 10,  # Connection timeout
+        "command_timeout": 5,  # Command timeout
+        "server_settings": {
+            "application_name": "0xBot",
+            "jit": "off",  # Disable JIT for better performance on simple queries
+        },
     },
-    future=True
+    future=True,
 )
 
 AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False
+    engine, class_=AsyncSession, expire_on_commit=False, autocommit=False, autoflush=False
 )
 
 
