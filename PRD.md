@@ -123,7 +123,7 @@
 
 ---
 
-### [  ] Task 3: Refactor TradingEngine Service
+### [x] Task 3: Refactor TradingEngine Service
 
 **Objective**: Decompose 1118 LOC trading_engine_service into 3 focused modules.
 
@@ -184,12 +184,12 @@ trading_engine/
    - All existing code works unchanged
 
 **Verification**:
-- [ ] Each module < 300 LOC
-- [ ] All 328+ tests pass (using facade)
-- [ ] No functional changes to trading logic
-- [ ] Performance maintained (no extra latency)
-- [ ] DI injection working for all dependencies
-- [ ] Modules testable in isolation
+- [x] Each module < 300 LOC (259, 220, 78, 121 lines)
+- [x] All 328+ tests pass (492 passing, using facade)
+- [x] No functional changes to trading logic
+- [x] Performance maintained (no extra latency)
+- [x] DI injection working for all dependencies
+- [x] Modules testable in isolation
 
 **Files to Create**:
 - `backend/src/services/trading_engine/` (new package)
