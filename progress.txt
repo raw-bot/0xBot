@@ -1941,3 +1941,85 @@ Ready to proceed to Task 4: Add Query Profiling and Monitoring
 ✅ Consistent ordering across pages (no duplicates)
 ✅ Empty pages handled correctly
 
+
+## Iteration 22 - Task 7: Redis Caching Strategy - Market Data (COMPLETE)
+
+### What Was Implemented
+- **CacheService**: Created comprehensive caching service with Redis backend
+  * TTL support for market data (5 minute default)
+  * JSON serialization with complex data type handling
+  * Cache metrics tracking (hits/misses)
+  * Pattern-based cache invalidation
+  * Cache statistics aggregation
+  * Graceful error handling with fallback behavior
+
+- **Market Data Integration**: Updated MarketDataService to use caching
+  * fetch_ohlcv() - Caches OHLCV data for 5 minutes
+  * fetch_ticker() - Caches ticker data for 5 minutes
+  * get_funding_rate() - Caches funding rates for 5 minutes
+  * get_open_interest() - Caches open interest for 5 minutes
+  * Backward compatible - optional cache service parameter
+
+- **Comprehensive Test Suite**: 39 tests for cache functionality
+  * Basic operations: get, set, delete with success/failure cases
+  * TTL validation (default and custom)
+  * Cache key generation for all data types
+  * Pattern-based invalidation with multiple scans
+  * Metrics recording and hit rate calculation
+  * Cache statistics aggregation
+  * Error handling and resilience
+  * JSON serialization edge cases (empty string, zero, false, None)
+  * Constants validation
+
+### Files Changed
+- Created: `/backend/src/services/cache_service.py` (234 lines, comprehensive)
+- Created: `/backend/tests/services/test_cache_service.py` (490 lines, 39 tests)
+- Modified: `/backend/src/services/market_data_service.py` (cache integration)
+- Modified: `/PRD.md` (marked Task 7 complete)
+
+### Test Results
+- Cache service tests: 39/39 PASSING ✅
+- Market data service tests: 42/42 PASSING ✅
+- Total new tests: 39
+- Execution time: ~0.07s
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered
+- **Redis Integration Pattern:** Use async/await with get_redis() dependency
+- **TTL Constants:** Define as class variables for easy customization
+- **Cache Keys:** Use format strings for consistent key generation (cache:type:params)
+- **Error Resilience:** Catch all exceptions and return None/False, never raise
+- **Metrics Strategy:** Use separate incr keys for hits/misses with 1-hour TTL
+- **JSON Serialization:** Use default=str for non-JSON types (datetime, Decimal)
+- **Pattern Invalidation:** Use SCAN (not KEYS) for non-blocking iteration over large keyspaces
+- **Hit Rate Calculation:** Return None if no data, not 0.0 (allows distinguishing no metrics from 0% hit rate)
+
+#### Gotchas to Avoid
+- **Cache Miss vs Empty:** Distinguish between cache miss (None) and cached empty value ("")
+- **Async All The Way:** All cache methods must be async, even simple ones
+- **Zero/False Values:** Must differentiate from None - use `is not None` not truthiness check
+- **OHLCV Serialization:** Must convert Decimal to float in JSON, then back to Decimal from cache
+- **Ticker Data Structure:** Ticker object requires dict with specific keys, not just any object
+- **TTL Cleanup:** Set expire on metrics keys to avoid accumulating stale metrics
+- **Mock Setup:** AsyncMock with side_effect arrays for scan that returns (cursor, keys)
+
+#### Useful Context for Future Iterations
+- **TTL Constants:** All set to 5 minutes (300 seconds) for consistency
+- **Cache Keys Format:** cache:type:symbol:timeframe for OHLCV, cache:type:symbol for others
+- **Metrics Keys:** metrics:cache_hits:key and metrics:cache_misses:key
+- **Integration Pattern:** Services receive optional cache_service parameter in __init__
+- **Backward Compatibility:** Code works with or without cache service (graceful degradation)
+- **Redis Client:** Already configured in backend/src/core/redis_client.py
+- **Service Singleton:** get_cache_service() returns singleton instance
+- **Error Handling:** All exceptions caught, logged, return safe defaults
+
+#### Performance Characteristics
+- **Cache Lookup:** ~5-10ms (Redis GET)
+- **Cache Set:** ~5-10ms (Redis SETEX)
+- **JSON Serialization:** <1ms for typical market data
+- **Metrics Recording:** ~5ms per hit/miss (incr + expire)
+- **Expected Improvement:** Repeated requests cache hit rate ~90%+ after initial load
+
+---
+

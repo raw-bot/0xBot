@@ -213,14 +213,22 @@ positions: Mapped[list["PositionModel"]] = relationship()
 - Current: NullPool (new connection per request)
 - Should be: QueuePool for production
 
-**Caching**:
-- Redis available
-- Usage: (To be discovered during audit)
+**Caching Pattern**:
+- Redis caching service implemented in `backend/src/services/cache_service.py`
+- CacheService provides generic cache operations with TTL support
+- Market data caching: OHLCV (5m), ticker (5m), funding rates (5m), open interest (5m)
+- Usage pattern: Services receive optional `cache_service` parameter
+- All cache methods are async: `get_cached(key)`, `set_cached(key, value, ttl)`
+- Cache hits/misses tracked automatically with `get_hit_rate()` and `get_cache_stats()`
+- Pattern invalidation with `invalidate_pattern(pattern)` for bulk invalidation
+- Graceful degradation: services work with or without cache (check if `self.cache` is not None)
+- JSON serialization handles complex types (Decimal, datetime) with `default=str`
 
 **Async Patterns**:
 - FastAPI: Full async/await
 - Database: asyncpg for PostgreSQL
 - Exchange API: async CCXT wrapper
+- Redis: async redis-py with connection pooling
 
 ---
 
@@ -253,17 +261,17 @@ When starting work on 0xBot:
 ---
 
 **Last Updated**: 2026-01-19
-**Updated By**: Ralph (Testing Implementation, Tasks 8-9)
+**Updated By**: Ralph (Caching Implementation, Task 7)
 **Last Changes**:
-- Added comprehensive testing patterns (service initialization, data types, return types)
-- Documented 15 common pitfalls and solutions
-- Captured 328 passing tests with 0 flaky tests
-- Added CI/CD workflow with GitHub Actions
-- Created HTML coverage reports (41% overall)
-- Services at 70%+ coverage: market_data (100%), position (100%), risk_manager (92%), trade_executor (74%)
+- Implemented Redis caching strategy for market data (5-minute TTL)
+- Created CacheService with generic cache operations, metrics tracking, pattern invalidation
+- Integrated caching into MarketDataService (OHLCV, ticker, funding rates, open interest)
+- Added comprehensive test suite: 39 tests for cache_service (100% passing)
+- All tests passing: 81/81 (cache + market_data services)
+- Documented caching patterns for future development
+- Backward compatible implementation with graceful degradation
 
 **Next Steps**:
-- Fix route/API endpoint tests (35 failing, auth-related)
-- Reach 80%+ overall coverage target
-- Add frontend testing framework
-- Consider extracting more common patterns
+- Task 8: Cache Technical Indicators (15-minute TTL) - indicators service integration
+- Task 9: Verify Performance Improvements - benchmarking before/after metrics
+- Task 10: Create Performance Documentation - PERFORMANCE.md guide
