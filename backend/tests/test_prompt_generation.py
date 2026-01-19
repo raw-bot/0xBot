@@ -6,7 +6,7 @@ from datetime import datetime
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from backend.src.services.multi_coin_prompt_service import MultiCoinPromptService
+from src.services.multi_coin_prompt_service import MultiCoinPromptService
 
 
 async def test_prompt_generation():

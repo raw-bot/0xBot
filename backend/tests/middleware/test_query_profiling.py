@@ -7,8 +7,8 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from backend.src.core.query_profiler import QueryProfiler
-from backend.src.middleware.query_profiling import QueryProfilingMiddleware
+from src.core.query_profiler import QueryProfiler
+from src.middleware.query_profiling import QueryProfilingMiddleware
 
 
 @pytest.fixture
@@ -229,7 +229,7 @@ class TestStructuredLogging:
     def test_json_formatter_formats_correctly(self):
         """Test JSON formatter output."""
         import logging
-        from backend.src.core.logging_config import JSONFormatter
+        from src.core.logging_config import JSONFormatter
 
         formatter = JSONFormatter()
         record = logging.LogRecord(
@@ -252,7 +252,7 @@ class TestStructuredLogging:
 
     def test_structured_logger_logs_query_metrics(self):
         """Test structured logger logs query metrics."""
-        from backend.src.core.logging_config import StructuredLogger
+        from src.core.logging_config import StructuredLogger
 
         logger = StructuredLogger("test")
         with patch('backend.src.core.logging_config.logging.getLogger') as mock_get:
@@ -272,7 +272,7 @@ class TestStructuredLogging:
 
     def test_slow_query_logging(self):
         """Test slow query logging."""
-        from backend.src.core.logging_config import StructuredLogger
+        from src.core.logging_config import StructuredLogger
 
         logger = StructuredLogger("test")
         with patch.object(logger.logger, 'warning') as mock_warning:

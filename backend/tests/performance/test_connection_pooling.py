@@ -52,7 +52,7 @@ class TestConnectionPoolConfiguration:
 
     def test_total_pool_capacity(self):
         """Verify total pool capacity (pool_size + max_overflow)."""
-        from backend.src.core.config import config
+        from src.core.config import config
 
         pool = engine.pool
         pool_size = pool.size()

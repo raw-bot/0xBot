@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.src.services.cache_service import CacheService
+from src.services.cache_service import CacheService
 
 
 @pytest.mark.asyncio
