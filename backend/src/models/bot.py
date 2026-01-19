@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, generate_uuid
+from ..config import TRADING_CONFIG, LIMITS_CONFIG
 
 if TYPE_CHECKING:
     from .llm_decision import LLMDecision
@@ -50,11 +51,11 @@ class Bot(Base):
         JSON,
         nullable=False,
         default=lambda: {
-            "max_position_pct": 0.10,
-            "max_drawdown_pct": 0.20,
-            "max_trades_per_day": 10,
-            "stop_loss_pct": 0.03,
-            "take_profit_pct": 0.06,
+            "max_position_pct": TRADING_CONFIG["DEFAULT_BOT_MAX_POSITION_PCT"],
+            "max_drawdown_pct": LIMITS_CONFIG["BOT_MAX_DRAWDOWN_PCT"],
+            "max_trades_per_day": LIMITS_CONFIG["BOT_MAX_TRADES_PER_DAY"],
+            "stop_loss_pct": TRADING_CONFIG["DEFAULT_STOP_LOSS_PCT"],
+            "take_profit_pct": TRADING_CONFIG["DEFAULT_TAKE_PROFIT_PCT"],
         },
     )
     status: Mapped[str] = mapped_column(

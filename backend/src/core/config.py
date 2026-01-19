@@ -1,4 +1,9 @@
-"""Configuration centralisee pour le bot de trading."""
+"""
+Configuration centralisee pour le bot de trading.
+
+This module provides backward-compatible access to configuration values
+while centralizing all constants in config.constants module.
+"""
 
 import os
 from decimal import Decimal
@@ -7,39 +12,55 @@ from typing import List
 
 from dotenv import load_dotenv
 
+# Import from new config package for centralized constants
+from ..config import (
+    TRADING_CONFIG,
+    TIMING_CONFIG,
+    LIMITS_CONFIG,
+    VALIDATION_CONFIG,
+    DATABASE_CONFIG,
+    API_CONFIG,
+    get_constant,
+)
+
 env_path = Path(__file__).resolve().parents[3] / ".env"
 load_dotenv(dotenv_path=env_path)
 
 
 class TradingConfig:
-    """Configuration centralisee pour le trading bot."""
+    """Configuration centralisee pour le trading bot.
+
+    This class provides backward-compatible access to configuration.
+    All constants are now centralized in config.constants and can be
+    overridden via environment variables using config.environment.
+    """
 
     # LLM Configuration
     FORCED_MODEL_DEEPSEEK: str = os.getenv("FORCE_DEEPSEEK_MODEL", "deepseek-chat")
 
     # News API
     CRYPTOCOMPARE_API_KEY = os.getenv("CRYPTOCOMPARE_API_KEY", "")
-    NEWS_FETCH_INTERVAL: int = 300
 
-    # Trading Parameters
-    MIN_CONFIDENCE_ENTRY: float = 0.70
-    MIN_CONFIDENCE_EXIT_EARLY: float = 0.60
-    MIN_CONFIDENCE_EXIT_NORMAL: float = 0.70
-    MAX_NEW_ENTRIES_PER_CYCLE: int = 2
+    # Trading Parameters - loaded from config package
+    NEWS_FETCH_INTERVAL: int = TIMING_CONFIG["NEWS_FETCH_INTERVAL_SECONDS"]
+    MIN_CONFIDENCE_ENTRY: float = VALIDATION_CONFIG["MIN_CONFIDENCE_ENTRY"]
+    MIN_CONFIDENCE_EXIT_EARLY: float = VALIDATION_CONFIG["MIN_CONFIDENCE_EXIT_EARLY"]
+    MIN_CONFIDENCE_EXIT_NORMAL: float = VALIDATION_CONFIG["MIN_CONFIDENCE_EXIT_NORMAL"]
+    MAX_NEW_ENTRIES_PER_CYCLE: int = LIMITS_CONFIG["MAX_NEW_ENTRIES_PER_CYCLE"]
 
-    # Risk Management
-    DEFAULT_STOP_LOSS_PCT: float = 0.035
-    DEFAULT_TAKE_PROFIT_PCT: float = 0.08
-    DEFAULT_POSITION_SIZE_PCT: float = 0.35
-    DEFAULT_LEVERAGE: float = 5.0
+    # Risk Management - loaded from config package
+    DEFAULT_STOP_LOSS_PCT: float = TRADING_CONFIG["DEFAULT_STOP_LOSS_PCT"]
+    DEFAULT_TAKE_PROFIT_PCT: float = TRADING_CONFIG["DEFAULT_TAKE_PROFIT_PCT"]
+    DEFAULT_POSITION_SIZE_PCT: float = TRADING_CONFIG["DEFAULT_POSITION_SIZE_PCT"]
+    DEFAULT_LEVERAGE: float = TRADING_CONFIG["DEFAULT_LEVERAGE"]
 
-    # SHORT-specific settings
-    SHORT_MAX_LEVERAGE: float = 3.0
-    SHORT_MIN_CONFIDENCE: float = 0.65
-    SHORT_POSITION_SIZE_PCT: float = 0.25
+    # SHORT-specific settings - loaded from config package
+    SHORT_MAX_LEVERAGE: float = TRADING_CONFIG["SHORT_MAX_LEVERAGE"]
+    SHORT_MIN_CONFIDENCE: float = VALIDATION_CONFIG["SHORT_MIN_CONFIDENCE"]
+    SHORT_POSITION_SIZE_PCT: float = TRADING_CONFIG["SHORT_POSITION_SIZE_PCT"]
 
-    # Trading Fees (Binance Futures Taker)
-    PAPER_TRADING_FEE_PCT: float = 0.0005
+    # Trading Fees - loaded from config package
+    PAPER_TRADING_FEE_PCT: float = TRADING_CONFIG["PAPER_TRADING_FEE_PCT"]
 
     # Allowed symbols whitelist
     ALLOWED_SYMBOLS: List[str] = [
@@ -50,17 +71,17 @@ class TradingConfig:
         "XRP/USDT",
     ]
 
-    # Rate Limiting
-    LLM_CALLS_PER_MINUTE: int = 10
+    # Rate Limiting - loaded from config package
+    LLM_CALLS_PER_MINUTE: int = API_CONFIG["LLM_CALLS_PER_MINUTE"]
 
-    # Performance
-    CYCLE_INTERVAL_SECONDS: int = 300
+    # Performance - loaded from config package
+    CYCLE_INTERVAL_SECONDS: int = TIMING_CONFIG["CYCLE_INTERVAL_SECONDS"]
 
-    # Database Connection Pool
-    DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "20"))  # Concurrent connections
-    DB_MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", "80"))  # Queue overflow before blocking
-    DB_POOL_RECYCLE: int = int(os.getenv("DB_POOL_RECYCLE", "3600"))  # Recycle connections after 1 hour
-    DB_POOL_PRE_PING: bool = os.getenv("DB_POOL_PRE_PING", "true").lower() == "true"  # Check connection before use
+    # Database Connection Pool - loaded from config package with env overrides
+    DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", str(DATABASE_CONFIG["POOL_SIZE"])))
+    DB_MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", str(DATABASE_CONFIG["MAX_OVERFLOW"])))
+    DB_POOL_RECYCLE: int = TIMING_CONFIG["DB_POOL_RECYCLE_SECONDS"]
+    DB_POOL_PRE_PING: bool = os.getenv("DB_POOL_PRE_PING", "true").lower() == "true"
 
     @classmethod
     def validate_config(cls) -> tuple[bool, List[str]]:
