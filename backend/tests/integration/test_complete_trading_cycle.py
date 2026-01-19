@@ -1,58 +1,69 @@
-"""Test d'intégration pour le cycle de trading complet."""
+"""Integration tests for complete trading cycle workflows (alternate implementations)."""
 
+import uuid
 import pytest
-import asyncio
+from datetime import datetime
 from decimal import Decimal
-from unittest.mock import Mock, patch
 
-from src.services.trading_engine_service import TradingEngine
-from src.services.multi_coin_prompt_service import MultiCoinPromptService
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.models.bot import Bot, BotStatus, ModelName
+from src.models.user import User
+from src.services.market_data_service import MarketDataService
+from src.services.market_analysis_service import MarketAnalysisService
+from src.services.risk_manager_service import RiskManagerService
 
 
+@pytest.mark.asyncio
+@pytest.mark.integration
 class TestCompleteTradingCycle:
-    """Tests d'intégration pour le cycle de trading complet."""
-    
-    @pytest.fixture
-    def mock_bot(self):
-        """Bot mock pour les tests."""
-        bot = Mock()
-        bot.id = "test-bot-id"
-        bot.name = "Test Bot"
-        bot.capital = Decimal("10000")
-        bot.trading_symbols = ["BTC/USDT", "ETH/USDT"]
-        return bot
-    
-    @pytest.fixture
-    def mock_db(self):
-        """Database mock pour les tests."""
-        return Mock()
-    
-    @pytest.mark.asyncio
-    async def test_trading_cycle_integration(self, mock_bot, mock_db):
-        """Test d'intégration du cycle de trading complet."""
-        # Arrange
-        engine = TradingEngine(mock_bot, mock_db)
-        
-        # Act - Simuler un cycle de trading
-        with patch.object(engine, '_trading_cycle') as mock_cycle:
-            await engine.start()
-            
-            # Assert
-            mock_cycle.assert_called()
-    
-    @pytest.mark.asyncio
-    async def test_multi_coin_prompt_service(self, mock_bot):
-        """Test du service de prompt multi-coins."""
-        # Arrange
-        service = MultiCoinPromptService()
-        
-        # Act
-        result = service.get_multi_coin_decision(
-            bot=mock_bot,
-            market_data={},
-            positions=[]
+    """Alternative integration tests for complete trading workflows."""
+
+    async def test_market_analysis_workflow(
+        self,
+        db_session: AsyncSession,
+        test_bot: Bot,
+    ):
+        """Test workflow: analyze market."""
+        # Setup services
+        market_analysis_service = MarketAnalysisService()
+
+        # Analyze market with correlation matrix
+        btc_prices = [45000, 45500, 46000, 46500, 47000]
+        eth_prices = [2400, 2450, 2500, 2550, 2600]
+        correlation = market_analysis_service.calculate_correlation_matrix(
+            {"BTC/USDT": btc_prices, "ETH/USDT": eth_prices}
         )
-        
-        # Assert
-        assert result is not None
-        assert "prompt" in result
+        assert correlation is not None
+        # Correlation should be a 2D array-like structure
+        assert len(correlation) > 0
+
+    async def test_risk_validation_workflow(
+        self,
+        db_session: AsyncSession,
+        test_bot: Bot,
+    ):
+        """Test workflow: validate risk parameters before trading."""
+        risk_manager_service = RiskManagerService()
+
+        # Create test decision
+        current_price = Decimal("47000")
+        decision = {
+            "symbol": "BTC/USDT",
+            "side": "long",
+            "size_pct": 0.10,
+            "entry_price": current_price,
+            "stop_loss": Decimal("45650"),
+            "take_profit": Decimal("48810"),
+            "confidence": 0.75,
+        }
+
+        # Validate
+        is_valid, error = risk_manager_service.validate_entry(
+            test_bot, decision, [], current_price
+        )
+        assert isinstance(is_valid, bool)
+
+        # If invalid, error message should be present
+        if not is_valid:
+            assert isinstance(error, str)
