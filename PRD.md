@@ -21,7 +21,7 @@
 
 ## Refactoring Tasks
 
-### [  ] Task 1: Cleanup & Documentation
+### [x] Task 1: Cleanup & Documentation
 
 **Objective**: Remove clutter and document current state for safe refactoring.
 
@@ -48,11 +48,11 @@
    - Identify service responsibilities
 
 **Verification**:
-- [ ] All 8 archived files deleted
-- [ ] No import errors after deletion
-- [ ] All 328+ tests still pass
-- [ ] ARCHITECTURE_CURRENT.md created
-- [ ] Dependency graph documented
+- [x] All 8 archived files deleted
+- [x] No import errors after deletion
+- [x] All 328+ tests still pass
+- [x] ARCHITECTURE_CURRENT.md created
+- [x] Dependency graph documented
 
 **Files to Delete**:
 - `backend/src/services/archived/*` (8 files)

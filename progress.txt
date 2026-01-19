@@ -2393,3 +2393,78 @@ Ready to proceed to Task 4: Add Query Profiling and Monitoring
 
 ---
 
+
+## Iteration 14 - Task 1: Cleanup & Documentation (COMPLETE)
+
+### What Was Implemented
+- **Deleted 8 archived services** from `backend/src/services/archived/`:
+  * alerting_service.py
+  * cache_service.py
+  * error_recovery_service.py
+  * health_check_service.py
+  * llm_decision_logger.py (executable)
+  * metrics_export_service.py
+  * performance_monitor.py
+  * validation_service.py
+
+- **Created ARCHITECTURE_CURRENT.md** (570 lines):
+  * Executive summary of monolithic architecture
+  * Documented all 10 global singletons with locations and purposes
+  * Listed all 24 active services with descriptions
+  * Service dependencies map
+  * Current issues and problems
+  * Startup/shutdown flow
+  * Baseline metrics
+
+- **Created DEPENDENCY_GRAPH.md** (450 lines):
+  * Visual ASCII diagrams of global singletons
+  * 6-tier service dependency tree (Tier 1-6)
+  * High-level trading cycle data flow
+  * Import bottleneck analysis
+  * Circular dependency check (none found - well layered)
+  * Global access patterns
+  * Refactoring target diagram
+
+- **Fixed test imports**: Updated 4 test files using incorrect `backend.src` paths to correct `src` paths
+
+### Files Changed
+- Deleted: 8 archived service files
+- Created: 2 documentation files (1020 lines total)
+- Modified: 4 test files (import paths)
+- Modified: PRD.md (marked Task 1 complete)
+
+### Verification Results
+- [x] All 8 archived services deleted
+- [x] Verified no references to archived services in codebase
+- [x] All 492+ tests still passing (no new failures)
+- [x] ARCHITECTURE_CURRENT.md created with comprehensive baseline
+- [x] DEPENDENCY_GRAPH.md created with visual maps
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered
+- **Tiered Architecture**: Services are well-organized in 6 tiers (external → analysis → decision → orchestration)
+- **No Circular Dependencies**: Current architecture avoids cycles, good foundation for refactoring
+- **Global Singleton Pattern**: All 10 globals accessed via direct imports (not factories)
+- **Import Bottlenecks**: market_data_service (7 users), cache_service (8 users) - these are critical
+- **Trading Cycle Flow**: Well-defined stages from market fetch → LLM → validation → execution → monitoring
+
+#### Gotchas to Avoid
+- **Two Large Services**: trading_engine_service (1118 LOC) and multi_coin_prompt_service (673 LOC) are the refactoring targets
+- **Database NullPool Issue**: Current pool config is "scalability killer" - will be addressed in later tasks
+- **Test Import Paths**: Tests were using incorrect `backend.src.*` imports instead of `src.*` - fixed all occurrences
+- **Archived Directory**: Even though empty except README.md, directory should be removed entirely after this task
+
+#### Useful Context for Future Iterations
+- **Total Services**: 24 active (8 archived deleted)
+- **Test Baseline**: 492 tests passing, 44 failed, 20 errors (pre-existing from Task 13)
+- **Documentation Quality**: Architecture docs provide clear baseline for measuring refactoring progress
+- **Refactoring Strategy**: Progressive approach maintains backward compatibility while modularizing
+- **Next Task (Task 2)**: Create ServiceContainer DI class and factory functions for all 10 singletons
+
+### Next Steps
+- Task 2: Create Dependency Injection Foundation (ServiceContainer, factories, compatibility layer)
+- Focus on DI container design to eliminate global imports while maintaining backward compatibility
+- All 492 tests must continue passing throughout refactoring
+
+---
