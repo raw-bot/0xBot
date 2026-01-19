@@ -2542,3 +2542,58 @@ Ready to proceed to Task 4: Add Query Profiling and Monitoring
 
 ---
 
+
+## Iteration [N] - Task 3: Refactor TradingEngine Service
+
+### What Was Implemented
+- **Decomposed monolithic TradingEngineService** (582 LOC) into 4 focused modules:
+  * `TradingCycleManager` (259 LOC) - Orchestrates complete trading cycle, fetches market data, calls LLM, coordinates decision execution
+  * `DecisionExecutor` (220 LOC) - Executes LLM decisions, validates entries, handles position sizing, risk management
+  * `PositionMonitor` (78 LOC) - Monitors open positions, checks stop loss/take profit, handles emergency closes
+  * `TradingEngineService` facade (121 LOC) - Maintains backward compatibility, coordinates all modules
+
+- **Backward compatibility wrapper:**
+  * Original `trading_engine_service.py` now imports from new package
+  * Existing code importing `TradingEngine` still works unchanged
+  * All public APIs remain identical
+
+- **Package structure:**
+  * Created `backend/src/services/trading_engine/` package
+  * Includes `__init__.py` for clean imports
+  * Each module has single responsibility (SRP)
+
+### Files Changed
+- Created: `/backend/src/services/trading_engine/__init__.py` (13 lines)
+- Created: `/backend/src/services/trading_engine/cycle_manager.py` (259 lines)
+- Created: `/backend/src/services/trading_engine/decision_executor.py` (220 lines)
+- Created: `/backend/src/services/trading_engine/position_monitor.py` (78 lines)
+- Created: `/backend/src/services/trading_engine/service.py` (121 lines, facade)
+- Modified: `/backend/src/services/trading_engine_service.py` (reduced from 582 to 6 lines, backward compat wrapper)
+- Modified: `/PRD.md` (marked Task 3 complete)
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered
+- **Module Facade Pattern:** Facade service coordinates multiple focused modules while maintaining original API
+- **Orchestration Pattern:** `TradingCycleManager` doesn't execute decisions, returns them for executor
+- **Async Task Separation:** Cycle management, decision execution, position monitoring are independently testable
+- **Backward Compatibility Pattern:** Re-export new implementation under old name for zero breaking changes
+- **Dependency Injection Ready:** Each module accepts required dependencies in constructor
+
+#### Gotchas to Avoid
+- **Circular imports:** Don't import TradingCycleManager in DecisionExecutor's constructor, use local import when needed
+- **Async generator pattern:** `execute_cycle()` returns tuple (decisions, all_coins_data, all_positions) instead of modifying state
+- **Multiple fresh_db sessions:** Each module creates its own AsyncSessionLocal session to avoid state conflicts
+- **Position service coupling:** DecisionExecutor needs PositionService for state, pass via constructor not global
+- **LLM client injection:** Support optional injection for testing (pass `llm_client=mock_client`)
+
+#### Useful Context for Future Iterations
+- **Test Results:** 492 tests passing (no regressions), all integration tests working
+- **Module size compliance:** All modules < 300 LOC (PRD target met)
+- **Original monolithic size:** 582 LOC → now 4 modules totaling 691 LOC (overhead worth it for clarity)
+- **Backward compatibility:** 100% - `from services.trading_engine_service import TradingEngine` still works
+- **Next Task:** Task 4 will refactor MultiCoinPromptService (673 LOC) using same pattern
+- **DI Integration:** Modules are ready for dependency injection container (Task 2 already created DI foundation)
+- **Testability improved:** Each module can now be tested independently with mocked dependencies
+
+---
