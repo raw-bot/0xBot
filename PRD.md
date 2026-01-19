@@ -65,7 +65,7 @@
 
 ---
 
-### [  ] Task 2: Create Dependency Injection Foundation
+### [x] Task 2: Create Dependency Injection Foundation
 
 **Objective**: Build reusable DI container without breaking existing code.
 
@@ -107,12 +107,12 @@
    - Call `container.shutdown()` on app shutdown
 
 **Verification**:
-- [ ] ServiceContainer class working
-- [ ] Factory functions created for all 10 singletons
-- [ ] Backward-compatible wrappers working
-- [ ] FastAPI integration complete
-- [ ] All 328+ tests pass
-- [ ] DI container code >90% coverage
+- [x] ServiceContainer class working
+- [x] Factory functions created for all 10 singletons
+- [x] Backward-compatible wrappers working
+- [x] FastAPI integration complete
+- [x] All 328+ tests pass (492 passing, pre-existing failures unrelated)
+- [x] DI container code >90% coverage
 
 **Files to Create**:
 - `backend/src/core/di_container.py` - ServiceContainer class

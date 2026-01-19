@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .core.config import config
 from .core.database import close_db
+from .core.di_container import get_container
 from .core.logging_config import configure_structured_logging
 from .core.redis_client import close_redis, init_redis
 from .core.scheduler import start_scheduler, stop_scheduler
@@ -33,6 +34,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup
     print("🚀 Starting AI Trading Agent API...")
 
+    # Initialize DI container
+    container = get_container()
+    print("✅ DI container initialized")
+
     # Configure structured logging
     configure_structured_logging()
     print("✅ Structured logging configured")
@@ -52,6 +57,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize database
     print("✅ Database connected")
 
+    # Startup DI container services
+    await container.startup()
+    print("✅ DI container services started")
+
     # Start bot scheduler
     await start_scheduler()
     print("✅ Bot scheduler started")
@@ -67,6 +76,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Stop scheduler first
     await stop_scheduler()
     print("✅ Bot scheduler stopped")
+
+    # Shutdown DI container services
+    await container.shutdown()
+    print("✅ DI container services stopped")
 
     # Close connections
     await close_db()
