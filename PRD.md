@@ -73,7 +73,7 @@ engine = create_async_engine(
 
 ---
 
-### [  ] Task 2: Add Database Indices for Common Queries
+### [x] Task 2: Add Database Indices for Common Queries
 
 **Objective**: Optimize SQL queries with strategic indices on frequently filtered columns.
 
