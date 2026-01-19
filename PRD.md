@@ -318,7 +318,7 @@ for position in positions:
 
 ---
 
-### [  ] Task 8: Cache Technical Indicators (15-minute TTL)
+### [x] Task 8: Cache Technical Indicators (15-minute TTL)
 
 **Objective**: Cache expensive indicator calculations.
 

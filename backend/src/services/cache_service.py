@@ -20,6 +20,7 @@ class CacheService:
     TTL_TICKER = 5 * 60  # 5 minutes for ticker data
     TTL_FUNDING_RATE = 5 * 60  # 5 minutes for funding rates
     TTL_OPEN_INTEREST = 5 * 60  # 5 minutes for open interest
+    TTL_INDICATOR = 15 * 60  # 15 minutes for technical indicators
 
     # Cache keys
     KEY_OHLCV = "cache:ohlcv:{symbol}:{timeframe}"
@@ -28,6 +29,10 @@ class CacheService:
     KEY_OPEN_INTEREST = "cache:open_interest:{symbol}"
     KEY_MARKET_SNAPSHOT = "cache:market_snapshot:{symbol}:{timeframe}"
     KEY_MARKET_SNAPSHOT_MULTI = "cache:market_snapshot_multi:{symbol}:{tf_short}:{tf_long}"
+    KEY_INDICATOR_SMA = "cache:indicator:sma:{symbol}:{timeframe}:{period}"
+    KEY_INDICATOR_EMA = "cache:indicator:ema:{symbol}:{timeframe}:{period}"
+    KEY_INDICATOR_RSI = "cache:indicator:rsi:{symbol}:{timeframe}:{period}"
+    KEY_INDICATOR_MACD = "cache:indicator:macd:{symbol}:{timeframe}"
 
     # Metrics keys
     KEY_CACHE_HITS = "metrics:cache_hits:{key}"
@@ -175,6 +180,22 @@ class CacheService:
         return self.KEY_MARKET_SNAPSHOT_MULTI.format(
             symbol=symbol, tf_short=tf_short, tf_long=tf_long
         )
+
+    async def get_sma_cache_key(self, symbol: str, timeframe: str, period: int) -> str:
+        """Get SMA cache key."""
+        return self.KEY_INDICATOR_SMA.format(symbol=symbol, timeframe=timeframe, period=period)
+
+    async def get_ema_cache_key(self, symbol: str, timeframe: str, period: int) -> str:
+        """Get EMA cache key."""
+        return self.KEY_INDICATOR_EMA.format(symbol=symbol, timeframe=timeframe, period=period)
+
+    async def get_rsi_cache_key(self, symbol: str, timeframe: str, period: int) -> str:
+        """Get RSI cache key."""
+        return self.KEY_INDICATOR_RSI.format(symbol=symbol, timeframe=timeframe, period=period)
+
+    async def get_macd_cache_key(self, symbol: str, timeframe: str) -> str:
+        """Get MACD cache key."""
+        return self.KEY_INDICATOR_MACD.format(symbol=symbol, timeframe=timeframe)
 
     async def _record_hit(self, key: str) -> None:
         """Record cache hit metric."""
