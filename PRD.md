@@ -157,7 +157,7 @@ for position in positions:
 
 ---
 
-### [  ] Task 4: Add Query Profiling and Monitoring
+### [x] Task 4: Add Query Profiling and Monitoring
 
 **Objective**: Measure and log query performance to identify bottlenecks.
 

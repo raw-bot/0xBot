@@ -10,9 +10,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .core.config import config
 from .core.database import close_db
+from .core.logging_config import configure_structured_logging
 from .core.redis_client import close_redis, init_redis
 from .core.scheduler import start_scheduler, stop_scheduler
 from .middleware.error_handler import ErrorHandlerMiddleware
+from .middleware.query_profiling import QueryProfilingMiddleware
 from .middleware.security import RequestIDMiddleware, SecurityHeadersMiddleware
 from .routes import auth_router, bots_router
 from .routes.dashboard import router as dashboard_router
@@ -30,6 +32,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     # Startup
     print("🚀 Starting AI Trading Agent API...")
+
+    # Configure structured logging
+    configure_structured_logging()
+    print("✅ Structured logging configured")
 
     # Validate configuration
     is_valid, errors = config.validate_config()
@@ -84,6 +90,7 @@ app = FastAPI(
 CORS_ORIGINS = ["*"]  # Allow all origins including file://
 
 # Add middlewares (order matters - first added is executed last)
+app.add_middleware(QueryProfilingMiddleware)
 app.add_middleware(ErrorHandlerMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestIDMiddleware)
