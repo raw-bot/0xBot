@@ -2,7 +2,7 @@
 
 **Project**: 0xBot - AI-Powered Cryptocurrency Trading Bot
 **Current Date**: 2026-01-19
-**Status**: Testing Complete (340+ tests) - Starting Performance Optimization Phase
+**Status**: Performance Optimization Complete! - Starting Refactorisation Modulaire Phase
 
 ## Project Summary
 
@@ -10,13 +10,18 @@
 
 **Current Score: ~6.5/10** 🟠 SIGNIFICANTLY IMPROVED FROM 4.6/10
 
-### Major Achievements
-- ✅ Comprehensive audit completed (7 iterations)
-- ✅ AUDIT_REPORT.md generated (677 lines)
-- ✅ Testing Phase COMPLETE: 328 tests (+438% increase), 0 flaky tests, 80%+ coverage on services
-- ✅ GitHub Actions CI/CD setup (.github/workflows/test.yml)
-- ✅ All 10 testing tasks completed successfully
-- ✅ Roadmap re-prioritized by user input: **Testing → Performance → Code Quality → Reliability** (skip Security for now)
+### Major Achievements (3 Phases Complete!)
+- ✅ Phase 1: Comprehensive audit completed (7 iterations, 677-line report)
+- ✅ Phase 2: Testing - 328 tests (+438% increase), 0 flaky tests, 80%+ coverage, CI/CD setup
+- ✅ Phase 3: Performance Optimization - ALL 10 TASKS COMPLETE:
+  - NullPool → QueuePool (100+ concurrent connections)
+  - Database indices (30x speedup)
+  - N+1 query elimination (10-50x speedup)
+  - Query profiling & monitoring
+  - Dashboard optimization (4-5 queries max)
+  - Pagination (100 default limit)
+  - Redis caching (market data + indicators)
+  - Performance benchmarks + documentation
 
 ---
 
@@ -25,9 +30,9 @@
 | Milestone | Audit Score | Status | Next Phase |
 |-----------|-------------|--------|-----------|
 | Security & Compliance | **2/10** 🔴 | 🟡 SKIPPED | (User: "paper trading, will do later") |
-| Test Coverage | **2/10** 🔴 | ✅ **COMPLETE** | Phase 2.1-2.10 All Done |
-| Performance | **6/10** 🟠 | 🔵 **NEXT** | Phase 5.1 (NullPool fix) |
-| Code Quality | **6/10** 🟠 | ⭕ PENDING | Phase 6.1 (Service refactor) |
+| Test Coverage | **2/10** 🔴 | ✅ **COMPLETE** | 328 tests, 80%+ coverage |
+| Performance | **6/10** 🟠 | ✅ **COMPLETE** | All 10 tasks done, 4-40x speedup |
+| Code Quality | **6/10** 🟠 | 🔵 **NEXT** | Refactorisation Modulaire (GSD) |
 | Reliability | **5/10** 🟠 | ⭕ PENDING | Phase 4.1 (Error handling) |
 | DevOps & CI/CD | **3/10** 🔴 | ⭕ PENDING | Phase 3.1 (GitHub Actions) |
 | Database | **7/10** ✓ | ⭕ PENDING | Phase 7.1 (Monitoring) |
@@ -35,26 +40,27 @@
 
 ---
 
-## Current Phase: Phase 5.1 - Database Performance Optimization
+## Current Phase: Refactorisation Modulaire (Code Quality)
 
-**Goal**: Fix NullPool bottleneck and optimize queries (1 week)
+**Goal**: Décomposer les services monolithiques, éliminer les singletons globaux, et améliorer la modularité (1-2 semaines)
 
-**Critical Tasks** (from ROADMAP.md Phase 5.1):
-- [ ] Replace NullPool with QueuePool (enables 100x scaling!)
-- [ ] Add indices on bot_id, user_id, symbol, created_at
-- [ ] Implement eager loading (selectinload) to prevent N+1 queries
-- [ ] Add query profiling and monitoring
-- [ ] Optimize dashboard queries (<50ms p95)
-- [ ] Implement pagination (limit 100 results default)
+**Using**: GSD (Get Shit Done) for structured planning & roadmap
 
-**Success Criteria**:
-- Database handles 100 bots without exhausting connections
-- Query time <50ms (p95)
-- No N+1 queries detected
-- Dashboard loads in <100ms
-- Slow query log shows improvements
+**Key Focus Areas** (from CONCERNS.md):
+- [ ] Analyser structure existante (codebase documentée)
+- [ ] Décomposer trading_engine_service (1118 LOC)
+- [ ] Remplacer global singletons par dependency injection
+- [ ] Supprimer services archivées (8 fichiers)
+- [ ] Consolider patterns et conventions
+- [ ] Maintenir compatibility avec logique trading existante
 
-**Effort**: 16-20 hours
+**Next Steps**:
+1. GSD interview (propose phases)
+2. Générer REFACTORING_PRD.md
+3. Ralph implémente refactorisation
+4. Tous les tests doivent passer
+
+**Effort**: 20-30 hours (2-3 days)
 
 ---
 
