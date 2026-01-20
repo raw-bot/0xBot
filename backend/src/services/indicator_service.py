@@ -134,6 +134,35 @@ class IndicatorService:
         return cumulative_tp_volume / cumulative_volume
 
     @staticmethod
+    def calculate_adx(
+        highs: list[float], lows: list[float], closes: list[float], period: int = 14
+    ) -> Optional[float]:
+        """Calculate Average Directional Index (ADX) using TA-Lib.
+
+        ADX measures trend strength:
+        - ADX > 25: Strong trend
+        - ADX 15-25: Weak trend
+        - ADX < 15: Choppy (avoid)
+
+        Args:
+            highs: List of high prices
+            lows: List of low prices
+            closes: List of close prices
+            period: ADX period (default 14)
+
+        Returns:
+            Current ADX value (0-100) or None if insufficient data
+        """
+        if not highs or not lows or not closes or len(closes) < period + 1:
+            return None
+
+        adx_values = talib.ADX(
+            _to_array(highs), _to_array(lows), _to_array(closes), timeperiod=period
+        )
+        cleaned = _clean_result(adx_values)
+        return cleaned[-1] if cleaned and cleaned[-1] is not None else None
+
+    @staticmethod
     def calculate_all_indicators(
         closes: list[float],
         highs: Optional[list[float]] = None,

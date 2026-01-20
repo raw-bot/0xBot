@@ -316,13 +316,11 @@ class IndicatorBlock:
         # === VWAP (Volume Weighted Average Price) ===
         vwap = self.calculate_vwap(highs, lows, closes, volumes)
 
-        # === ADX (simplified - using trend strength based on slope) ===
-        # For simplicity, we'll use the rate of change of 200 SMA as trend strength
-        if len(sma_200_vals) >= 3 and sma_200_vals[-3] is not None and sma_200 is not None:
-            sma_slope = (sma_200 - sma_200_vals[-3]) / sma_200_vals[-3] * 100  # percent change
-            adx = min(max(abs(sma_slope) * 2, 0), 100)  # Scale to 0-100
-        else:
-            adx = 0
+        # === TRUE ADX (Average Directional Index) ===
+        # ADX > 25: Strong trend, 15-25: Weak trend, < 15: Choppy
+        from ..services.indicator_service import IndicatorService
+        adx_val = IndicatorService.calculate_adx(highs, lows, closes, 14)
+        adx = adx_val if adx_val is not None else 0
 
         # === SIGNAL GENERATION ===
         regime_ok = current_price > sma_200 if sma_200 else False
@@ -343,6 +341,12 @@ class IndicatorBlock:
         price_above_vwap = current_price > vwap if vwap else False
         if vwap:
             logger.debug(f"[VWAP] Price: ${current_price:.2f}, VWAP: ${vwap:.2f}, Signal: {price_above_vwap}")
+
+        # ADX signal
+        adx_strong = adx > 25
+        adx_weak = 15 < adx <= 25
+        adx_choppy = adx <= 15
+        logger.debug(f"[ADX] Value: {adx:.1f}, Strong: {adx_strong}, Weak: {adx_weak}, Choppy: {adx_choppy}")
 
         confluence_signals = [
             regime_ok,

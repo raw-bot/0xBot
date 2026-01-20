@@ -52,7 +52,7 @@
 
 ---
 
-## TASK 2: True ADX (Replace Simplified) (1 hour)
+## TASK 2: True ADX (Replace Simplified) (1 hour) [x]
 
 **Goal**: Replace simplified ADX (just SMA-200 slope) with real TA-Lib ADX
 
