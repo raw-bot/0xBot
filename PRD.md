@@ -90,7 +90,7 @@
 
 ---
 
-## TASK 3: Activate MACD (1 hour)
+## TASK 3: Activate MACD (1 hour) [x]
 
 **Goal**: MACD exists but is never used - activate it in Trinity
 

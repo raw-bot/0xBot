@@ -40,8 +40,9 @@ class TrinityDecisionBlock:
     - Bounce: Price closed back above EMA_20
     - Momentum: RSI < 40 (oversold)
     - Volume: Current volume > volume MA
+    - MACD: MACD line > signal line (momentum confirmation)
 
-    Entry requires: Regime + Strength + (Bounce OR Momentum) + Volume (4/5 minimum)
+    Entry requires: At least 4/6 signals for entry, 5/6 for strong entry
 
     Exit Logic:
     - Supertrend turns red (below current price)
@@ -108,12 +109,12 @@ class TrinityDecisionBlock:
 
                 self.logger.info(
                     f"[TRINITY] {symbol}: BUY signal | Confluence: {decision.confluence_score:.0f}/100 | "
-                    f"Signals: {decision.signals_met}/5 | Confidence: {decision.confidence:.0f}%"
+                    f"Signals: {decision.signals_met}/6 | Confidence: {decision.confidence:.0f}%"
                 )
             else:
                 self.logger.debug(
                     f"[TRINITY] {symbol}: No entry (confluence {decision.confluence_score:.0f}/100) | "
-                    f"Signals: {decision.signals_met}/5"
+                    f"Signals: {decision.signals_met}/6"
                 )
 
         return signals if signals else None
@@ -134,15 +135,21 @@ class TrinityDecisionBlock:
         price_bounced = signals.get("price_bounced", False)       # Back above EMA
         oversold = signals.get("oversold", False)                 # RSI < 40
         volume_confirmed = signals.get("volume_confirmed", False) # Vol > SMA vol
+        macd_positive = signals.get("macd_positive", False)       # MACD line > signal line
 
-        # Count how many signals met
-        conditions = [regime_ok, trend_strength_ok, price_bounced, oversold, volume_confirmed]
+        # Log MACD for debugging
+        if macd_positive or signals.get("macd_bullish_cross", False):
+            self.logger.debug(f"[TRINITY] {symbol}: MACD positive={macd_positive}, bullish_cross={signals.get('macd_bullish_cross', False)}")
+
+        # Count how many signals met (including MACD)
+        conditions = [regime_ok, trend_strength_ok, price_bounced, oversold, volume_confirmed, macd_positive]
         signals_met = sum(conditions)
+        total_signals = 6
 
         # Decision logic: need strong confluence
-        if signals_met >= 4:
-            confidence = min(signals_met / 5, 1.0)
-            reason = f"Strong confluence ({signals_met}/5 signals) | Confluence score: {confluence:.0f}/100"
+        if signals_met >= 5:
+            confidence = min(signals_met / total_signals, 1.0)
+            reason = f"Strong confluence ({signals_met}/{total_signals} signals) | Confluence score: {confluence:.0f}/100"
             return TrinityDecision(
                 symbol=symbol,
                 should_enter=True,
@@ -152,9 +159,9 @@ class TrinityDecisionBlock:
                 confluence_score=confluence,
                 signals_met=signals_met,
             )
-        elif signals_met == 3:
-            confidence = signals_met / 5
-            reason = f"Moderate confluence ({signals_met}/5 signals) | Confluence score: {confluence:.0f}/100"
+        elif signals_met >= 4:
+            confidence = signals_met / total_signals
+            reason = f"Moderate confluence ({signals_met}/{total_signals} signals) | Confluence score: {confluence:.0f}/100"
             return TrinityDecision(
                 symbol=symbol,
                 should_enter=True,
@@ -165,8 +172,8 @@ class TrinityDecisionBlock:
                 signals_met=signals_met,
             )
         else:
-            confidence = signals_met / 5
-            reason = f"Weak confluence ({signals_met}/5 signals) - waiting for more confirmation"
+            confidence = signals_met / total_signals
+            reason = f"Weak confluence ({signals_met}/{total_signals} signals) - waiting for more confirmation"
             return TrinityDecision(
                 symbol=symbol,
                 should_enter=False,

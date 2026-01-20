@@ -322,6 +322,17 @@ class IndicatorBlock:
         adx_val = IndicatorService.calculate_adx(highs, lows, closes, 14)
         adx = adx_val if adx_val is not None else 0
 
+        # === MACD (Moving Average Convergence Divergence) ===
+        macd_data = IndicatorService.calculate_macd(closes, fast_period=12, slow_period=26, signal_period=9)
+        macd_line = macd_data['macd'][-1] if macd_data['macd'] and macd_data['macd'][-1] is not None else 0
+        macd_signal = macd_data['signal'][-1] if macd_data['signal'] and macd_data['signal'][-1] is not None else 0
+        macd_histogram = macd_data['histogram'][-1] if macd_data['histogram'] and macd_data['histogram'][-1] is not None else 0
+        # Check for bullish cross: MACD line crosses above signal line
+        macd_prev = macd_data['macd'][-2] if len(macd_data['macd']) > 1 and macd_data['macd'][-2] is not None else None
+        signal_prev = macd_data['signal'][-2] if len(macd_data['signal']) > 1 and macd_data['signal'][-2] is not None else None
+        macd_bullish_cross = (macd_prev is not None and signal_prev is not None and
+                             macd_prev <= signal_prev and macd_line > macd_signal)
+
         # === SIGNAL GENERATION ===
         regime_ok = current_price > sma_200 if sma_200 else False
         trend_strength_ok = adx > 25
@@ -348,6 +359,10 @@ class IndicatorBlock:
         adx_choppy = adx <= 15
         logger.debug(f"[ADX] Value: {adx:.1f}, Strong: {adx_strong}, Weak: {adx_weak}, Choppy: {adx_choppy}")
 
+        # MACD signal
+        macd_positive = macd_line > macd_signal
+        logger.debug(f"[MACD] Line: {macd_line:.6f}, Signal: {macd_signal:.6f}, Positive: {macd_positive}, Cross: {macd_bullish_cross}")
+
         confluence_signals = [
             regime_ok,
             trend_strength_ok,
@@ -369,6 +384,9 @@ class IndicatorBlock:
             'current_volume': current_volume,
             'price': current_price,
             'vwap': vwap,
+            'macd_line': macd_line,
+            'macd_signal': macd_signal,
+            'macd_histogram': macd_histogram,
             'confluence_score': confluence_score,
             'signals': {
                 'regime_filter': regime_ok,
@@ -377,7 +395,9 @@ class IndicatorBlock:
                 'price_bounced': price_above_ema,
                 'oversold': oversold,
                 'volume_confirmed': volume_confirmed,
-                'price_above_vwap': price_above_vwap
+                'price_above_vwap': price_above_vwap,
+                'macd_positive': macd_positive,
+                'macd_bullish_cross': macd_bullish_cross
             }
         }
 
