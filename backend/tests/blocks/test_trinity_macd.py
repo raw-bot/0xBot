@@ -48,6 +48,39 @@ class TestMACDInIndicators:
         assert isinstance(result['macd_signal'], (int, float))
         assert isinstance(result['signals']['macd_positive'], bool)
 
+    def test_obv_calculated_in_indicators(self):
+        """Test that OBV is calculated and included in indicator results."""
+        block = IndicatorBlock()
+
+        # Generate sample OHLCV data with uptrend (OBV should be accumulating)
+        closes = [100 + i * 0.5 for i in range(250)]  # Uptrend
+        highs = [101 + i * 0.5 for i in range(250)]
+        lows = [99 + i * 0.5 for i in range(250)]
+        volumes = [1000 + i * 10 for i in range(250)]  # Increasing volume
+
+        ohlcv_dict = {
+            'timestamp': list(range(250)),
+            'open': [100 + i * 0.5 for i in range(250)],
+            'high': highs,
+            'low': lows,
+            'close': closes,
+            'volume': volumes
+        }
+
+        # Calculate indicators
+        result = block.calculate_indicators_from_ccxt(ohlcv_dict)
+
+        # Verify OBV fields are present
+        assert 'obv' in result
+        assert 'obv_ma' in result
+        assert 'signals' in result
+        assert 'obv_accumulating' in result['signals']
+
+        # Verify OBV values are numeric
+        assert isinstance(result['obv'], (int, float))
+        assert isinstance(result['obv_ma'], (int, float))
+        assert isinstance(result['signals']['obv_accumulating'], bool)
+
     def test_macd_positive_signal_in_uptrend(self):
         """Test that MACD positive signal is detected correctly."""
         block = IndicatorBlock()
@@ -108,17 +141,18 @@ class TestMACDInTrinityDecision:
                 'volume_confirmed': True,
                 'macd_positive': True,  # MACD positive
                 'macd_bullish_cross': False,
-                'price_above_vwap': True
+                'price_above_vwap': True,
+                'obv_accumulating': True  # OBV accumulating
             },
             confluence_score=100.0
         )
 
         decision = trinity._analyze_confluence('BTC/USD', snapshot)
 
-        # All 6 signals met
-        assert decision.signals_met == 6
+        # All 7 signals met
+        assert decision.signals_met == 7
         assert decision.should_enter is True
-        assert decision.confidence > 0.8  # 6/6 signals
+        assert decision.confidence > 0.8  # 7/7 signals
 
     def test_macd_negative_reduces_signals(self):
         """Test that negative MACD reduces signal count."""
@@ -143,17 +177,18 @@ class TestMACDInTrinityDecision:
                 'volume_confirmed': True,
                 'macd_positive': False,  # MACD NOT positive
                 'macd_bullish_cross': False,
-                'price_above_vwap': True
+                'price_above_vwap': True,
+                'obv_accumulating': True  # OBV accumulating
             },
             confluence_score=80.0
         )
 
         decision = trinity._analyze_confluence('BTC/USD', snapshot)
 
-        # Missing MACD signal - 5/6
-        assert decision.signals_met == 5
-        assert decision.should_enter is True  # Still enters with 5/6
-        assert decision.confidence == pytest.approx(5/6, rel=0.01)
+        # Missing MACD signal - 6/7
+        assert decision.signals_met == 6
+        assert decision.should_enter is True  # Still enters with 6/7
+        assert decision.confidence == pytest.approx(6/7, rel=0.01)
 
     def test_macd_insufficient_signals_no_entry(self):
         """Test that without MACD and other signals, no entry."""
@@ -178,7 +213,8 @@ class TestMACDInTrinityDecision:
                 'volume_confirmed': False,
                 'macd_positive': False,  # MACD negative
                 'macd_bullish_cross': False,
-                'price_above_vwap': False
+                'price_above_vwap': False,
+                'obv_accumulating': False  # OBV not accumulating
             },
             confluence_score=20.0
         )
@@ -212,7 +248,8 @@ class TestMACDInTrinityDecision:
                 'volume_confirmed': True,
                 'macd_positive': True,
                 'macd_bullish_cross': True,  # Bullish cross just happened
-                'price_above_vwap': True
+                'price_above_vwap': True,
+                'obv_accumulating': True  # OBV accumulating
             },
             confluence_score=100.0
         )

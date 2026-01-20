@@ -121,7 +121,7 @@
 
 ---
 
-## TASK 4: Add OBV (On-Balance Volume) (45 min)
+## TASK 4: Add OBV (On-Balance Volume) (45 min) [x]
 
 **Goal**: Detect whale accumulation/distribution with OBV
 

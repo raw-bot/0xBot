@@ -41,8 +41,9 @@ class TrinityDecisionBlock:
     - Momentum: RSI < 40 (oversold)
     - Volume: Current volume > volume MA
     - MACD: MACD line > signal line (momentum confirmation)
+    - OBV: On-Balance Volume trending up (accumulation detected)
 
-    Entry requires: At least 4/6 signals for entry, 5/6 for strong entry
+    Entry requires: At least 4/7 signals for entry, 5/7 for strong entry
 
     Exit Logic:
     - Supertrend turns red (below current price)
@@ -109,12 +110,12 @@ class TrinityDecisionBlock:
 
                 self.logger.info(
                     f"[TRINITY] {symbol}: BUY signal | Confluence: {decision.confluence_score:.0f}/100 | "
-                    f"Signals: {decision.signals_met}/6 | Confidence: {decision.confidence:.0f}%"
+                    f"Signals: {decision.signals_met}/7 | Confidence: {decision.confidence:.0f}%"
                 )
             else:
                 self.logger.debug(
                     f"[TRINITY] {symbol}: No entry (confluence {decision.confluence_score:.0f}/100) | "
-                    f"Signals: {decision.signals_met}/6"
+                    f"Signals: {decision.signals_met}/7"
                 )
 
         return signals if signals else None
@@ -136,15 +137,18 @@ class TrinityDecisionBlock:
         oversold = signals.get("oversold", False)                 # RSI < 40
         volume_confirmed = signals.get("volume_confirmed", False) # Vol > SMA vol
         macd_positive = signals.get("macd_positive", False)       # MACD line > signal line
+        obv_accumulating = signals.get("obv_accumulating", False) # OBV trending up
 
-        # Log MACD for debugging
+        # Log MACD and OBV for debugging
         if macd_positive or signals.get("macd_bullish_cross", False):
             self.logger.debug(f"[TRINITY] {symbol}: MACD positive={macd_positive}, bullish_cross={signals.get('macd_bullish_cross', False)}")
+        if obv_accumulating:
+            self.logger.debug(f"[TRINITY] {symbol}: OBV accumulating={obv_accumulating}")
 
-        # Count how many signals met (including MACD)
-        conditions = [regime_ok, trend_strength_ok, price_bounced, oversold, volume_confirmed, macd_positive]
+        # Count how many signals met (including MACD and OBV)
+        conditions = [regime_ok, trend_strength_ok, price_bounced, oversold, volume_confirmed, macd_positive, obv_accumulating]
         signals_met = sum(conditions)
-        total_signals = 6
+        total_signals = 7
 
         # Decision logic: need strong confluence
         if signals_met >= 5:

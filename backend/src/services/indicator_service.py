@@ -163,6 +163,56 @@ class IndicatorService:
         return cleaned[-1] if cleaned and cleaned[-1] is not None else None
 
     @staticmethod
+    def calculate_obv(closes: list[float], volumes: list[float], obv_ma_period: int = 14) -> tuple[float, float, bool]:
+        """Calculate On-Balance Volume (OBV) and trend.
+
+        OBV detects whale accumulation/distribution:
+        - If close > prev_close: obv += volume
+        - If close < prev_close: obv -= volume
+        - If close == prev_close: obv stays same
+        - obv_trending = current_obv > obv_ma
+
+        Args:
+            closes: List of close prices
+            volumes: List of volumes
+            obv_ma_period: Period for OBV moving average (default 14)
+
+        Returns:
+            Tuple of (current_obv, obv_ma, obv_trending)
+        """
+        if not closes or not volumes or len(closes) != len(volumes):
+            return 0.0, 0.0, False
+
+        if len(closes) < obv_ma_period + 1:
+            return 0.0, 0.0, False
+
+        # Calculate OBV values
+        obv_values = []
+        obv = 0.0
+
+        for i in range(len(closes)):
+            if i == 0:
+                obv = float(volumes[0])
+            else:
+                if closes[i] > closes[i - 1]:
+                    obv += float(volumes[i])
+                elif closes[i] < closes[i - 1]:
+                    obv -= float(volumes[i])
+                # If close == prev_close, obv stays same (no change)
+
+            obv_values.append(obv)
+
+        # Calculate OBV moving average
+        obv_ma_vals = IndicatorService.calculate_sma(obv_values, obv_ma_period)
+        obv_ma = obv_ma_vals[-1] if obv_ma_vals and obv_ma_vals[-1] is not None else 0.0
+
+        # Current OBV and trend
+        current_obv = obv_values[-1]
+        obv_trending = current_obv > obv_ma
+
+        return current_obv, obv_ma, obv_trending
+
+    @staticmethod
     def calculate_all_indicators(
         closes: list[float],
         highs: Optional[list[float]] = None,

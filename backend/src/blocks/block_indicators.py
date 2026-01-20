@@ -333,6 +333,10 @@ class IndicatorBlock:
         macd_bullish_cross = (macd_prev is not None and signal_prev is not None and
                              macd_prev <= signal_prev and macd_line > macd_signal)
 
+        # === OBV (On-Balance Volume) - Accumulation/Distribution ===
+        current_obv, obv_ma, obv_trending = IndicatorService.calculate_obv(closes, volumes, obv_ma_period=14)
+        logger.debug(f"[OBV] Current: {current_obv:.0f}, MA: {obv_ma:.0f}, Accumulating: {obv_trending}")
+
         # === SIGNAL GENERATION ===
         regime_ok = current_price > sma_200 if sma_200 else False
         trend_strength_ok = adx > 25
@@ -387,6 +391,8 @@ class IndicatorBlock:
             'macd_line': macd_line,
             'macd_signal': macd_signal,
             'macd_histogram': macd_histogram,
+            'obv': current_obv,
+            'obv_ma': obv_ma,
             'confluence_score': confluence_score,
             'signals': {
                 'regime_filter': regime_ok,
@@ -397,7 +403,8 @@ class IndicatorBlock:
                 'volume_confirmed': volume_confirmed,
                 'price_above_vwap': price_above_vwap,
                 'macd_positive': macd_positive,
-                'macd_bullish_cross': macd_bullish_cross
+                'macd_bullish_cross': macd_bullish_cross,
+                'obv_accumulating': obv_trending
             }
         }
 
