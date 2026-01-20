@@ -123,6 +123,38 @@ class IndicatorBlock:
 
         return result
 
+    def calculate_vwap(self, highs: list[float], lows: list[float], closes: list[float], volumes: list[float]) -> float | None:
+        """
+        Calculate Volume Weighted Average Price.
+
+        Args:
+            highs: List of high prices
+            lows: List of low prices
+            closes: List of close prices
+            volumes: List of volumes
+
+        Returns:
+            Current VWAP value or None if insufficient data
+        """
+        if not highs or not lows or not closes or not volumes or len(closes) < 1:
+            return None
+
+        cumulative_tp_volume = 0.0
+        cumulative_volume = 0.0
+
+        for i in range(len(closes)):
+            # Typical Price = (High + Low + Close) / 3
+            tp = (highs[i] + lows[i] + closes[i]) / 3.0
+            vol = volumes[i]
+
+            cumulative_tp_volume += tp * vol
+            cumulative_volume += vol
+
+        if cumulative_volume == 0:
+            return None
+
+        return cumulative_tp_volume / cumulative_volume
+
     def supertrend(self, highs: list[float], lows: list[float], closes: list[float], period: int = 10, multiplier: float = 3.0) -> tuple[list[float | None], list[str]]:
         """
         Supertrend indicator
@@ -281,6 +313,9 @@ class IndicatorBlock:
         # === CURRENT PRICE ===
         current_price = closes[-1]
 
+        # === VWAP (Volume Weighted Average Price) ===
+        vwap = self.calculate_vwap(highs, lows, closes, volumes)
+
         # === ADX (simplified - using trend strength based on slope) ===
         # For simplicity, we'll use the rate of change of 200 SMA as trend strength
         if len(sma_200_vals) >= 3 and sma_200_vals[-3] is not None and sma_200 is not None:
@@ -304,6 +339,11 @@ class IndicatorBlock:
         oversold = rsi_val < 40
         volume_confirmed = current_volume > volume_ma
 
+        # VWAP signal
+        price_above_vwap = current_price > vwap if vwap else False
+        if vwap:
+            logger.debug(f"[VWAP] Price: ${current_price:.2f}, VWAP: ${vwap:.2f}, Signal: {price_above_vwap}")
+
         confluence_signals = [
             regime_ok,
             trend_strength_ok,
@@ -324,6 +364,7 @@ class IndicatorBlock:
             'volume_ma': volume_ma,
             'current_volume': current_volume,
             'price': current_price,
+            'vwap': vwap,
             'confluence_score': confluence_score,
             'signals': {
                 'regime_filter': regime_ok,
@@ -331,7 +372,8 @@ class IndicatorBlock:
                 'pullback_detected': pullback_detected,
                 'price_bounced': price_above_ema,
                 'oversold': oversold,
-                'volume_confirmed': volume_confirmed
+                'volume_confirmed': volume_confirmed,
+                'price_above_vwap': price_above_vwap
             }
         }
 

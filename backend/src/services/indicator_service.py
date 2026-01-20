@@ -101,6 +101,39 @@ class IndicatorService:
         return {"k": _clean_result(slowk), "d": _clean_result(slowd)}
 
     @staticmethod
+    def calculate_vwap(candles: list[dict[str, float]]) -> Optional[float]:
+        """Calculate Volume Weighted Average Price.
+
+        Args:
+            candles: List of dicts with 'high', 'low', 'close', 'volume' keys
+
+        Returns:
+            Current VWAP value or None if insufficient data
+        """
+        if not candles or len(candles) < 1:
+            return None
+
+        cumulative_tp_volume = 0.0
+        cumulative_volume = 0.0
+
+        for candle in candles:
+            high = float(candle.get("high", 0))
+            low = float(candle.get("low", 0))
+            close = float(candle.get("close", 0))
+            volume = float(candle.get("volume", 0))
+
+            # Typical Price = (High + Low + Close) / 3
+            tp = (high + low + close) / 3.0
+
+            cumulative_tp_volume += tp * volume
+            cumulative_volume += volume
+
+        if cumulative_volume == 0:
+            return None
+
+        return cumulative_tp_volume / cumulative_volume
+
+    @staticmethod
     def calculate_all_indicators(
         closes: list[float],
         highs: Optional[list[float]] = None,
