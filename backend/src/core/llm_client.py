@@ -4,9 +4,10 @@ import asyncio
 import json
 import os
 from time import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 from anthropic import AsyncAnthropic
+from anthropic.types import TextBlock
 from openai import AsyncOpenAI
 
 from ..core.config import config
@@ -27,9 +28,9 @@ MODEL_COSTS = {
 class RateLimiter:
     """Simple rate limiter for API calls."""
 
-    def __init__(self, calls_per_minute: int = 10):
+    def __init__(self, calls_per_minute: int = 10) -> None:
         self.calls_per_minute = calls_per_minute
-        self.calls: list = []
+        self.calls: list[float] = []
 
     async def acquire(self) -> None:
         """Wait if rate limit is reached."""
@@ -46,12 +47,12 @@ class RateLimiter:
 class LLMClient:
     """Unified interface for multiple LLM providers (Claude, GPT, DeepSeek, Qwen)."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize LLM clients with lazy initialization."""
-        self._anthropic_client = None
-        self._openai_client = None
-        self._deepseek_client = None
-        self._qwen_client = None
+        self._anthropic_client: Optional[AsyncAnthropic] = None
+        self._openai_client: Optional[AsyncOpenAI] = None
+        self._deepseek_client: Optional[AsyncOpenAI] = None
+        self._qwen_client: Optional[AsyncOpenAI] = None
         self._rate_limiter = RateLimiter(config.LLM_CALLS_PER_MINUTE)
 
     @property
@@ -120,7 +121,7 @@ class LLMClient:
                 messages=[{"role": "user", "content": prompt}],
             )
 
-            raw_response = response.content[0].text
+            raw_response = cast(TextBlock, response.content[0]).text
             input_tokens = response.usage.input_tokens
             output_tokens = response.usage.output_tokens
             tokens_used = input_tokens + output_tokens
@@ -163,7 +164,7 @@ class LLMClient:
                 model=model_name,
                 max_tokens=max_tokens,
                 temperature=temperature,
-                messages=messages,
+                messages=messages,  # type: ignore[arg-type]
             )
 
             raw_response = response.choices[0].message.content or ""
@@ -204,9 +205,9 @@ class LLMClient:
 
             if start_idx != -1 and end_idx != -1:
                 json_str = response[start_idx : end_idx + 1]
-                return json.loads(json_str)
+                return cast(Dict[str, Any], json.loads(json_str))
 
-            return json.loads(response)
+            return cast(Dict[str, Any], json.loads(response))
         except json.JSONDecodeError as e:
             logger.warning(f"Failed to parse JSON from response: {e}")
             return {

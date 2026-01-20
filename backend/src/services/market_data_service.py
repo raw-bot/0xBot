@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional, cast
 
 from ..core.exchange_client import ExchangeClient, get_exchange_client
 from ..core.logger import get_logger
@@ -11,7 +11,7 @@ from .cache_service import CacheService, get_cache_service
 logger = get_logger(__name__)
 
 
-def _safe_decimal(value, default="0") -> Optional[Decimal]:
+def _safe_decimal(value: Any, default: Optional[str] = "0") -> Optional[Decimal]:
     """Convert value to Decimal, handling None and invalid values."""
     if value in (None, "", "None"):
         return Decimal(default) if default else None
@@ -42,7 +42,7 @@ class OHLCV:
 class Ticker:
     """Current market ticker data."""
 
-    def __init__(self, data: dict):
+    def __init__(self, data: dict[str, Any]) -> None:
         self.symbol = data.get("symbol", "")
         self.last = _safe_decimal(data.get("last"), "0")
         self.bid = _safe_decimal(data.get("bid"), None)
@@ -165,7 +165,10 @@ class MarketDataService:
     async def get_current_price(self, symbol: str) -> Decimal:
         """Get current market price for a symbol."""
         ticker = await self.fetch_ticker(symbol)
-        return ticker.last
+        price = ticker.last
+        if price is None:
+            return Decimal("0")
+        return price
 
     async def get_funding_rate(self, symbol: str) -> float:
         """Get current funding rate for perpetual futures with caching."""
@@ -193,7 +196,7 @@ class MarketDataService:
             logger.error(f"Error fetching funding rate: {e}")
             return 0.0
 
-    async def get_open_interest(self, symbol: str) -> dict:
+    async def get_open_interest(self, symbol: str) -> dict[str, Any]:
         """Get open interest data for perpetual futures with caching."""
         try:
             # Try to get from cache if cache service available
@@ -202,12 +205,12 @@ class MarketDataService:
                 cached = await self.cache.get_cached(cache_key)
                 if cached:
                     logger.debug(f"Open interest cache hit for {symbol}")
-                    return cached
+                    return cast(dict[str, Any], cached)
 
             # Fetch from exchange if not cached
-            oi_data = await self.exchange.fetch_open_interest(symbol)
+            oi_data = await self.exchange.fetch_open_interest(symbol)  # type: ignore[attr-defined]
             latest = float(oi_data.get("openInterest", 0)) if oi_data else 0
-            result = {"latest": latest, "average": latest}
+            result: dict[str, Any] = {"latest": latest, "average": latest}
 
             # Cache the result
             if self.cache:
@@ -237,7 +240,7 @@ class MarketDataService:
         """Extract volumes from OHLCV data."""
         return [float(candle.volume) for candle in ohlcv_list]
 
-    async def get_market_snapshot(self, symbol: str, timeframe: str = "1h") -> dict:
+    async def get_market_snapshot(self, symbol: str, timeframe: str = "1h") -> dict[str, Any]:
         """Get complete market snapshot with OHLCV, indicators, and series data."""
         try:
             from .indicator_service import IndicatorService
@@ -261,12 +264,13 @@ class MarketDataService:
             atr3_series = IndicatorService.calculate_atr(highs, lows, closes, 3)
             atr14_series = IndicatorService.calculate_atr(highs, lows, closes, 14)
 
-            return {
+            price = ticker.last if ticker.last is not None else Decimal("0")
+            result: dict[str, Any] = {
                 "symbol": symbol,
                 "timeframe": timeframe,
                 "ohlcv": ohlcv,
                 "ticker": ticker,
-                "current_price": float(ticker.last),
+                "current_price": float(price),
                 "funding_rate": funding_rate,
                 "open_interest": open_interest,
                 "timestamp": datetime.utcnow(),
@@ -296,13 +300,14 @@ class MarketDataService:
                     },
                 },
             }
+            return result
         except Exception as e:
             logger.error(f"Error creating market snapshot: {e}")
             raise
 
     async def get_market_data_multi_timeframe(
         self, symbol: str, timeframe_short: str = "1h", timeframe_long: str = "4h"
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Get market data for multiple timeframes with full series data."""
         snapshot = await self.get_market_snapshot(symbol, timeframe_short)
 
@@ -344,11 +349,11 @@ class MarketDataService:
             return snapshot
 
 
-def _get_last_valid(series: list) -> Optional[float]:
+def _get_last_valid(series: list[Any]) -> Optional[float]:
     """Get last non-None value from series."""
     if not series:
         return None
     for val in reversed(series):
         if val is not None:
-            return val
+            return float(val) if val else None
     return None
