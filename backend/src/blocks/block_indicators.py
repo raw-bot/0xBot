@@ -4,7 +4,7 @@ Calculates: 200 SMA (Daily), 20 EMA (1H), ADX, RSI, Supertrend, Volume
 No external dependencies (no pandas_ta) - pure calculations
 """
 
-import pandas as pd
+import pandas as pd  # type: ignore[import-untyped]
 from typing import Optional, Dict, Any
 from decimal import Decimal
 import math
@@ -24,60 +24,62 @@ class IndicatorBlock:
     - Confirmation: Volume
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = get_logger(__name__)
 
     # ============ INDICATOR CALCULATIONS ============
 
-    def sma(self, values: list, period: int) -> list:
+    def sma(self, values: list[float], period: int) -> list[float | None]:
         """Simple Moving Average"""
         if len(values) < period:
             return [None] * len(values)
-        result = [None] * (period - 1)
+        result: list[float | None] = [None] * (period - 1)
         for i in range(period - 1, len(values)):
             result.append(sum(values[i - period + 1:i + 1]) / period)
         return result
 
-    def ema(self, values: list, period: int) -> list:
+    def ema(self, values: list[float], period: int) -> list[float | None]:
         """Exponential Moving Average"""
         if len(values) < period:
             return [None] * len(values)
 
-        result = [None] * (period - 1)
+        result: list[float | None] = [None] * (period - 1)
         sma_val = sum(values[:period]) / period
         result.append(sma_val)
 
         multiplier = 2 / (period + 1)
         for i in range(period, len(values)):
-            ema_val = values[i] * multiplier + result[-1] * (1 - multiplier)
-            result.append(ema_val)
+            last_val = result[-1]
+            if last_val is not None:
+                ema_val = values[i] * multiplier + last_val * (1 - multiplier)
+                result.append(ema_val)
 
         return result
 
-    def rsi(self, values: list, period: int = 14) -> list:
+    def rsi(self, values: list[float], period: int = 14) -> list[float | None]:
         """Relative Strength Index"""
         if len(values) < period + 1:
             return [None] * len(values)
 
-        result = [None] * period
+        result: list[float | None] = [None] * period
 
-        gains = []
-        losses = []
+        gains: list[float] = []
+        losses: list[float] = []
 
         for i in range(1, len(values)):
             change = values[i] - values[i - 1]
             if change > 0:
                 gains.append(change)
-                losses.append(0)
+                losses.append(0.0)
             else:
-                gains.append(0)
+                gains.append(0.0)
                 losses.append(abs(change))
 
         avg_gain = sum(gains[:period]) / period
         avg_loss = sum(losses[:period]) / period
 
         if avg_loss == 0:
-            result.append(100)
+            result.append(100.0)
         else:
             rs = avg_gain / avg_loss
             result.append(100 - (100 / (1 + rs)))
@@ -87,19 +89,19 @@ class IndicatorBlock:
             avg_loss = (avg_loss * (period - 1) + losses[i - 1]) / period
 
             if avg_loss == 0:
-                result.append(100)
+                result.append(100.0)
             else:
                 rs = avg_gain / avg_loss
                 result.append(100 - (100 / (1 + rs)))
 
         return result
 
-    def atr(self, highs: list, lows: list, closes: list, period: int = 14) -> list:
+    def atr(self, highs: list[float], lows: list[float], closes: list[float], period: int = 14) -> list[float | None]:
         """Average True Range"""
         if len(highs) < period:
             return [None] * len(highs)
 
-        tr_values = []
+        tr_values: list[float] = []
         for i in range(len(highs)):
             if i == 0:
                 tr = highs[i] - lows[i]
@@ -111,7 +113,7 @@ class IndicatorBlock:
                 )
             tr_values.append(tr)
 
-        result = [None] * (period - 1)
+        result: list[float | None] = [None] * (period - 1)
         atr_val = sum(tr_values[:period]) / period
         result.append(atr_val)
 
@@ -121,7 +123,7 @@ class IndicatorBlock:
 
         return result
 
-    def supertrend(self, highs: list, lows: list, closes: list, period: int = 10, multiplier: float = 3.0) -> tuple[list, list]:
+    def supertrend(self, highs: list[float], lows: list[float], closes: list[float], period: int = 10, multiplier: float = 3.0) -> tuple[list[float | None], list[str]]:
         """
         Supertrend indicator
         Returns: (supertrend_values, trend_signals)
@@ -129,60 +131,81 @@ class IndicatorBlock:
         if len(highs) < period:
             return [None] * len(highs), ["neutral"] * len(highs)
 
-        hl2 = [(highs[i] + lows[i]) / 2 for i in range(len(highs))]
+        hl2: list[float] = [(highs[i] + lows[i]) / 2 for i in range(len(highs))]
         atr_vals = self.atr(highs, lows, closes, period)
 
-        basic_ub = [hl2[i] + multiplier * atr_vals[i] if atr_vals[i] is not None else None for i in range(len(hl2))]
-        basic_lb = [hl2[i] - multiplier * atr_vals[i] if atr_vals[i] is not None else None for i in range(len(hl2))]
-
-        final_ub = [None] * len(highs)
-        final_lb = [None] * len(highs)
-        supertrend = [None] * len(highs)
-        trend = ["neutral"] * len(highs)
-
-        for i in range(len(highs)):
-            if i == 0:
-                if basic_ub[i] is not None and basic_lb[i] is not None:
-                    final_ub[i] = basic_ub[i]
-                    final_lb[i] = basic_lb[i]
+        basic_ub: list[float | None] = []
+        basic_lb: list[float | None] = []
+        for i in range(len(hl2)):
+            atr_val = atr_vals[i]
+            if atr_val is not None:
+                basic_ub.append(hl2[i] + multiplier * atr_val)
+                basic_lb.append(hl2[i] - multiplier * atr_val)
             else:
-                if basic_ub[i] is not None and basic_lb[i] is not None and final_ub[i - 1] is not None and final_lb[i - 1] is not None:
-                    final_ub[i] = basic_ub[i] if basic_ub[i] < final_ub[i - 1] or closes[i - 1] > final_ub[i - 1] else final_ub[i - 1]
-                    final_lb[i] = basic_lb[i] if basic_lb[i] > final_lb[i - 1] or closes[i - 1] < final_lb[i - 1] else final_lb[i - 1]
-                elif basic_ub[i] is not None and basic_lb[i] is not None:
-                    final_ub[i] = basic_ub[i]
-                    final_lb[i] = basic_lb[i]
+                basic_ub.append(None)
+                basic_lb.append(None)
+
+        final_ub: list[float | None] = [None] * len(highs)
+        final_lb: list[float | None] = [None] * len(highs)
+        supertrend: list[float | None] = [None] * len(highs)
+        trend: list[str] = ["neutral"] * len(highs)
 
         for i in range(len(highs)):
             if i == 0:
-                if final_ub[i] is not None:
-                    if closes[i] <= final_ub[i]:
-                        supertrend[i] = final_ub[i]
+                ub = basic_ub[i]
+                lb = basic_lb[i]
+                if ub is not None and lb is not None:
+                    final_ub[i] = ub
+                    final_lb[i] = lb
+            else:
+                ub = basic_ub[i]
+                lb = basic_lb[i]
+                ub_prev = final_ub[i - 1]
+                lb_prev = final_lb[i - 1]
+                if ub is not None and lb is not None and ub_prev is not None and lb_prev is not None:
+                    final_ub[i] = ub if ub < ub_prev or closes[i - 1] > ub_prev else ub_prev
+                    final_lb[i] = lb if lb > lb_prev or closes[i - 1] < lb_prev else lb_prev
+                elif ub is not None and lb is not None:
+                    final_ub[i] = ub
+                    final_lb[i] = lb
+
+        for i in range(len(highs)):
+            if i == 0:
+                ub = final_ub[i]
+                lb = final_lb[i]
+                if ub is not None:
+                    if closes[i] <= ub:
+                        supertrend[i] = ub
                         trend[i] = "sell"
                     else:
-                        supertrend[i] = final_lb[i]
+                        supertrend[i] = lb
                         trend[i] = "buy"
             else:
-                if supertrend[i - 1] is None:
-                    if final_ub[i] is not None and closes[i] <= final_ub[i]:
-                        supertrend[i] = final_ub[i]
+                st_prev = supertrend[i - 1]
+                if st_prev is None:
+                    ub = final_ub[i]
+                    lb = final_lb[i]
+                    if ub is not None and closes[i] <= ub:
+                        supertrend[i] = ub
                         trend[i] = "sell"
-                    elif final_lb[i] is not None:
-                        supertrend[i] = final_lb[i]
+                    elif lb is not None:
+                        supertrend[i] = lb
                         trend[i] = "buy"
                 else:
-                    if closes[i] <= supertrend[i - 1] and final_ub[i] is not None:
-                        supertrend[i] = final_ub[i]
+                    ub = final_ub[i]
+                    lb = final_lb[i]
+                    if closes[i] <= st_prev and ub is not None:
+                        supertrend[i] = ub
                         trend[i] = "sell"
-                    elif final_lb[i] is not None:
-                        supertrend[i] = final_lb[i]
+                    elif lb is not None:
+                        supertrend[i] = lb
                         trend[i] = "buy"
 
         return supertrend, trend
 
     # ============ DATA CONVERSION & PROCESSING ============
 
-    def convert_ccxt_to_dict(self, ohlcv_list: list) -> Dict[str, list]:
+    def convert_ccxt_to_dict(self, ohlcv_list: list[Any]) -> dict[str, list[Any]]:
         """
         Convert CCXT OHLCV format to dict of lists.
 
@@ -194,12 +217,12 @@ class IndicatorBlock:
         if not ohlcv_list or len(ohlcv_list) == 0:
             return {}
 
-        timestamps = [candle[0] for candle in ohlcv_list]
-        opens = [float(candle[1]) for candle in ohlcv_list]
-        highs = [float(candle[2]) for candle in ohlcv_list]
-        lows = [float(candle[3]) for candle in ohlcv_list]
-        closes = [float(candle[4]) for candle in ohlcv_list]
-        volumes = [float(candle[5]) for candle in ohlcv_list]
+        timestamps: list[Any] = [candle[0] for candle in ohlcv_list]
+        opens: list[float] = [float(candle[1]) for candle in ohlcv_list]
+        highs: list[float] = [float(candle[2]) for candle in ohlcv_list]
+        lows: list[float] = [float(candle[3]) for candle in ohlcv_list]
+        closes: list[float] = [float(candle[4]) for candle in ohlcv_list]
+        volumes: list[float] = [float(candle[5]) for candle in ohlcv_list]
 
         return {
             'timestamp': timestamps,
@@ -212,8 +235,8 @@ class IndicatorBlock:
 
     def calculate_indicators_from_ccxt(
         self,
-        ohlcv_dict: Dict[str, list]
-    ) -> Dict[str, Any]:
+        ohlcv_dict: dict[str, list[Any]]
+    ) -> dict[str, Any]:
         """
         Calculate indicators from CCXT OHLCV data.
 
@@ -260,7 +283,7 @@ class IndicatorBlock:
 
         # === ADX (simplified - using trend strength based on slope) ===
         # For simplicity, we'll use the rate of change of 200 SMA as trend strength
-        if len(sma_200_vals) >= 3 and sma_200_vals[-3] is not None:
+        if len(sma_200_vals) >= 3 and sma_200_vals[-3] is not None and sma_200 is not None:
             sma_slope = (sma_200 - sma_200_vals[-3]) / sma_200_vals[-3] * 100  # percent change
             adx = min(max(abs(sma_slope) * 2, 0), 100)  # Scale to 0-100
         else:
@@ -312,7 +335,7 @@ class IndicatorBlock:
             }
         }
 
-    def get_entry_signal(self, indicator_data: Dict[str, Any]) -> tuple[bool, str, float]:
+    def get_entry_signal(self, indicator_data: dict[str, Any]) -> tuple[bool, str, float]:
         """
         Determine if entry conditions are met based on indicator confluence.
 
@@ -345,7 +368,7 @@ class IndicatorBlock:
             reason = f"Weak confluence ({met}/5 signals) - waiting"
             return False, reason, confidence
 
-    def get_exit_signal(self, indicator_data: Dict[str, Any]) -> tuple[bool, str]:
+    def get_exit_signal(self, indicator_data: dict[str, Any]) -> tuple[bool, str]:
         """
         Determine if exit conditions are met.
 

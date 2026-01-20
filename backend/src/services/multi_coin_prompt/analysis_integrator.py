@@ -4,7 +4,7 @@ Analysis Integrator - Integrates technical and sentiment analysis, parses LLM re
 
 import json
 import logging
-from typing import Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -12,11 +12,11 @@ logger = logging.getLogger(__name__)
 class AnalysisIntegrator:
     """Integrates analysis components and parses LLM responses."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize AnalysisIntegrator."""
         pass
 
-    def prepare_price_data(self, all_coins_data: Dict) -> Dict[str, Dict]:
+    def prepare_price_data(self, all_coins_data: dict[str, Any]) -> dict[str, dict[str, Any]]:
         """Prepare price data structure for narrative analysis."""
         price_data = {}
         for symbol, data in all_coins_data.items():
@@ -31,7 +31,7 @@ class AnalysisIntegrator:
             }
         return price_data
 
-    def extract_position_symbols(self, all_positions: List) -> set:
+    def extract_position_symbols(self, all_positions: list[Any]) -> set[str]:
         """Extract symbols from all positions."""
         position_symbols = {
             pos.symbol if hasattr(pos, "symbol") else pos.get("symbol")
@@ -41,8 +41,8 @@ class AnalysisIntegrator:
         return position_symbols
 
     def parse_multi_coin_response(
-        self, response_text: str, target_symbols: Optional[List[str]] = None
-    ) -> Dict:
+        self, response_text: str, target_symbols: Optional[list[str]] = None
+    ) -> dict[str, Any]:
         """Parse LLM response for multi-coin decisions."""
         target_symbols = target_symbols or []
 
@@ -69,7 +69,7 @@ class AnalysisIntegrator:
             logger.error(f"Unexpected error parsing response: {e}")
             return self._create_fallback_response(target_symbols, "Parse error")
 
-    def get_decision_for_symbol(self, symbol: str, response_text: str) -> Dict:
+    def get_decision_for_symbol(self, symbol: str, response_text: str) -> dict[str, Any]:
         """Extract decision for a specific symbol from LLM response."""
         default = {"action": "hold", "confidence": 0.6, "reasoning": f"Default HOLD for {symbol}"}
         if not response_text.strip():
@@ -89,34 +89,38 @@ class AnalysisIntegrator:
             logger.warning(f"Error parsing {symbol}: {e}")
             return {**default, "reasoning": f"Parsing error for {symbol}"}
 
-    def parse_simple_response(self, response_text: str, symbol: str, current_market_price: float = 0) -> Dict:
+    def parse_simple_response(self, response_text: str, symbol: str, current_market_price: float = 0) -> dict[str, Any]:
         """Compatibility method for SimpleLLMPromptService interface."""
         return self.get_decision_for_symbol(symbol, response_text)
 
-    def _get_price_at_offset(self, market_data: Dict, offset: int) -> float:
+    def _get_price_at_offset(self, market_data: dict[str, Any], offset: int) -> float:
         """Get price from series at offset candles back, or current price if unavailable."""
         current = market_data.get("current_price", 0)
         price_series = market_data.get("price_series", [])
-        return price_series[-offset] if len(price_series) > offset else current
+        if len(price_series) > offset:
+            val = price_series[-offset]
+            if isinstance(val, (int, float)):
+                return float(val)
+        return float(current)
 
-    def _calc_volume_ratio(self, market_data: Dict) -> float:
+    def _calc_volume_ratio(self, market_data: dict[str, Any]) -> float:
         """Calculate current volume vs average."""
         tech = market_data.get("technical_indicators", {}).get("1h", {})
         avg_vol = tech.get("avg_volume", 1)
         return tech.get("volume", 0) / avg_vol if avg_vol > 0 else 1.0
 
-    def _extract_json(self, text: str) -> Optional[Dict]:
+    def _extract_json(self, text: str) -> Optional[dict[str, Any]]:
         """Extract JSON from response text."""
         text = text.strip()
         if text.startswith("{"):
-            return json.loads(text)
+            return json.loads(text)  # type: ignore[no-any-return]
         start = text.find("{")
         end = text.rfind("}")
         if start != -1 and end > start:
-            return json.loads(text[start:end + 1])
+            return json.loads(text[start:end + 1])  # type: ignore[no-any-return]
         return None
 
-    def _create_fallback_response(self, symbols: List[str], reason: str = "default HOLD") -> Dict:
+    def _create_fallback_response(self, symbols: list[str], reason: str = "default HOLD") -> dict[str, dict[str, Any]]:
         """Create fallback HOLD response for all symbols."""
         return {
             symbol: {"signal": "hold", "confidence": 0.50, "justification": reason}

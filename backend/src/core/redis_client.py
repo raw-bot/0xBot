@@ -1,7 +1,7 @@
 """Redis connection manager for caching and rate limiting."""
 
 import os
-from typing import Optional
+from typing import Any, Optional
 
 import redis.asyncio as redis
 from redis.asyncio import Redis
@@ -13,12 +13,12 @@ class RedisClient:
     def __init__(self) -> None:
         """Initialize Redis client."""
         self._redis: Optional[Redis] = None
-        self._url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        self._url: str = os.getenv("REDIS_URL", "redis://localhost:6379")
 
     async def connect(self) -> None:
         """Establish Redis connection."""
         if self._redis is None:
-            self._redis = await redis.from_url(
+            self._redis = await redis.from_url(  # type: ignore[no-untyped-call]
                 self._url,
                 encoding="utf-8",
                 decode_responses=True,
@@ -40,35 +40,36 @@ class RedisClient:
 
     async def get(self, key: str) -> Optional[str]:
         """Get value by key."""
-        return await self.client.get(key)
+        return await self.client.get(key)  # type: ignore[no-any-return]
 
     async def set(self, key: str, value: str) -> bool:
         """Set key-value pair without expiration."""
-        return await self.client.set(key, value)
+        return await self.client.set(key, value)  # type: ignore[no-any-return]
 
     async def set_with_ttl(self, key: str, value: str, ttl: int) -> bool:
         """Set key-value pair with TTL in seconds."""
-        return await self.client.setex(key, ttl, value)
+        return await self.client.setex(key, ttl, value)  # type: ignore[no-any-return]
 
     async def delete(self, key: str) -> int:
         """Delete key and return number of keys deleted."""
-        return await self.client.delete(key)
+        return await self.client.delete(key)  # type: ignore[no-any-return]
 
     async def increment(self, key: str) -> int:
         """Increment counter and return new value."""
-        return await self.client.incr(key)
+        return await self.client.incr(key)  # type: ignore[no-any-return]
 
     async def expire(self, key: str, seconds: int) -> bool:
         """Set expiration time on key."""
-        return await self.client.expire(key, seconds)
+        return await self.client.expire(key, seconds)  # type: ignore[no-any-return]
 
     async def exists(self, key: str) -> bool:
         """Check if key exists."""
-        return await self.client.exists(key) > 0
+        result: int = await self.client.exists(key)
+        return result > 0
 
     async def ttl(self, key: str) -> int:
         """Get TTL for key (-1 if no expiration, -2 if key doesn't exist)."""
-        return await self.client.ttl(key)
+        return await self.client.ttl(key)  # type: ignore[no-any-return]
 
 
 _redis_client: Optional[RedisClient] = None

@@ -3,7 +3,7 @@ Market Data Formatter - Formats market data for prompt generation.
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from ..fvg_detector_service import get_fvg_detector
 
@@ -19,12 +19,12 @@ class MarketDataFormatter:
         "XRP/USDT": "XRP",
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize MarketDataFormatter."""
         self.coin_mapping = self.COIN_MAPPING
         self.fvg_detector = get_fvg_detector()
 
-    def format_market_data(self, symbols: List[str], all_coins_data: Dict[str, Dict]) -> str:
+    def format_market_data(self, symbols: List[str], all_coins_data: dict[str, dict[str, Any]]) -> str:
         """Format all market data into dashboard text."""
         lines = []
         for symbol in symbols:
@@ -50,7 +50,7 @@ class MarketDataFormatter:
 
         return "\n".join(lines)
 
-    def format_fvg_analysis(self, symbols: List[str], all_coins_data: Dict[str, Dict]) -> str:
+    def format_fvg_analysis(self, symbols: List[str], all_coins_data: dict[str, dict[str, Any]]) -> str:
         """Format Fair Value Gap analysis for all symbols."""
         lines = []
         for symbol in symbols:
@@ -62,7 +62,7 @@ class MarketDataFormatter:
 
         return "\n".join(lines)
 
-    def format_positions(self, all_positions: List) -> str:
+    def format_positions(self, all_positions: list[Any]) -> str:
         """Format all positions for prompt."""
         if not all_positions:
             return "### No Open Positions"
@@ -73,7 +73,7 @@ class MarketDataFormatter:
 
         return "\n".join(lines)
 
-    def _format_position(self, pos) -> List[str]:
+    def _format_position(self, pos: Any) -> list[str]:
         """Format a single position for the prompt."""
         lines = []
         if hasattr(pos, "symbol"):
@@ -116,13 +116,13 @@ class MarketDataFormatter:
 
         return lines
 
-    def _get_price_at_offset(self, market_data: Dict, offset: int) -> float:
+    def _get_price_at_offset(self, market_data: dict[str, Any], offset: int) -> Any:
         """Get price from series at offset candles back, or current price if unavailable."""
         current = market_data.get("current_price", 0)
         price_series = market_data.get("price_series", [])
         return price_series[-offset] if len(price_series) > offset else current
 
-    def _get_price_range(self, market_data: Dict, lookback: int) -> tuple:
+    def _get_price_range(self, market_data: dict[str, Any], lookback: int) -> tuple[Any, Any]:
         """Get (high, low) from recent price series."""
         current = market_data.get("current_price", 0)
         price_series = market_data.get("price_series", [])
@@ -131,13 +131,14 @@ class MarketDataFormatter:
             return current, current
         return max(recent), min(recent)
 
-    def _calc_volume_ratio(self, market_data: Dict) -> float:
+    def _calc_volume_ratio(self, market_data: dict[str, Any]) -> float:
         """Calculate current volume vs average."""
         tech = market_data.get("technical_indicators", {}).get("1h", {})
         avg_vol = tech.get("avg_volume", 1)
-        return tech.get("volume", 0) / avg_vol if avg_vol > 0 else 1.0
+        result = tech.get("volume", 0) / avg_vol if avg_vol > 0 else 1.0
+        return float(result)
 
-    def _analyze_fvg(self, symbol: str, market_data: Dict) -> str:
+    def _analyze_fvg(self, symbol: str, market_data: dict[str, Any]) -> str:
         """Analyze Fair Value Gaps for a symbol."""
         ohlcv_data = market_data.get("ohlcv", [])
         if not ohlcv_data or len(ohlcv_data) < 3:

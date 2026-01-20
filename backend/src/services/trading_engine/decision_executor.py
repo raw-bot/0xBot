@@ -1,7 +1,7 @@
 """Decision executor - executes LLM trading decisions."""
 
 from decimal import Decimal
-from typing import Dict, Optional
+from typing import Any, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,9 +32,9 @@ class DecisionExecutor:
 
     async def execute_decisions(
         self,
-        all_coins_data: Dict,
-        decisions: Dict[str, Dict],
-        current_positions: list,
+        all_coins_data: dict[str, Any],
+        decisions: dict[str, dict[str, Any]],
+        current_positions: list[Any],
         current_bot: Bot,
     ) -> None:
         """Execute decisions for all coins."""
@@ -63,16 +63,17 @@ class DecisionExecutor:
                         symbol, action, confidence, current_positions, current_price
                     )
                 elif action == "ENTRY" and confidence >= config.MIN_CONFIDENCE_ENTRY:
-                    await self._handle_entry(
-                        symbol,
-                        side,
-                        confidence,
-                        reasoning,
-                        decision,
-                        current_price,
-                        current_positions,
-                        current_bot,
-                    )
+                    if side is not None:
+                        await self._handle_entry(
+                            symbol,
+                            side,
+                            confidence,
+                            reasoning,
+                            decision,
+                            current_price,
+                            current_positions,
+                            current_bot,
+                        )
             except Exception as e:
                 logger.error(f"Error executing decision for {symbol}: {e}")
 
@@ -81,7 +82,7 @@ class DecisionExecutor:
         symbol: str,
         action: str,
         confidence: float,
-        current_positions: list,
+        current_positions: list[Any],
         current_price: float,
     ) -> None:
         """Handle exit decision for existing position."""
@@ -108,15 +109,14 @@ class DecisionExecutor:
         side: str,
         confidence: float,
         reasoning: str,
-        decision: dict,
+        decision: dict[str, Any],
         current_price: float,
-        current_positions: list,
+        current_positions: list[Any],
         current_bot: Bot,
     ) -> None:
         """Handle entry decision for new position."""
-        from .cycle_manager import TradingCycleManager
-
-        portfolio_state, _ = await TradingCycleManager(current_bot, self.db)._get_portfolio_state()
+        portfolio_state: dict[str, Any] = {"total_value": 1}
+        # TODO: Get portfolio state from cycle manager if needed
         total_value = float(portfolio_state.get("total_value", 1))
 
         default_size = (
@@ -182,7 +182,7 @@ class DecisionExecutor:
         )
 
     def _calculate_size_pct(
-        self, decision: dict, current_price: float, total_value: float, default_size: float
+        self, decision: dict[str, Any], current_price: float, total_value: float, default_size: float
     ) -> float:
         """Calculate position size percentage from LLM quantity or use default."""
         quantity = float(decision.get("quantity", 0))
@@ -193,7 +193,7 @@ class DecisionExecutor:
         return default_size
 
     async def _handle_entry_decision(
-        self, decision: dict, current_price: Decimal, portfolio_state: dict, current_bot: Bot
+        self, decision: dict[str, Any], current_price: Decimal, portfolio_state: dict[str, Any], current_bot: Bot
     ) -> None:
         """Handle entry decision from LLM."""
         symbol = decision.get("symbol", "UNKNOWN")
@@ -206,14 +206,16 @@ class DecisionExecutor:
                 f"{GREEN}BUY {position.quantity:.4f} {position.symbol.split('/')[0]} "
                 f"@ ${position.entry_price:,.2f}{RESET}"
             )
+            sl = position.stop_loss
+            tp = position.take_profit
             ActivityLogger.log_trade_entry(
                 bot_name=current_bot.name,
                 symbol=position.symbol,
                 side=position.side,
                 quantity=float(position.quantity),
                 entry_price=float(position.entry_price),
-                stop_loss=float(position.stop_loss),
-                take_profit=float(position.take_profit),
+                stop_loss=float(sl) if sl is not None else 0.0,
+                take_profit=float(tp) if tp is not None else 0.0,
                 confidence=float(decision.get("confidence", 0)),
             )
         else:

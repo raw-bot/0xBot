@@ -16,18 +16,18 @@ class ServiceContainer:
 
     def __init__(self) -> None:
         """Initialize the service container."""
-        self._services: Dict[str, Callable] = {}
+        self._services: Dict[str, Callable[..., Any]] = {}
         self._singletons: Dict[str, Any] = {}
-        self._startup_hooks: list[Callable] = []
-        self._shutdown_hooks: list[Callable] = []
+        self._startup_hooks: list[Callable[..., Any]] = []
+        self._shutdown_hooks: list[Callable[..., Any]] = []
 
     def register(
         self,
         name: str,
-        factory: Callable,
+        factory: Callable[..., Any],
         singleton: bool = True,
-        startup_hook: Optional[Callable] = None,
-        shutdown_hook: Optional[Callable] = None,
+        startup_hook: Optional[Callable[..., Any]] = None,
+        shutdown_hook: Optional[Callable[..., Any]] = None,
     ) -> None:
         """
         Register a service factory.

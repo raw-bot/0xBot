@@ -3,7 +3,7 @@ MultiCoinPromptService Facade - Coordinates prompt generation modules.
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Optional
 
 from ..alpha_setup_generator import AlphaSetupGenerator
 from ..fvg_detector_service import get_fvg_detector
@@ -26,24 +26,24 @@ class MultiCoinPromptService:
         "XRP/USDT": "XRP",
     }
 
-    def __init__(self, db=None):
+    def __init__(self, db: Any = None) -> None:
         """Initialize MultiCoinPromptService with all dependency modules."""
         self.db = db
-        self.narrative_analyzer = NarrativeAnalyzer()
-        self.pain_trade_analyzer = PainTradeAnalyzer()
-        self.alpha_setup_generator = AlphaSetupGenerator()
+        self.narrative_analyzer = NarrativeAnalyzer()  # type: ignore[no-untyped-call]
+        self.pain_trade_analyzer = PainTradeAnalyzer()  # type: ignore[no-untyped-call]
+        self.alpha_setup_generator = AlphaSetupGenerator()  # type: ignore[no-untyped-call]
         self.sentiment_service = get_sentiment_service()
         self.fvg_detector = get_fvg_detector()
         self.coin_mapping = self.COIN_MAPPING
 
         # Initialize new modular components
-        self.prompt_builder = PromptBuilder()
-        self.market_formatter = MarketDataFormatter()
+        self.prompt_builder = PromptBuilder()  # type: ignore[no-untyped-call]
+        self.market_formatter = MarketDataFormatter()  # type: ignore[no-untyped-call]
         self.analysis_integrator = AnalysisIntegrator()
 
     def get_simple_decision(
-        self, bot, symbol, market_snapshot, market_regime, all_coins_data, bot_positions=None
-    ):
+        self, bot: Any, symbol: str, market_snapshot: Any, market_regime: Any, all_coins_data: Any, bot_positions: Any = None
+    ) -> dict[str, Any]:
         """Compatibility wrapper for SimpleLLMPromptService interface."""
         all_coins_data = all_coins_data if isinstance(all_coins_data, dict) else {}
         prompt_data = self.get_multi_coin_decision(
@@ -57,13 +57,13 @@ class MultiCoinPromptService:
 
     def get_multi_coin_decision(
         self,
-        bot,
-        all_coins_data: Dict[str, Dict],
-        all_positions: List,
-        news_data: Optional[List[Dict]] = None,
-        portfolio_state: Optional[Dict] = None,
+        bot: Any,
+        all_coins_data: dict[str, dict[str, Any]],
+        all_positions: list[Any],
+        news_data: Optional[list[dict[str, Any]]] = None,
+        portfolio_state: Optional[dict[str, Any]] = None,
         sentiment_data: Optional[MarketSentiment] = None,
-    ) -> Dict:
+    ) -> dict[str, Any]:
         """Generate comprehensive multi-coin prompt with all analysis sections."""
         all_positions = all_positions or []
         news_data = news_data or []
@@ -136,13 +136,17 @@ class MultiCoinPromptService:
             ),
         }
 
-    def _get_price_at_offset(self, market_data: Dict, offset: int) -> float:
+    def _get_price_at_offset(self, market_data: dict[str, Any], offset: int) -> float:
         """Get price from series at offset candles back, or current price if unavailable."""
         current = market_data.get("current_price", 0)
         price_series = market_data.get("price_series", [])
-        return price_series[-offset] if len(price_series) > offset else current
+        if len(price_series) > offset:
+            val = price_series[-offset]
+            if isinstance(val, (int, float)):
+                return float(val)
+        return float(current)
 
-    def _get_price_range(self, market_data: Dict, lookback: int) -> tuple:
+    def _get_price_range(self, market_data: dict[str, Any], lookback: int) -> tuple[float, float]:
         """Get (high, low) from recent price series."""
         current = market_data.get("current_price", 0)
         price_series = market_data.get("price_series", [])
@@ -151,7 +155,7 @@ class MultiCoinPromptService:
             return current, current
         return max(recent), min(recent)
 
-    def _calc_price_change(self, market_data: Dict, period: str) -> float:
+    def _calc_price_change(self, market_data: dict[str, Any], period: str) -> float:
         """Calculate price change for a period."""
         current = market_data.get("current_price", 0)
         offsets = {"1h": 12, "4h": 48, "24h": 288}
@@ -159,17 +163,17 @@ class MultiCoinPromptService:
         old_price = self._get_price_at_offset(market_data, offset) if offset else market_data.get("price_series", [current])[0]
         return ((current - old_price) / old_price * 100) if old_price > 0 else 0
 
-    def _calc_volume_ratio(self, market_data: Dict) -> float:
+    def _calc_volume_ratio(self, market_data: dict[str, Any]) -> float:
         """Calculate current volume vs average."""
         tech = market_data.get("technical_indicators", {}).get("1h", {})
         avg_vol = tech.get("avg_volume", 1)
         return tech.get("volume", 0) / avg_vol if avg_vol > 0 else 1.0
 
-    def _get_primary_sentiment(self, news_list: List[Dict]) -> str:
+    def _get_primary_sentiment(self, news_list: list[dict[str, Any]]) -> str:
         """Get primary sentiment from news list."""
         return news_list[0].get("sentiment", "neutral") if news_list else "neutral"
 
-    def _analyze_squeeze(self, symbol: str, market_data: Dict):
+    def _analyze_squeeze(self, symbol: str, market_data: dict[str, Any]) -> Any:
         """Analyze squeeze potential for a symbol."""
         current = market_data.get("current_price", 0)
         high_4h, low_4h = self._get_price_range(market_data, 48)
@@ -188,8 +192,8 @@ class MultiCoinPromptService:
         )
 
     def _generate_alpha_setup(
-        self, symbol: str, market_data: Dict, narrative_class: str
-    ):
+        self, symbol: str, market_data: dict[str, Any], narrative_class: str
+    ) -> Any:
         """Generate alpha setup for a symbol."""
         current = market_data.get("current_price", 0)
         price_series = market_data.get("price_series", [])
@@ -220,16 +224,16 @@ class MultiCoinPromptService:
         )
 
     def parse_multi_coin_response(
-        self, response_text: str, target_symbols: Optional[List[str]] = None
-    ) -> Dict:
+        self, response_text: str, target_symbols: Optional[list[str]] = None
+    ) -> dict[str, Any]:
         """Parse LLM response for multi-coin decisions."""
         target_symbols = target_symbols or list(self.coin_mapping.keys())
         return self.analysis_integrator.parse_multi_coin_response(response_text, target_symbols)
 
-    def get_decision_for_symbol(self, symbol: str, response_text: str) -> Dict:
+    def get_decision_for_symbol(self, symbol: str, response_text: str) -> dict[str, Any]:
         """Extract decision for a specific symbol from LLM response."""
         return self.analysis_integrator.get_decision_for_symbol(symbol, response_text)
 
-    def parse_simple_response(self, response_text: str, symbol: str, current_market_price: float = 0) -> Dict:
+    def parse_simple_response(self, response_text: str, symbol: str, current_market_price: float = 0) -> dict[str, Any]:
         """Compatibility method for SimpleLLMPromptService interface."""
         return self.analysis_integrator.parse_simple_response(response_text, symbol, current_market_price)

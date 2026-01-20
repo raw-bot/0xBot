@@ -49,7 +49,7 @@ class TrinityDecisionBlock:
     - OR RSI > 75 (extreme overbought)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = get_logger(__name__)
 
     async def get_decisions(

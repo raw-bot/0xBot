@@ -1,6 +1,6 @@
 """Technical indicator service using TA-Lib with caching support."""
 
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 import talib
@@ -44,7 +44,7 @@ class IndicatorService:
         fast_period: int = 12,
         slow_period: int = 26,
         signal_period: int = 9,
-    ) -> dict:
+    ) -> dict[str, list[Optional[float]]]:
         """Calculate MACD. Returns dict with 'macd', 'signal', 'histogram' lists."""
         macd, signal, histogram = talib.MACD(
             _to_array(prices),
@@ -61,7 +61,7 @@ class IndicatorService:
     @staticmethod
     def calculate_bollinger_bands(
         prices: list[float], period: int = 20, std_dev: int = 2
-    ) -> dict:
+    ) -> dict[str, list[Optional[float]]]:
         """Calculate Bollinger Bands. Returns dict with 'upper', 'middle', 'lower' lists."""
         upper, middle, lower = talib.BBANDS(
             _to_array(prices), timeperiod=period, nbdevup=std_dev, nbdevdn=std_dev
@@ -88,7 +88,7 @@ class IndicatorService:
         fastk_period: int = 14,
         slowk_period: int = 3,
         slowd_period: int = 3,
-    ) -> dict:
+    ) -> dict[str, list[Optional[float]]]:
         """Calculate Stochastic Oscillator. Returns dict with 'k' and 'd' lists."""
         slowk, slowd = talib.STOCH(
             _to_array(highs),
@@ -105,7 +105,7 @@ class IndicatorService:
         closes: list[float],
         highs: Optional[list[float]] = None,
         lows: Optional[list[float]] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Calculate all commonly used indicators at once."""
         indicators = {
             "ema_20": IndicatorService.calculate_ema(closes, 20),
@@ -123,19 +123,19 @@ class IndicatorService:
         return indicators
     
     @staticmethod
-    def get_latest_values(indicators: dict) -> dict:
+    def get_latest_values(indicators: dict[str, Any]) -> dict[str, Any]:
         """Extract the latest (most recent) value from each indicator."""
 
-        def get_latest(values: list) -> Optional[float]:
+        def get_latest(values: list[Any]) -> Optional[float]:
             """Get the last non-None value from a list."""
             if not values:
                 return None
             for val in reversed(values):
                 if val is not None:
-                    return val
+                    return float(val) if isinstance(val, (int, float)) else None
             return None
 
-        latest = {}
+        latest: dict[str, Any] = {}
         for key, value in indicators.items():
             if isinstance(value, dict):
                 latest[key] = {sub_key: get_latest(sub_val) if isinstance(sub_val, list) else None
@@ -151,7 +151,7 @@ class IndicatorService:
 class CachedIndicatorService:
     """Indicator service with caching support for expensive calculations."""
 
-    def __init__(self, cache_service: Optional['CacheService'] = None):
+    def __init__(self, cache_service: Optional[Any] = None) -> None:
         """Initialize cached indicator service.
 
         Args:
@@ -165,7 +165,7 @@ class CachedIndicatorService:
         prices: list[float],
         symbol: str,
         timeframe: str,
-        period: int = 20
+        period: int = 20,
     ) -> list[Optional[float]]:
         """Calculate EMA with optional caching.
 
@@ -187,14 +187,15 @@ class CachedIndicatorService:
 
             if cached is not None:
                 logger.debug(f"EMA cache hit (symbol={symbol}, timeframe={timeframe}, period={period})")
-                return cached
+                return cached  # type: ignore[no-any-return]
 
             result = self.indicator_service.calculate_ema(prices, period)
-            await self.cache_service.set_cached(
-                cache_key,
-                result,
-                ttl=self.cache_service.TTL_INDICATOR
-            )
+            if self.cache_service:
+                await self.cache_service.set_cached(
+                    cache_key,
+                    result,
+                    ttl=self.cache_service.TTL_INDICATOR,
+                )
             return result
         except Exception as e:
             logger.error(f"Error in cached EMA calculation: {e}")
@@ -206,7 +207,7 @@ class CachedIndicatorService:
         prices: list[float],
         symbol: str,
         timeframe: str,
-        period: int = 20
+        period: int = 20,
     ) -> list[Optional[float]]:
         """Calculate SMA with optional caching.
 
@@ -228,14 +229,15 @@ class CachedIndicatorService:
 
             if cached is not None:
                 logger.debug(f"SMA cache hit (symbol={symbol}, timeframe={timeframe}, period={period})")
-                return cached
+                return cached  # type: ignore[no-any-return]
 
             result = self.indicator_service.calculate_sma(prices, period)
-            await self.cache_service.set_cached(
-                cache_key,
-                result,
-                ttl=self.cache_service.TTL_INDICATOR
-            )
+            if self.cache_service:
+                await self.cache_service.set_cached(
+                    cache_key,
+                    result,
+                    ttl=self.cache_service.TTL_INDICATOR,
+                )
             return result
         except Exception as e:
             logger.error(f"Error in cached SMA calculation: {e}")
@@ -247,7 +249,7 @@ class CachedIndicatorService:
         prices: list[float],
         symbol: str,
         timeframe: str,
-        period: int = 14
+        period: int = 14,
     ) -> list[Optional[float]]:
         """Calculate RSI with optional caching.
 
@@ -269,14 +271,15 @@ class CachedIndicatorService:
 
             if cached is not None:
                 logger.debug(f"RSI cache hit (symbol={symbol}, timeframe={timeframe}, period={period})")
-                return cached
+                return cached  # type: ignore[no-any-return]
 
             result = self.indicator_service.calculate_rsi(prices, period)
-            await self.cache_service.set_cached(
-                cache_key,
-                result,
-                ttl=self.cache_service.TTL_INDICATOR
-            )
+            if self.cache_service:
+                await self.cache_service.set_cached(
+                    cache_key,
+                    result,
+                    ttl=self.cache_service.TTL_INDICATOR,
+                )
             return result
         except Exception as e:
             logger.error(f"Error in cached RSI calculation: {e}")
@@ -290,8 +293,8 @@ class CachedIndicatorService:
         timeframe: str,
         fast_period: int = 12,
         slow_period: int = 26,
-        signal_period: int = 9
-    ) -> dict:
+        signal_period: int = 9,
+    ) -> dict[str, list[Optional[float]]]:
         """Calculate MACD with optional caching.
 
         Args:
@@ -316,16 +319,17 @@ class CachedIndicatorService:
 
             if cached is not None:
                 logger.debug(f"MACD cache hit (symbol={symbol}, timeframe={timeframe})")
-                return cached
+                return cached  # type: ignore[no-any-return]
 
             result = self.indicator_service.calculate_macd(
                 prices, fast_period, slow_period, signal_period
             )
-            await self.cache_service.set_cached(
-                cache_key,
-                result,
-                ttl=self.cache_service.TTL_INDICATOR
-            )
+            if self.cache_service:
+                await self.cache_service.set_cached(
+                    cache_key,
+                    result,
+                    ttl=self.cache_service.TTL_INDICATOR,
+                )
             return result
         except Exception as e:
             logger.error(f"Error in cached MACD calculation: {e}")
@@ -348,7 +352,8 @@ class CachedIndicatorService:
             return 0
 
         pattern = f"cache:indicator:*:{symbol}:{timeframe}*"
-        return await self.cache_service.invalidate_pattern(pattern)
+        result = await self.cache_service.invalidate_pattern(pattern)
+        return result if isinstance(result, int) else 0
 
 
 # Singleton instance
@@ -356,7 +361,7 @@ _cached_indicator_service: Optional[CachedIndicatorService] = None
 
 
 async def get_cached_indicator_service(
-    cache_service: Optional['CacheService'] = None
+    cache_service: Optional[Any] = None,
 ) -> CachedIndicatorService:
     """Get cached indicator service instance (FastAPI dependency).
 

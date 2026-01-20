@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -32,7 +32,7 @@ class BotCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     model_name: str
     capital: float = Field(..., ge=100)
-    trading_symbols: Optional[List[str]] = None
+    trading_symbols: Optional[list[str]] = None
     risk_params: Optional[RiskParamsSchema] = None
     paper_trading: bool = True
 
@@ -40,7 +40,7 @@ class BotCreateRequest(BaseModel):
 class BotUpdateRequest(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     capital: Optional[float] = Field(None, ge=100)
-    trading_symbols: Optional[List[str]] = None
+    trading_symbols: Optional[list[str]] = None
     risk_params: Optional[RiskParamsSchema] = None
     status: Optional[str] = None
 
@@ -51,8 +51,8 @@ class BotResponse(BaseModel):
     name: str
     model_name: str
     capital: float
-    trading_symbols: List[str]
-    risk_params: dict
+    trading_symbols: list[str]
+    risk_params: dict[str, Any]
     status: str
     paper_trading: bool
     created_at: str
@@ -103,23 +103,23 @@ class TradeResponse(BaseModel):
 
 
 class BotListResponse(BaseModel):
-    bots: List[BotResponse]
+    bots: list[BotResponse]
     total: int
 
 
 class PositionListResponse(BaseModel):
-    positions: List[PositionResponse]
+    positions: list[PositionResponse]
     total: int
 
 
 class TradeListResponse(BaseModel):
-    trades: List[TradeResponse]
+    trades: list[TradeResponse]
     total: int
 
 
 class MessageResponse(BaseModel):
     message: str
-    details: Optional[dict] = None
+    details: Optional[dict[str, Any]] = None
 
 
 class EquitySnapshotResponse(BaseModel):
@@ -130,7 +130,7 @@ class EquitySnapshotResponse(BaseModel):
 
 
 class EquityHistoryResponse(BaseModel):
-    snapshots: List[EquitySnapshotResponse]
+    snapshots: list[EquitySnapshotResponse]
     current_equity: float
     initial_capital: float
     total_return_pct: float
@@ -190,7 +190,7 @@ def bot_to_response(bot: Bot) -> BotResponse:
     )
 
 
-def position_to_response(position) -> PositionResponse:
+def position_to_response(position: Any) -> PositionResponse:
     return PositionResponse(
         id=str(position.id),
         bot_id=str(position.bot_id),
@@ -210,7 +210,7 @@ def position_to_response(position) -> PositionResponse:
     )
 
 
-def trade_to_response(trade) -> TradeResponse:
+def trade_to_response(trade: Any) -> TradeResponse:
     return TradeResponse(
         id=str(trade.id),
         bot_id=str(trade.bot_id),
@@ -230,7 +230,7 @@ async def create_bot(
     request: BotCreateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> BotResponse:
     bot_service = BotService(db)
 
     bot_data = BotCreate(
@@ -255,7 +255,7 @@ async def list_bots(
     include_stopped: bool = False,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> BotListResponse:
     # Validate pagination parameters
     limit = max(10, min(limit, 1000))  # Enforce min 10, max 1000
     if page < 1:
@@ -274,7 +274,7 @@ async def get_bot(
     bot_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> BotResponse:
     bot = await get_bot_with_ownership(bot_id, current_user, db, load_relations=True)
     return bot_to_response(bot)
 
@@ -285,7 +285,7 @@ async def update_bot(
     request: BotUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> BotResponse:
     bot = await get_bot_with_ownership(bot_id, current_user, db)
     bot_service = BotService(db)
 
@@ -298,6 +298,8 @@ async def update_bot(
     )
 
     updated_bot = await bot_service.update_bot(bot.id, update_data)
+    if updated_bot is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update bot")
     return bot_to_response(updated_bot)
 
 
@@ -306,7 +308,7 @@ async def delete_bot(
     bot_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> MessageResponse:
     bot = await get_bot_with_ownership(bot_id, current_user, db)
     bot_service = BotService(db)
     await bot_service.delete_bot(bot.id)
@@ -318,7 +320,7 @@ async def start_bot(
     bot_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> MessageResponse:
     bot = await get_bot_with_ownership(bot_id, current_user, db)
 
     if bot.status == BotStatus.ACTIVE:
@@ -347,7 +349,7 @@ async def pause_bot(
     bot_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> MessageResponse:
     bot = await get_bot_with_ownership(bot_id, current_user, db)
     bot_service = BotService(db)
     await bot_service.update_bot(bot.id, BotUpdate(status=BotStatus.PAUSED.value))
@@ -363,7 +365,7 @@ async def stop_bot(
     bot_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> MessageResponse:
     bot = await get_bot_with_ownership(bot_id, current_user, db)
     position_service = PositionService(db)
     positions = await position_service.get_open_positions(bot.id)
@@ -393,7 +395,7 @@ async def get_bot_positions(
     status_filter: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> PositionListResponse:
     bot = await get_bot_with_ownership(bot_id, current_user, db)
 
     # Validate pagination parameters
@@ -424,7 +426,7 @@ async def get_bot_trades(
     limit: int = 100,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> TradeListResponse:
     bot = await get_bot_with_ownership(bot_id, current_user, db)
 
     # Validate pagination parameters
@@ -449,7 +451,7 @@ async def get_bot_trades(
 
     return TradeListResponse(
         trades=[trade_to_response(trade) for trade in trades],
-        total=total,
+        total=total if total is not None else 0,
     )
 
 
@@ -459,7 +461,7 @@ async def get_bot_equity(
     period: str = "24h",
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> EquityHistoryResponse:
     bot = await get_bot_with_ownership(bot_id, current_user, db)
 
     period_map = {

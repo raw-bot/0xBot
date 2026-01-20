@@ -4,7 +4,7 @@ import asyncio
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional, Union
 
 from sqlalchemy import select, text
 
@@ -43,7 +43,7 @@ class TradingOrchestrator:
         self.decision_mode = decision_mode.lower()
         self.paper_trading = paper_trading
         self._running = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: Optional[asyncio.Task[Any]] = None
 
         self.market_data = MarketDataBlock(paper_trading=paper_trading)
         self.portfolio = PortfolioBlock(bot_id)
@@ -54,6 +54,7 @@ class TradingOrchestrator:
         self.llm_decision = LLMDecisionBlock(llm_client=llm_client, bot_id=bot_id) if llm_client else None
 
         # Set active decision block
+        self.decision: Union[LLMDecisionBlock, TrinityDecisionBlock, IndicatorDecisionBlock]
         if self.decision_mode == "llm" and self.llm_decision:
             self.decision = self.llm_decision
             logger.info(f"🧠 Using LLM-based decision mode + Trade Filter + Memory")
@@ -110,7 +111,9 @@ class TradingOrchestrator:
         async with AsyncSessionLocal() as db:
             result = await db.execute(select(Bot).where(Bot.id == self.bot_id))
             bot = result.scalar_one_or_none()
-            return bot and bot.status == BotStatus.ACTIVE.value
+            if bot is None:
+                return False
+            return bot.status == BotStatus.ACTIVE.value
 
     async def _run_cycle(self) -> None:
         """Execute one complete trading cycle."""
@@ -147,7 +150,7 @@ class TradingOrchestrator:
 
         await self.portfolio.record_snapshot()
 
-    async def _check_exits(self, positions: list, market_data: dict) -> None:
+    async def _check_exits(self, positions: list[Any], market_data: dict[str, Any]) -> None:
         """Check if any positions should be closed and update current prices."""
         for position in positions:
             if position.symbol not in market_data:
@@ -161,7 +164,7 @@ class TradingOrchestrator:
                 logger.info(f"Exit triggered for {position.symbol}: {reason}")
                 await self.execution.close_position(position, current_price, reason)
 
-    async def _update_position_price(self, position, current_price: Decimal) -> None:
+    async def _update_position_price(self, position: Any, current_price: Decimal) -> None:
         """Update position with current market price."""
         try:
             async with AsyncSessionLocal() as db:
@@ -173,7 +176,7 @@ class TradingOrchestrator:
         except Exception as e:
             logger.warning(f"Failed to update position: {e}")
 
-    async def _execute_decision(self, decision, market_data: dict, portfolio_state) -> None:
+    async def _execute_decision(self, decision: Any, market_data: dict[str, Any], portfolio_state: Any) -> None:
         """Validate and execute a single decision."""
         # Normalize decision format (handle both TradingSignal and legacy formats)
         signal_type = getattr(decision, 'signal_type', None)
@@ -198,8 +201,14 @@ class TradingOrchestrator:
         side = str(decision.side) if hasattr(decision.side, 'value') else decision.side
 
         # Keep as Decimal for validation, convert to float later for execution
-        stop_loss = decision.stop_loss if decision.stop_loss else None
-        take_profit = decision.take_profit if decision.take_profit else None
+        stop_loss = decision.stop_loss if decision.stop_loss else Decimal("0")
+        take_profit = decision.take_profit if decision.take_profit else Decimal("0")
+
+        # Ensure they are Decimal
+        if not isinstance(stop_loss, Decimal):
+            stop_loss = Decimal(str(stop_loss)) if stop_loss else Decimal("0")
+        if not isinstance(take_profit, Decimal):
+            take_profit = Decimal(str(take_profit)) if take_profit else Decimal("0")
 
         validation = self.risk.validate_entry(
             symbol=decision.symbol,
@@ -221,12 +230,12 @@ class TradingOrchestrator:
             side=side,
             size_pct=decision.size_pct,
             entry_price=current_price,
-            stop_loss=float(stop_loss) if stop_loss else None,
-            take_profit=float(take_profit) if take_profit else None,
+            stop_loss=stop_loss if stop_loss and stop_loss > 0 else Decimal("0"),
+            take_profit=take_profit if take_profit and take_profit > 0 else Decimal("0"),
             leverage=getattr(decision, 'leverage', 1),
         )
 
-        if result.success:
+        if result.success and result.position:
             logger.info(f"{side.upper()} {decision.symbol} @ ${current_price:,.2f}")
             sl_float = float(stop_loss) if stop_loss else 0
             tp_float = float(take_profit) if take_profit else 0
@@ -243,7 +252,7 @@ class TradingOrchestrator:
         else:
             logger.error(f"{decision.symbol}: {result.error}")
 
-    async def _handle_close_signal(self, decision, market_data: dict, portfolio_state) -> None:
+    async def _handle_close_signal(self, decision: Any, market_data: dict[str, Any], portfolio_state: Any) -> None:
         """Handle LLM close signal for a position."""
         position = self._find_position(decision.symbol, portfolio_state.open_positions)
         if not position:
@@ -256,11 +265,11 @@ class TradingOrchestrator:
         logger.info(f"LLM EXIT {decision.symbol}: {decision.reasoning[:50]}...")
         await self.execution.close_position(position, price_data.price, "llm_decision")
 
-    def _has_position(self, symbol: str, positions: list) -> bool:
+    def _has_position(self, symbol: str, positions: list[Any]) -> bool:
         """Check if there's an open position for the symbol."""
         return any(p.symbol == symbol for p in positions)
 
-    def _find_position(self, symbol: str, positions: list):
+    def _find_position(self, symbol: str, positions: list[Any]) -> Any:
         """Find open position for symbol."""
         return next((p for p in positions if p.symbol == symbol), None)
 
@@ -279,19 +288,22 @@ class TradingOrchestrator:
             if not self.llm_decision:
                 logger.error("LLM decision block not available (no LLM client provided)")
                 return False
-            self.decision = self.llm_decision
+            llm_dec = self.llm_decision
+            self.decision = llm_dec
             self.decision_mode = "llm"
             logger.info("🧠 Switched to LLM-based decision mode")
             return True
 
         elif mode == "trinity":
-            self.decision = self.trinity_decision
+            trinity_dec = self.trinity_decision
+            self.decision = trinity_dec
             self.decision_mode = "trinity"
             logger.info("📈 Switched to Trinity indicator framework (confluence scoring)")
             return True
 
         elif mode == "indicator":
-            self.decision = self.indicator_decision
+            indicator_dec = self.indicator_decision
+            self.decision = indicator_dec
             self.decision_mode = "indicator"
             logger.info("📊 Switched to legacy indicator-based decision mode")
             return True
