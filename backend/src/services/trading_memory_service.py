@@ -1,7 +1,7 @@
 """Trading memory service - learns from trade history."""
 
 from decimal import Decimal
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 from uuid import UUID
 

@@ -13,7 +13,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class FVG:
     impulse_strength: float  # How strong the impulse candle was
     is_mitigated: bool = False  # Has price touched this FVG?
     confluence_score: float = 0.0  # Bonus from alignments
-    formation_candles: List[Dict] = field(default_factory=list)
+    formation_candles: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def size(self) -> float:
@@ -75,10 +75,10 @@ class FVGDetectorService:
     IMPULSE_MULTIPLIER = 1.5  # Candle body must be > 1.5x ATR
     MAX_FVG_AGE_CANDLES = 50  # Don't track old FVGs
 
-    def __init__(self):
-        self.active_fvgs: Dict[str, List[FVG]] = {}  # symbol -> list of FVGs
+    def __init__(self) -> None:
+        self.active_fvgs: dict[str, list[FVG]] = {}  # symbol -> list of FVGs
 
-    def detect_fvgs(self, symbol: str, candles: List[Dict], timeframe: str = "1h") -> List[FVG]:
+    def detect_fvgs(self, symbol: str, candles: list[dict[str, Any]], timeframe: str = "1h") -> list[FVG]:
         """
         Detect Fair Value Gaps in candle data.
 
@@ -125,7 +125,7 @@ class FVGDetectorService:
         return detected
 
     def _check_bullish_fvg(
-        self, prev: Dict, impulse: Dict, next_c: Dict, atr: float, timeframe: str
+        self, prev: dict[str, Any], impulse: dict[str, Any], next_c: dict[str, Any], atr: float, timeframe: str
     ) -> Optional[FVG]:
         """
         Check for bullish FVG (gap up).
@@ -174,7 +174,7 @@ class FVGDetectorService:
         )
 
     def _check_bearish_fvg(
-        self, prev: Dict, impulse: Dict, next_c: Dict, atr: float, timeframe: str
+        self, prev: dict[str, Any], impulse: dict[str, Any], next_c: dict[str, Any], atr: float, timeframe: str
     ) -> Optional[FVG]:
         """
         Check for bearish FVG (gap down).
@@ -222,12 +222,12 @@ class FVGDetectorService:
             formation_candles=[prev, impulse, next_c],
         )
 
-    def _calculate_atr(self, candles: List[Dict], period: int = 14) -> float:
+    def _calculate_atr(self, candles: list[dict[str, Any]], period: int = 14) -> float:
         """Calculate Average True Range."""
         if len(candles) < period:
             return 0.0
 
-        true_ranges = []
+        true_ranges: list[float] = []
         for i in range(1, len(candles)):
             high = candles[i].get("high", 0)
             low = candles[i].get("low", 0)
@@ -258,7 +258,7 @@ class FVGDetectorService:
                     f"${current_price:,.2f} (zone: ${fvg.bottom:,.2f}-${fvg.top:,.2f})"
                 )
 
-    def get_unmitigated_fvgs(self, symbol: str) -> List[FVG]:
+    def get_unmitigated_fvgs(self, symbol: str) -> list[FVG]:
         """Get only fresh, unmitigated FVGs for a symbol."""
         if symbol not in self.active_fvgs:
             return []
@@ -291,7 +291,7 @@ class FVGDetectorService:
             return ZoneType.EQUILIBRIUM, 0.5
 
     def validate_entry(
-        self, fvg: FVG, current_candle: Dict, intended_side: Literal["long", "short"]
+        self, fvg: FVG, current_candle: dict[str, Any], intended_side: Literal["long", "short"]
     ) -> Tuple[bool, str]:
         """
         Validate entry based on candle reaction at FVG.

@@ -31,8 +31,8 @@ class MarketSnapshot:
     ema_slow: Optional[float] = None
     atr: Optional[float] = None
     trend: str = "neutral"
-    ohlcv_1h: Optional[list] = None
-    ohlcv_4h: Optional[list] = None
+    ohlcv_1h: Optional[list[Any]] = None
+    ohlcv_4h: Optional[list[Any]] = None
 
     # Trinity Framework Indicators
     sma_200: Optional[float] = None        # Regime filter
@@ -57,9 +57,9 @@ class MarketDataBlock:
         self.indicator_block = IndicatorBlock()  # Trinity framework indicators
         self.symbols = config.ALLOWED_SYMBOLS
 
-    async def fetch_all(self) -> Dict[str, MarketSnapshot]:
+    async def fetch_all(self) -> dict[str, MarketSnapshot]:
         """Fetch market data for all configured symbols."""
-        snapshots = {}
+        snapshots: dict[str, MarketSnapshot] = {}
         for symbol in self.symbols:
             try:
                 snapshot = await self._fetch_symbol(symbol)
@@ -71,7 +71,7 @@ class MarketDataBlock:
         # Check if we have ANY market data
         if not snapshots:
             logger.error("🔴 CRITICAL: No market data fetched for ANY symbol! Trading cycle cannot proceed.")
-            return None  # Signal upstream that data fetch failed
+            return {}  # Signal upstream that data fetch failed (return empty dict instead of None)
 
         logger.info(f"Fetched market data for {len(snapshots)} symbols")
         return snapshots
@@ -102,8 +102,8 @@ class MarketDataBlock:
         return MarketSnapshot(
             symbol=symbol,
             price=Decimal(str(ticker.last)),
-            change_24h=ticker.percentage or 0,
-            volume_24h=ticker.quote_volume or 0,
+            change_24h=float(ticker.percentage or 0),
+            volume_24h=float(ticker.quote_volume or 0),
             # Legacy indicators
             rsi=legacy_indicators.get("rsi"),
             ema_fast=legacy_indicators.get("ema_fast"),
@@ -123,7 +123,7 @@ class MarketDataBlock:
             signals=trinity_indicators.get("signals", {}),
         )
 
-    def _calculate_indicators(self, ohlcv: Optional[List]) -> dict:
+    def _calculate_indicators(self, ohlcv: Optional[list[Any]]) -> dict[str, Any]:
         """Calculate technical indicators from OHLCV data."""
         if not ohlcv or len(ohlcv) < MIN_CANDLES_FOR_INDICATORS:
             return {}
@@ -137,11 +137,12 @@ class MarketDataBlock:
         ema_slow = self.indicator_service.calculate_ema(closes, period=21)
         atr_values = self.indicator_service.calculate_atr(highs, lows, closes)
 
-        indicators = {
+        indicators: dict[str, Any] = {
             "rsi": rsi_values[-1] if rsi_values else None,
             "ema_fast": ema_fast[-1] if ema_fast else None,
             "ema_slow": ema_slow[-1] if ema_slow else None,
             "atr": atr_values[-1] if atr_values else None,
+            "trend": "neutral",
         }
 
         if indicators["ema_fast"] and indicators["ema_slow"]:
@@ -149,8 +150,6 @@ class MarketDataBlock:
                 indicators["trend"] = "bullish"
             elif indicators["ema_fast"] < indicators["ema_slow"]:
                 indicators["trend"] = "bearish"
-            else:
-                indicators["trend"] = "neutral"
 
         return indicators
 

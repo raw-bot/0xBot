@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Optional, Tuple, Dict, List
+from typing import Optional, Tuple, Dict, List, Any, Sequence
 import statistics
 
 from sqlalchemy import select, and_, func
@@ -20,7 +20,7 @@ logger = get_logger(__name__)
 class StrategyMetrics:
     """Container for calculated strategy metrics."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.total_trades: int = 0
         self.winning_trades: int = 0
         self.losing_trades: int = 0
@@ -41,7 +41,7 @@ class StrategyMetrics:
         self.symbol_win_rates: Dict[str, Decimal] = {}
         self.lookback_days: int = 30
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert metrics to dictionary for API response."""
         return {
             "total_trades": self.total_trades,
@@ -138,7 +138,7 @@ class StrategyPerformanceService:
                 await db.close()
 
     def _calculate_trade_metrics(
-        self, metrics: StrategyMetrics, positions: List[Position], trades: List[Trade]
+        self, metrics: StrategyMetrics, positions: Sequence[Position], trades: Sequence[Trade]
     ) -> None:
         """Calculate basic trade metrics (win rate, profit factor, etc)."""
         if not positions:
@@ -216,7 +216,7 @@ class StrategyPerformanceService:
                 )
 
     def _calculate_risk_metrics(
-        self, metrics: StrategyMetrics, positions: List[Position]
+        self, metrics: StrategyMetrics, positions: Sequence[Position]
     ) -> None:
         """Calculate risk metrics (max drawdown, etc)."""
         if not positions:
@@ -271,7 +271,7 @@ class StrategyPerformanceService:
             metrics.consecutive_losses = max_consecutive_losses
 
     def _calculate_sharpe_ratio(
-        self, metrics: StrategyMetrics, positions: List[Position]
+        self, metrics: StrategyMetrics, positions: Sequence[Position]
     ) -> None:
         """Calculate Sharpe ratio from returns."""
         if metrics.total_trades < 2:
@@ -304,7 +304,7 @@ class StrategyPerformanceService:
         except Exception as e:
             logger.warning(f"Failed to calculate Sharpe ratio: {e}")
 
-    async def get_strategy_summary(self, bot_id: str) -> Dict:
+    async def get_strategy_summary(self, bot_id: str) -> dict[str, Any]:
         """Get a summary of strategy performance for dashboard display."""
         metrics = await self.calculate_metrics(bot_id)
         return {
@@ -323,7 +323,7 @@ class StrategyPerformanceService:
 
     async def get_recent_trades_performance(
         self, bot_id: str, limit: int = 10
-    ) -> List[Dict]:
+    ) -> list[dict[str, Any]]:
         """Get performance data for the most recent trades.
 
         Note: Uses batch query to avoid N+1 pattern (was 1 + N queries, now 2 queries)
@@ -356,7 +356,7 @@ class StrategyPerformanceService:
             all_trades = trades_result.scalars().all()
 
             # Group trades by position_id for efficient lookup
-            trades_by_position = {}
+            trades_by_position: dict[Any, list[Trade]] = {}
             for trade in all_trades:
                 if trade.position_id not in trades_by_position:
                     trades_by_position[trade.position_id] = []

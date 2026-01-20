@@ -2,7 +2,7 @@
 
 import asyncio
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,12 +26,12 @@ logger = get_logger(__name__)
 class BotScheduler:
     """Scheduler for managing multiple trading bot engines."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the bot scheduler."""
         self.active_engines: Dict[uuid.UUID, Any] = {}
-        self.engine_tasks: Dict[uuid.UUID, asyncio.Task] = {}
+        self.engine_tasks: Dict[uuid.UUID, asyncio.Task[Any]] = {}
         self.is_running = False
-        self.monitor_task: Optional[asyncio.Task] = None
+        self.monitor_task: Optional[asyncio.Task[Any]] = None
         logger.info("Bot scheduler initialized")
 
     async def start(self) -> None:
@@ -120,7 +120,7 @@ class BotScheduler:
                     db = session
                     break
 
-            bot_service = BotService(db)
+            bot_service = BotService(cast(AsyncSession, db))
             bot = await bot_service.get_bot(bot_id)
 
             if not bot:
@@ -144,7 +144,7 @@ class BotScheduler:
                 )
                 logger.info(f"[DECISION] Using Trinity indicator framework (confluence scoring)")
             else:
-                engine = TradingEngine(bot=bot, db=db, cycle_interval=cycle_interval)
+                engine = TradingEngine(bot=bot, db=cast(AsyncSession, db), cycle_interval=cycle_interval)  # type: ignore[assignment]
 
             task = asyncio.create_task(engine.start())
             self.active_engines[bot_id] = engine
@@ -198,7 +198,7 @@ class BotScheduler:
         """Get all currently active engines."""
         return self.active_engines.copy()
 
-    def get_engine_status(self, bot_id: uuid.UUID) -> Optional[dict]:
+    def get_engine_status(self, bot_id: uuid.UUID) -> Optional[dict[str, Any]]:
         """Get status information for a specific engine."""
         if bot_id not in self.active_engines:
             return None
@@ -213,9 +213,9 @@ class BotScheduler:
             "cycle_interval": engine.cycle_interval,
         }
 
-    def get_all_status(self) -> list[dict]:
+    def get_all_status(self) -> list[dict[str, Any]]:
         """Get status for all active engines."""
-        return [self.get_engine_status(bot_id) for bot_id in self.active_engines.keys()]
+        return [status for status in (self.get_engine_status(bot_id) for bot_id in self.active_engines.keys()) if status is not None]
 
 
 _scheduler: Optional[BotScheduler] = None

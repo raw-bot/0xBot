@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import aiohttp
 
@@ -18,12 +18,12 @@ class NewsService:
 
     BASE_URL = "https://min-api.cryptocompare.com/data/v2/news/"
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.api_key = config.CRYPTOCOMPARE_API_KEY
-        self.cache: Dict[str, Dict] = {}  # key -> {data: ..., timestamp: ...}
+        self.cache: dict[str, dict[str, Any]] = {}  # key -> {data: ..., timestamp: ...}
         self.cache_ttl = 300  # 5 minutes cache
 
-    async def get_latest_news(self, symbols: List[str] = None) -> List[Dict]:
+    async def get_latest_news(self, symbols: Optional[list[str]] = None) -> list[dict[str, Any]]:
         """
         Get latest news, optionally filtered by symbols.
         Returns a simplified list of news items for the LLM.
@@ -60,7 +60,7 @@ class NewsService:
             logger.error(f"❌ Error fetching news: {e}")
             return []
 
-    async def _fetch_cached(self, cache_key: str, params: Dict) -> Dict:
+    async def _fetch_cached(self, cache_key: str, params: dict[str, Any]) -> dict[str, Any]:
         """Fetch from API with caching."""
         now = datetime.utcnow()
 
@@ -68,7 +68,7 @@ class NewsService:
         if cache_key in self.cache:
             cached = self.cache[cache_key]
             if (now - cached["timestamp"]).total_seconds() < self.cache_ttl:
-                return cached["data"]
+                return cached["data"]  # type: ignore[no-any-return]
 
         # Fetch fresh
         data = await self._fetch_from_api(params)
@@ -79,7 +79,7 @@ class NewsService:
 
         return data
 
-    async def _fetch_from_api(self, params: Dict) -> Dict:
+    async def _fetch_from_api(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute HTTP request to CryptoCompare with timeout."""
         headers = {"Authorization": f"Apikey {self.api_key}"}
         timeout = aiohttp.ClientTimeout(total=5)  # 5 second timeout
@@ -88,7 +88,7 @@ class NewsService:
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(self.BASE_URL, params=params, headers=headers) as response:
                     if response.status == 200:
-                        return await response.json()
+                        return await response.json()  # type: ignore[no-any-return]
                     elif response.status == 429:
                         logger.warning("⚠️ CryptoCompare Rate Limit Hit")
                         return {}
@@ -106,7 +106,7 @@ class NewsService:
             logger.debug(f"CryptoCompare connection error: {e}")
             return {}
 
-    def _format_news_for_llm(self, raw_news: List[Dict]) -> List[Dict]:
+    def _format_news_for_llm(self, raw_news: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Format raw news items into concise summaries for the LLM."""
         formatted = []
         for item in raw_news:

@@ -97,7 +97,13 @@ class MarketSentimentService:
             if isinstance(results[1], Exception):
                 logger.warning(f"Failed to fetch global market: {results[1]}")
 
-            global_market.trending_coins = trending
+            # Ensure global_market and fear_greed are correct types before using them
+            if not isinstance(global_market, GlobalMarketData):
+                global_market = self._get_default_global_market()
+            if not isinstance(fear_greed, FearGreedData):
+                fear_greed = self._get_default_fear_greed()
+
+            global_market.trending_coins = trending if isinstance(trending, list) else []
             market_phase = self._determine_market_phase(fear_greed.value)
             llm_guidance = self._generate_llm_guidance(fear_greed, global_market, market_phase)
 

@@ -23,13 +23,13 @@ class MemoryConfig:
 class DummyMemoryProvider(BaseMemoryProvider):
     """No-op memory provider when memory is disabled."""
 
-    async def remember(self, key: str, value: Any, metadata: Optional[Dict] = None) -> bool:
+    async def remember(self, key: str, value: Any, metadata: Optional[dict[str, Any]] = None) -> bool:
         return True
 
     async def recall(self, key: str, default: Any = None) -> Any:
         return default
 
-    async def search(self, pattern: str) -> Dict[str, Any]:
+    async def search(self, pattern: str) -> dict[str, Any]:
         return {}
 
     async def forget(self, key: str) -> bool:
@@ -38,25 +38,26 @@ class DummyMemoryProvider(BaseMemoryProvider):
     async def clear_all(self) -> bool:
         return True
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         return {"status": "disabled", "provider": "none"}
 
 
 class MemoryManager:
     """Central memory manager - handles all memory operations."""
 
-    _instance = None  # Singleton
-    _config: MemoryConfig = None
-    _provider: BaseMemoryProvider = None
+    _instance: Optional["MemoryManager"] = None  # Singleton
+    _config: Optional[MemoryConfig] = None
+    _provider: Optional[BaseMemoryProvider] = None
+    _initialized: bool = False
 
-    def __new__(cls):
+    def __new__(cls) -> "MemoryManager":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
         return cls._instance
 
     @classmethod
-    def initialize(cls, config: MemoryConfig = None) -> "MemoryManager":
+    def initialize(cls, config: Optional[MemoryConfig] = None) -> "MemoryManager":
         """Initialize the memory manager.
 
         Args:
@@ -106,11 +107,11 @@ class MemoryManager:
         """Get the memory provider."""
         if cls._provider is None:
             cls.initialize()
-        return cls._provider
+        return cls._provider  # type: ignore[return-value]
 
     @classmethod
     async def remember(
-        cls, key: str, value: Any, metadata: Optional[Dict] = None
+        cls, key: str, value: Any, metadata: Optional[dict[str, Any]] = None
     ) -> bool:
         """Remember something.
 
@@ -140,7 +141,7 @@ class MemoryManager:
         return await provider.recall(key, default)
 
     @classmethod
-    async def search(cls, pattern: str) -> Dict[str, Any]:
+    async def search(cls, pattern: str) -> dict[str, Any]:
         """Search for memories.
 
         Args:
@@ -172,7 +173,7 @@ class MemoryManager:
         return await provider.clear_all()
 
     @classmethod
-    async def health_check(cls) -> Dict[str, Any]:
+    async def health_check(cls) -> dict[str, Any]:
         """Check memory system health."""
         provider = cls.get_provider()
         health = await provider.health_check()
@@ -191,7 +192,7 @@ class MemoryManager:
         """Check if memory system is enabled."""
         if cls._config is None:
             cls.initialize()
-        return cls._config.enabled
+        return cls._config.enabled if cls._config else False
 
     @classmethod
     def switch_on(cls) -> None:
