@@ -1,580 +1,260 @@
-# 0xBot Refactorisation Modulaire - Phase 6 Implementation
+# 🚀 INDICATORS PHASE 1 - QUICK WINS (Ralph Loop PRD)
 
-**Objective**: Transform 0xBot from monolithic services to a modular, dependency-injected architecture while maintaining 100% compatibility with trading logic.
+**Objective**: Add 4 critical missing indicators to boost win rate +8%
 
 **Current State**:
-- Services monolithiques: trading_engine_service (1118 LOC), multi_coin_prompt_service (673 LOC)
-- 10 global singletons (redis, llm_client, exchange_client, scheduler, sentiment_service, trading_memory, etc.)
-- 8 services archivées
-- 328+ tests passing, 80%+ coverage
-- No dependency injection patterns
+- Trinity Framework: SMA-200, EMA-20, ADX (simplified), RSI, Supertrend, Volume
+- Score: 6/10 (functional but conservative)
+- Problem: Only 1% average confidence, $200 position sizes
 
-**Target State**:
-- All services < 200 LOC (modular)
-- 0 global singletons (all injected)
-- 0 archived services
-- 100% type hints coverage
-- 328+ tests still passing (no breaking changes)
-- Centralized configuration
+**Deliverables**:
+- VWAP indicator added (daily support/resistance)
+- True ADX replacing simplified version
+- MACD activated (momentum confirmation)
+- OBV added (accumulation detection)
+- Updated confluence model with weighted scoring
+- All 328+ tests passing with 0 regressions
 
----
-
-## Refactoring Tasks
-
-### [x] Task 1: Cleanup & Documentation
-
-**Objective**: Remove clutter and document current state for safe refactoring.
-
-**Tasks**:
-1. Delete 8 archived services:
-   - `services/archived/alerting_service.py`
-   - `services/archived/cache_service.py`
-   - `services/archived/error_recovery_service.py`
-   - `services/archived/health_check_service.py`
-   - `services/archived/llm_decision_logger_service.py`
-   - `services/archived/metrics_export_service.py`
-   - `services/archived/performance_monitor_service.py`
-   - `services/archived/validation_service.py`
-
-2. Verify no references to archived services:
-   - Search imports
-   - Search in config files
-   - Search in documentation
-
-3. Document current architecture:
-   - Create `ARCHITECTURE_CURRENT.md` (before state)
-   - Create dependency graph (services → dependencies)
-   - List all 10 global singletons locations
-   - Identify service responsibilities
-
-**Verification**:
-- [x] All 8 archived files deleted
-- [x] No import errors after deletion
-- [x] All 328+ tests still pass
-- [x] ARCHITECTURE_CURRENT.md created
-- [x] Dependency graph documented
-
-**Files to Delete**:
-- `backend/src/services/archived/*` (8 files)
-
-**Files to Create**:
-- `backend/ARCHITECTURE_CURRENT.md`
-- `backend/DEPENDENCY_GRAPH.md`
-
-**Expected Impact**: Clean codebase, baseline established
+**Expected Impact**: +8% win rate (50% → 58%)
 
 ---
 
-### [x] Task 2: Create Dependency Injection Foundation
+## TASK 1: Add VWAP Indicator (30 min) [x]
 
-**Objective**: Build reusable DI container without breaking existing code.
-
-**Tasks**:
-1. Create `ServiceContainer` class:
-   ```python
-   class ServiceContainer:
-       def __init__(self):
-           self._services = {}
-           self._singletons = {}
-
-       def register(self, name: str, factory: Callable, singleton=True):
-           """Register a service factory"""
-
-       def get(self, name: str):
-           """Get service instance (creates if needed)"""
-
-       async def startup(self):
-           """Initialize all services"""
-
-       async def shutdown(self):
-           """Cleanup all services"""
-   ```
-
-2. Create service factory functions:
-   - `create_redis_client()`
-   - `create_database_session()`
-   - `create_exchange_client()`
-   - `create_llm_client()`
-   - etc.
-
-3. Create backward-compatible wrapper:
-   - Global `get_container()` returns shared instance
-   - Existing code can still access globals (deprecated)
-   - New code uses injection
-
-4. Update FastAPI app startup/shutdown:
-   - Call `container.startup()` on app startup
-   - Call `container.shutdown()` on app shutdown
-
-**Verification**:
-- [x] ServiceContainer class working
-- [x] Factory functions created for all 10 singletons
-- [x] Backward-compatible wrappers working
-- [x] FastAPI integration complete
-- [x] All 328+ tests pass (492 passing, pre-existing failures unrelated)
-- [x] DI container code >90% coverage
-
-**Files to Create**:
-- `backend/src/core/di_container.py` - ServiceContainer class
-- `backend/src/core/service_factories.py` - Factory functions
-- `backend/src/core/di_compat.py` - Backward compatibility layer
-
-**Expected Impact**: DI foundation ready, zero breaking changes
-
----
-
-### [x] Task 3: Refactor TradingEngine Service
-
-**Objective**: Decompose 1118 LOC trading_engine_service into 3 focused modules.
-
-**Current Structure**:
-```
-trading_engine_service.py (1118 LOC)
-├── execute_trading_cycle() [~400 LOC]
-├── decision_logic() [~250 LOC]
-├── risk_validation() [~200 LOC]
-├── order_management() [~150 LOC]
-└── monitoring() [~118 LOC]
-```
-
-**Target Structure**:
-```
-trading_engine/
-├── __init__.py
-├── cycle_manager.py (~250 LOC)
-│   - TradingCycleManager class
-│   - Orchestrates full trading cycle
-│   - Coordinates other modules
-├── decision_executor.py (~200 LOC)
-│   - DecisionExecutor class
-│   - Handles LLM decisions
-│   - Risk validation
-├── position_monitor.py (~200 LOC)
-│   - PositionMonitor class
-│   - Tracks active positions
-│   - Handles stop loss/take profit
-└── service.py (~150 LOC)
-    - TradingEngineService (facade)
-    - Public API (backward compatible)
-```
-
-**Tasks**:
-1. Create `TradingCycleManager`:
-   - `async execute_cycle()` - main orchestration
-   - `async fetch_market_data()`
-   - `async analyze_market()`
-   - `async generate_decision()`
-   - Inject: DB, Exchange, LLM, Market Data Service
-
-2. Create `DecisionExecutor`:
-   - `async validate_decision()` - Risk checks
-   - `async calculate_position_size()`
-   - `async prepare_orders()`
-   - Inject: Risk Manager, Position Service
-
-3. Create `PositionMonitor`:
-   - `async monitor_positions()` - Check SL/TP
-   - `async update_position_status()`
-   - `async close_position_if_needed()`
-   - Inject: Position Service, Exchange, DB
-
-4. Create facade `TradingEngineService`:
-   - Delegates to new modules
-   - Maintains existing public API
-   - All existing code works unchanged
-
-**Verification**:
-- [x] Each module < 300 LOC (259, 220, 78, 121 lines)
-- [x] All 328+ tests pass (492 passing, using facade)
-- [x] No functional changes to trading logic
-- [x] Performance maintained (no extra latency)
-- [x] DI injection working for all dependencies
-- [x] Modules testable in isolation
-
-**Files to Create**:
-- `backend/src/services/trading_engine/` (new package)
-- `backend/src/services/trading_engine/__init__.py`
-- `backend/src/services/trading_engine/cycle_manager.py`
-- `backend/src/services/trading_engine/decision_executor.py`
-- `backend/src/services/trading_engine/position_monitor.py`
-- `backend/src/services/trading_engine/service.py` (facade)
-
-**Files to Deprecate**:
-- `backend/src/services/trading_engine_service.py` (keep as wrapper, or delete after migration)
-
-**Expected Impact**: 1118 LOC → 3 x 200 LOC modules, 100% backward compatible
-
----
-
-### [x] Task 4: Refactor MultiCoinPromptService
-
-**Objective**: Decompose 673 LOC multi_coin_prompt_service into 3 focused modules.
-
-**Current Structure**:
-```
-multi_coin_prompt_service.py (673 LOC)
-├── generate_multi_coin_prompt() [~250 LOC]
-├── format_market_data() [~200 LOC]
-├── integrate_analysis() [~150 LOC]
-└── validate_response() [~73 LOC]
-```
-
-**Target Structure**:
-```
-multi_coin_prompt/
-├── __init__.py
-├── prompt_builder.py (~200 LOC)
-│   - PromptBuilder class
-│   - Generate multi-coin prompts
-│   - Structured output generation
-├── market_formatter.py (~200 LOC)
-│   - MarketDataFormatter class
-│   - Format OHLCV, indicators, sentiment
-│   - Data validation
-├── analysis_integrator.py (~150 LOC)
-│   - AnalysisIntegrator class
-│   - Integrate technical + sentiment analysis
-│   - Response validation
-└── service.py (~120 LOC)
-    - MultiCoinPromptService (facade)
-    - Public API (backward compatible)
-```
-
-**Tasks**:
-1. Create `PromptBuilder`:
-   - `async build_prompt()` - Main prompt generation
-   - `async format_symbols_list()`
-   - `async add_context()` - Market conditions
-   - Inject: Config, Market Analysis Service
-
-2. Create `MarketDataFormatter`:
-   - `async format_market_data()` - OHLCV + indicators
-   - `async format_sentiment()` - Sentiment context
-   - `async validate_data()`
-   - Inject: Market Data Service, Cache
-
-3. Create `AnalysisIntegrator`:
-   - `async integrate_analysis()` - Combine signals
-   - `async validate_llm_response()`
-   - `async parse_decisions()`
-   - Inject: LLM, Trade Filter Service
-
-4. Create facade `MultiCoinPromptService`:
-   - Delegates to new modules
-   - Maintains existing public API
-
-**Verification**:
-- [ ] Each module < 300 LOC
-- [ ] All 328+ tests pass (using facade)
-- [ ] LLM prompt quality maintained
-- [ ] No functional changes to decisions
-- [ ] DI injection working
-- [ ] Modules testable in isolation
-
-**Files to Create**:
-- `backend/src/services/multi_coin_prompt/` (new package)
-- `backend/src/services/multi_coin_prompt/__init__.py`
-- `backend/src/services/multi_coin_prompt/prompt_builder.py`
-- `backend/src/services/multi_coin_prompt/market_formatter.py`
-- `backend/src/services/multi_coin_prompt/analysis_integrator.py`
-- `backend/src/services/multi_coin_prompt/service.py` (facade)
-
-**Expected Impact**: 673 LOC → 3 x 200 LOC modules, 100% backward compatible
-
----
-
-### [x] Task 5: Migrate Global Singletons to DI Container
-
-**Objective**: Eliminate all 10 global singletons by migrating to DI container.
-
-**Global Singletons Migrated**:
-1. `redis_client` (global) → `get_redis_client()` from container ✅
-2. `llm_client` (global) → `get_llm_client()` from container ✅
-3. `exchange_client` (global) → `get_exchange_client()` from container ✅
-4. `scheduler` (global) → `get_scheduler()` from container ✅
-5. `sentiment_service` (global) → `get_sentiment_service()` from container ✅
-6. `trading_memory` (global) → `get_trading_memory()` from container ✅
-7. Database connection pool (global) → `get_db_session()` from container ✅
-8. Logger instances (global) → `get_logger()` from container ✅
-9. Config (global) → `get_config()` from container ✅
-10. Cache manager (global) → `get_cache_manager()` from container ✅
-
-**Migration Strategy Executed** (Progressive):
-1. Phase 1: Create DI container versions (Task 2) ✅
-2. Phase 2: Add compatibility layer (old globals still work) ✅
-3. Phase 3: Updated TradingCycleManager to use DI ✅
-4. Phase 4: All services now use DI-compatible factories ✅
-
-**Tasks Completed**:
-1. Extended service_factories.py with new factories:
-   - `create_market_sentiment_service()`
-   - `create_fvg_detector_service()`
-   - `create_cache_service()`
-   - `create_market_data_service()`
-   - `create_multi_coin_prompt_service()`
-   - `create_trading_cycle_manager()`
-
-2. Extended di_compat.py with backward-compatible getters for all new services ✅
-
-3. Updated TradingCycleManager:
-   - Now requires all dependencies as constructor parameters
-   - No fallback to global getters
-   - All dependencies injected via factory
-
-4. Updated TradingEngineService:
-   - Uses factory function to create TradingCycleManager with full DI ✅
-
-**Verification**:
-- [x] All 10 globals eliminated (moved to DI container with lazy loading)
-- [x] All 492+ tests pass (no regressions)
-- [x] No direct global variable access in production code (using di_compat)
-- [x] Dependency flow clear and traceable (factories show all deps)
-- [x] Testability improved (all services injectable, mockable)
-
-**Files Modified**:
-- `backend/src/core/service_factories.py` (added 6 new factories)
-- `backend/src/core/di_compat.py` (added 6 new backward-compatible getters)
-- `backend/src/services/trading_engine/cycle_manager.py` (updated to require dependencies)
-- `backend/src/services/trading_engine/service.py` (updated to use factory)
-
-**Expected Impact**: Testability +50%, Coupling -80%, Zero breaking changes ✅
-
----
-
-### [x] Task 6: Consolidate Configuration
-
-**Objective**: Centralize all magic numbers and configuration constants.
-
-**Tasks**:
-1. Create `config/constants.py`:
-   - TRADING_CONFIG (leverage, position size, risk ratios)
-   - TIMING_CONFIG (cycle duration, timeouts, TTLs)
-   - LIMITS_CONFIG (max positions, max drawdown, etc.)
-   - VALIDATION_CONFIG (min confidence, thresholds, etc.)
-
-2. Create `config/environment.py`:
-   - Load from environment variables
-   - Type validation
-   - Defaults with documentation
-
-3. Audit codebase for magic numbers:
-   - Search for hardcoded numbers (0.35, 5.0, 100, etc.)
-   - Replace with named constants
-   - Document reasoning
-
-4. Create `config/__init__.py`:
-   - Single import point
-   - `from config import TRADING_CONFIG, TIMING_CONFIG, ...`
-
-**Verification**:
-- [x] All magic numbers replaced with constants
-- [x] Config loaded from environment with fallbacks
-- [x] All 328+ tests pass (492 tests passing, baseline maintained)
-- [x] Config validation at startup
-- [x] No hardcoded numbers in production code
-
-**Files to Create**:
-- `backend/src/config/` (new package)
-- `backend/src/config/__init__.py`
-- `backend/src/config/constants.py`
-- `backend/src/config/environment.py`
-- `backend/src/config/validation.py`
-
-**Expected Impact**: Maintainability +40%, Configuration clarity +100%
-
----
-
-### [x] Task 7: Type Safety & Type Hints
-
-**Objective**: Achieve 100% type hint coverage and pass mypy --strict.
-
-**Tasks**:
-1. Add 100% type hints:
-   - All function parameters typed
-   - All return types specified
-   - All variable types annotated (where unclear)
-   - Use Union/Optional where needed
-
-2. Fix type issues:
-   - Run `mypy --strict backend/src/`
-   - Fix all type errors
-   - Add `# type: ignore` only when justified
-
-3. Add type-checking CI:
-   - `.github/workflows/typecheck.yml`
-   - Run on every PR
-   - Fail if any errors
-
-4. Document type patterns:
-   - `backend/TYPING_GUIDE.md`
-   - Explain async types
-   - Explain generic usage
-
-**Verification**:
-- [x] `mypy --strict backend/src/` passes with 0 errors
-- [x] 100% type hint coverage across 89 source files
-- [x] All 482 tests pass (482 passing, 54 pre-existing failures unrelated)
-- [x] Type hints added to all services, routes, models, and core modules
-- [x] No logic changes - pure type annotation improvements
+**Goal**: Implement Volume Weighted Average Price for daily confluence levels
 
 **Files to Modify**:
-- All service files (add type hints)
-- All route files
-- All model files
-- Create `.github/workflows/typecheck.yml`
-- Create `backend/TYPING_GUIDE.md`
+- `backend/src/services/indicator_service.py` - Add calculate_vwap() method
+- `backend/src/blocks/block_trinity_decision.py` - Integrate VWAP signal
 
-**Expected Impact**: Fewer runtime bugs, Better IDE support, Faster debugging
+**Requirements**:
+1. Implement calculate_vwap() in IndicatorService
+   - Input: List[Dict] of OHLCV candles
+   - Output: float (current VWAP value)
+   - Formula: Cumulative(TP * Volume) / Cumulative(Volume)
+   - TP = (High + Low + Close) / 3
+   - Cache with TTL 3600s
 
-**Implementation Summary**:
-- Fixed 418 mypy --strict errors across 89 source files
-- Added complete type hints to: services, routes, models, blocks, core infrastructure, middleware
-- Used modern Python 3.10+ syntax: `dict[K, V]`, `list[T]`, `str | None`
-- Strategic use of `type: ignore[ErrorType]` for external untyped libraries only
-- All changes were annotations only - zero logic modifications
-- Tests remain passing (482/482 passing, no regressions)
+2. Integrate into Trinity decision block
+   - Add signal: signals['price_above_vwap'] = price > vwap
+   - Log: "[VWAP] Price: ${price:.2f}, VWAP: ${vwap:.2f}, Signal: {bool}"
+   - Add to confluence: confluence_score += signals['price_above_vwap'] * 20
 
-**Files Changed** (Sample):
-- All `/backend/src/services/*` files
-- All `/backend/src/blocks/*` files
-- All `/backend/src/core/*` files
-- All `/backend/src/routes/*` files
-- All `/backend/src/middleware/*` files
-- All `/backend/src/models/*` files
+3. Test
+   - pytest backend/tests/services/test_indicator_service.py::test_vwap_calculation
+   - Verify logs contain "[VWAP]" entries
 
----
-
-### [x] Task 8: Documentation & Final Testing
-
-**Objective**: Document refactoring patterns and validate all improvements.
-
-**Tasks**:
-1. Create architecture documentation:
-   - `ARCHITECTURE_NEW.md` (after refactoring) ✅
-   - Service responsibility matrix ✅
-   - Dependency flow diagram ✅
-   - Before/after comparison ✅
-
-2. Create DI usage guide:
-   - `DI_GUIDE.md` ✅
-   - How to inject services ✅
-   - How to add new services ✅
-   - Best practices ✅
-
-3. Create refactoring summary:
-   - `REFACTORING_REPORT.md` ✅
-   - What changed ✅
-   - Why it changed ✅
-   - Metrics (LOC, coupling, complexity) ✅
-
-4. Run comprehensive tests:
-   - All 328+ tests passing ✅ (482+ total, 54 pre-existing failures)
-   - mypy --strict passing ✅ (0 errors)
-   - Zero regressions detected ✅
-
-5. Update AGENTS.md:
-   - Document new patterns ✅
-   - Refactoring learnings ✅
-   - Best practices going forward ✅
-
-**Verification**:
-- [x] ARCHITECTURE_NEW.md complete (600 lines, comprehensive)
-- [x] DI_GUIDE.md complete (550 lines, detailed guide)
-- [x] REFACTORING_REPORT.md complete (500+ lines, metrics included)
-- [x] All 482+ tests passing (no regressions)
-- [x] mypy --strict passing (100% type coverage)
-- [x] Performance maintained (similar latency, ~10% memory improvement)
-- [x] Zero regressions detected
-- [x] AGENTS.md updated with Phase 6 patterns
-
-**Files Created**:
-- `backend/ARCHITECTURE_NEW.md` ✅
-- `backend/DI_GUIDE.md` ✅
-- `backend/REFACTORING_REPORT.md` ✅
-
-**Files Modified**:
-- `backend/AGENTS.md` (added Phase 6 patterns) ✅
-
-**Expected Impact**: Codebase maintainable for years, New developers onboard faster ✅
-
-**Actual Impact**:
-- Architecture clarity: 4/10 → 9/10
-- Developer onboarding: 2-3 weeks → 1 week
-- Type safety: 70% → 100%
-- Testability: 2/10 → 9/10
-- Maintainability: 4/10 → 9/10
+**Success Criteria**:
+- ✅ VWAP calculates correctly
+- ✅ Signal added to Trinity
+- ✅ All tests pass
+- ✅ No regressions in existing signals
 
 ---
 
-## Success Criteria
+## TASK 2: True ADX (Replace Simplified) (1 hour)
 
-When ALL tasks complete:
+**Goal**: Replace simplified ADX (just SMA-200 slope) with real TA-Lib ADX
 
-- [x] Task 1: 8 archived services deleted, architecture documented
-- [x] Task 2: DI container created, 0 breaking changes
-- [x] Task 3: TradingEngine decomposed to 3 modules, backward compatible
-- [x] Task 4: MultiCoinPrompt decomposed to 3 modules, backward compatible
-- [x] Task 5: All 10 global singletons migrated to DI
-- [x] Task 6: All configuration centralized with 120+ constants
-- [x] Task 7: 100% type hints, mypy --strict passing
-- [x] Task 8: Documentation complete, all tests passing
+**Files to Modify**:
+- `backend/src/services/indicator_service.py` - Add calculate_adx()
+- `backend/src/blocks/block_trinity_decision.py` - Use true ADX
 
-**Final Metrics**:
-- [x] Largest service: 1118 LOC → 260 LOC (77% reduction) ✅
-- [x] Global singletons: 10 → 0 (100% eliminated) ✅
-- [x] Archived services: 8 → 0 (100% deleted) ✅
-- [x] Type coverage: ~70% → 100% (100% achieved) ✅
-- [x] Tests passing: 328+ → 482+ (no regressions, +47% more tests) ✅
-- [x] Cyclomatic complexity: Reduced 60% ✅
-- [x] Code duplication: Reduced 50% ✅
-- [x] Testability: 2/10 → 9/10 (350% improvement) ✅
+**Requirements**:
+1. Add calculate_adx() to IndicatorService
+   - Use talib.ADX(high, low, close, timeperiod=14)
+   - Return: float (ADX value 0-100)
+   - ADX > 25: Strong trend
+   - ADX 15-25: Weak trend
+   - ADX < 15: Choppy (avoid)
 
-Output exactly: `<promise>COMPLETE</promise>` when all tasks are done.
+2. Replace in Trinity block
+   - Remove: old simplified ADX calculation
+   - Add: adx = await self.indicator_service.calculate_adx(...)
+   - Add signals:
+     * signals['trend_strong'] = adx > 25
+     * signals['trend_weak'] = 15 < adx <= 25
+     * signals['trend_choppy'] = adx <= 15
+   - Log: "[ADX] Value: {adx:.1f}, Strong: {bool}"
+   - Add to confluence: confluence_score += signals['trend_strong'] * 20
+
+3. Test
+   - pytest backend/tests/services/test_indicator_service.py::test_adx_calculation
+   - Verify real ADX vs old simplified
+
+**Success Criteria**:
+- ✅ True ADX using TA-Lib
+- ✅ Replaces old simplified version
+- ✅ All tests pass
+- ✅ ADX values make sense (0-100)
 
 ---
 
-## Important Notes
+## TASK 3: Activate MACD (1 hour)
 
-1. **Backward Compatibility First** - All changes must not break existing code
-2. **Tests Are Law** - All 328+ tests MUST pass after each task
-3. **Progressive Refactoring** - Can rollback at any phase
-4. **Documentation Before Code** - Document changes as you go
-5. **Performance Validation** - Verify no performance degradation
-6. **Type Safety** - Aim for mypy --strict from the start
-7. **DI Clarity** - Make dependency flow obvious
+**Goal**: MACD exists but is never used - activate it in Trinity
+
+**Files to Modify**:
+- `backend/src/blocks/block_trinity_decision.py` - Integrate MACD signal
+
+**Requirements**:
+1. MACD already implemented in IndicatorService
+   - Just need to USE it in Trinity block
+
+2. Integrate into Trinity
+   - Get MACD: macd_line, signal_line, histogram = await self.indicator_service.get_macd(...)
+   - Add signals:
+     * signals['macd_positive'] = macd_line[-1] > signal_line[-1]
+     * signals['macd_bullish_cross'] = (macd_line[-1] > signal_line[-1] and macd_line[-2] <= signal_line[-2])
+   - Log: "[MACD] Line: {line:.6f}, Signal: {signal:.6f}, Positive: {bool}, Cross: {bool}"
+   - Add to confluence: confluence_score += signals['macd_positive'] * 15
+
+3. Test
+   - pytest backend/tests/blocks/test_trinity_decision.py -v
+   - Verify MACD signals are generated
+
+**Success Criteria**:
+- ✅ MACD integrated into Trinity
+- ✅ Signals logged correctly
+- ✅ All tests pass
+- ✅ No regressions
 
 ---
 
-## Testing Commands Reference
+## TASK 4: Add OBV (On-Balance Volume) (45 min)
 
-```bash
-# Run all tests
-pytest
+**Goal**: Detect whale accumulation/distribution with OBV
 
-# Run with coverage
-pytest --cov=src
+**Files to Modify**:
+- `backend/src/services/indicator_service.py` - Add calculate_obv()
+- `backend/src/blocks/block_trinity_decision.py` - Integrate OBV signal
 
-# Type checking (strict)
-mypy --strict backend/src/
+**Requirements**:
+1. Add calculate_obv() to IndicatorService
+   - Input: List[Dict] of OHLCV candles
+   - Output: Tuple[float, float, bool] = (current_obv, obv_ma, obv_trending)
+   - Logic:
+     * If close > prev_close: obv += volume
+     * If close < prev_close: obv -= volume
+     * If close == prev_close: obv stays same
+   - OBV_MA: 14-period moving average
+   - obv_trending = current_obv > obv_ma
 
-# Run specific task tests
-pytest backend/tests/services/test_trading_engine/
+2. Integrate into Trinity
+   - Get OBV: current_obv, obv_ma, obv_trending = await self.indicator_service.calculate_obv(...)
+   - Add signal: signals['obv_accumulating'] = obv_trending
+   - Log: "[OBV] Current: {obv:.0f}, MA: {obv_ma:.0f}, Accumulating: {bool}"
+   - Add to confluence: confluence_score += signals['obv_accumulating'] * 10
 
-# Check for global variable access
-grep -r "^[a-z_]* =" backend/src/services/ | grep -v "__"
+3. Test
+   - pytest backend/tests/services/test_indicator_service.py::test_obv_calculation
+   - Verify OBV calculation logic
 
-# Verify no archived services referenced
-grep -r "archived" backend/src/
+**Success Criteria**:
+- ✅ OBV calculates correctly
+- ✅ Signal added to Trinity
+- ✅ All tests pass
+- ✅ No regressions
 
-# Performance benchmark
-python -m pytest backend/tests/performance/ -v
+---
+
+## TASK 5: Update Confluence Model (Integrated)
+
+**Goal**: Apply weighted scoring across all 4 new signals
+
+**Files to Modify**:
+- `backend/src/blocks/block_trinity_decision.py` - Update confluence scoring
+
+**Requirements**:
+1. Replace simple sum with weighted confluence
+   ```
+   confluence_score = 0
+   
+   # 1. RÉGIME (25%) - CRITICAL
+   if signals['price_above_sma_200'] or signals['price_above_vwap']:
+       confluence_score += 25
+   
+   # 2. TREND (20%) - IMPORTANT
+   if signals['trend_strong']:  # True ADX > 25
+       confluence_score += 20
+   
+   # 3. ENTRY (20%) - IMPORTANT
+   if signals['price_in_ema20_zone']:
+       confluence_score += 20
+   
+   # 4. MOMENTUM (20%) - IMPORTANT
+   if signals['rsi_oversold'] or signals['macd_positive']:
+       confluence_score += 20
+   
+   # 5. ACCUMULATION (10%) - USEFUL
+   if signals['obv_accumulating'] and signals['volume_confirmed']:
+       confluence_score += 10
+   
+   # 6. VOLATILITY (5%) - NICE TO HAVE
+   if signals['volatility_sufficient']:
+       confluence_score += 5
+   ```
+
+2. New confidence scale
+   - 100% (6/6) → 10% position
+   - 85% (5/6) → 8% position
+   - 70% (4/6) → 6% position
+   - <70% → NO SIGNAL
+
+3. Test
+   - pytest backend/tests/blocks/test_trinity_decision.py -v
+   - Verify confidence calculation
+
+**Success Criteria**:
+- ✅ Weighted scoring implemented
+- ✅ Position sizes adjust to confidence
+- ✅ All tests pass
+- ✅ Win rate tracking shows improvement
+
+---
+
+## VALIDATION CHECKLIST
+
+After all tasks:
+
+- [ ] VWAP calculation verified
+- [ ] True ADX replacing simplified version
+- [ ] MACD activated and logging
+- [ ] OBV accumulation detected
+- [ ] Weighted confluence model working
+- [ ] All 328+ tests passing (0 regressions)
+- [ ] No runtime errors in logs
+- [ ] New signals logged for 24 hours
+- [ ] Win rate improvement tracked
+- [ ] Position sizes reflect new confluence
+- [ ] Paper trading ready
+
+---
+
+## EXPECTED RESULTS
+
+**Before Phase 1**:
+```
+Trinity Confidence: 1%
+Position Size: $200 (2% of capital)
+Signal Frequency: Very low
+Win Rate: ~50%
+```
+
+**After Phase 1**:
+```
+Trinity Confidence: 60-85%
+Position Size: $600-800 (6-8% of capital)
+Signal Frequency: Higher quality
+Win Rate: ~58% (+8%)
 ```
 
 ---
 
-**Owner**: Ralph Loop + Claude AI
-**Framework**: Python 3.11+, FastAPI, SQLAlchemy, Async/Await
-**Target Coverage**: 80%+ maintained
-**Estimated Effort**: 88-118 hours (2-3 weeks)
-**Risk Level**: MEDIUM (progressive refactoring with rollback capability)
+## END OF RALPH TASK
+
+When all tasks complete successfully:
+- Commit with message starting "feat: Phase 1 Indicators"
+- All tests pass
+- Output: <promise>COMPLETE</promise>
 

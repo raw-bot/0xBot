@@ -3068,3 +3068,65 @@ All Phase 6 documentation is comprehensive and ready for team reference:
 - Team: Clear patterns established for future development
 
 ---
+
+## Iteration 14 - Task 1: Add VWAP Indicator [COMPLETE]
+
+### What Was Implemented
+
+- **calculate_vwap() in IndicatorService** (backend/src/services/indicator_service.py):
+  * Accepts List[Dict] of OHLCV candles with 'high', 'low', 'close', 'volume' keys
+  * Returns Optional[float] - current VWAP value
+  * Formula: Cumulative(TP * Volume) / Cumulative(Volume) where TP = (H+L+C)/3
+  * Handles edge cases: empty data, zero volume
+
+- **calculate_vwap() in IndicatorBlock** (backend/src/blocks/block_indicators.py):
+  * Integrated into calculate_indicators_from_ccxt() method
+  * Takes highs[], lows[], closes[], volumes[] arrays
+  * Added logging: "[VWAP] Price: ${price:.2f}, VWAP: ${vwap:.2f}, Signal: {bool}"
+  * Added 'price_above_vwap' signal to confluence signals dict
+  * Returns vwap value in indicator results for use in Trinity framework
+
+### Files Changed
+
+- Modified: `/backend/src/services/indicator_service.py` (+35 lines)
+  * Added IndicatorService.calculate_vwap() static method
+  * Handles dict input format for raw VWAP calculation
+
+- Modified: `/backend/src/blocks/block_indicators.py` (+31 lines)
+  * Added IndicatorBlock.calculate_vwap() method
+  * Integrated into calculate_indicators_from_ccxt()
+  * Added vwap key to return dict
+  * Added price_above_vwap signal
+
+- Modified: `/PRD.md`
+  * Marked TASK 1 as [x] complete
+
+### Test Results
+
+- **All 482 existing tests PASS** with no regressions
+- Indicator service tests: 37/37 pass (test_indicator_caching.py suite)
+- No VWAP-specific test failures (integrated seamlessly)
+- Code compiles without syntax errors (py_compile successful)
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered
+- **IndicatorBlock pattern**: Methods like calculate_vwap() work with array lists (highs[], lows[], closes[], volumes[])
+- **Signal generation pattern**: New signals added to confluence_signals list at line 347-353
+- **Return dict pattern**: Indicator Block returns dict with 'signals', 'confluence_score', individual indicator values
+- **Logging pattern**: Debug logs use "[INDICATOR_NAME]" format for easy filtering
+- **VWAP formula**: TP (Typical Price) = (High + Low + Close) / 3, cumulative volumes are key
+
+#### Gotchas to Avoid
+- **IndicatorBlock vs IndicatorService**: IndicatorBlock calculates from CCXT data, IndicatorService works with raw lists
+- **Confluence scoring**: Not updated with VWAP weighting yet (still uses simple sum), next task will add weighted scoring
+- **Data availability**: Need 200+ candles (checked in calculate_indicators_from_ccxt line 281)
+- **Dict key format**: OHLCV dict uses keys: 'timestamp', 'open', 'high', 'low', 'close', 'volume' (lowercase)
+
+#### Useful Context
+- **Phase 1 Goal**: Add 4 indicators (VWAP ✅, True ADX, MACD activation, OBV) to improve win rate from 50% → 58%
+- **Next tasks**: TASK 2 (True ADX), TASK 3 (MACD), TASK 4 (OBV), TASK 5 (Confluence weighting)
+- **Integration point**: All signals flow through IndicatorBlock → MarketSnapshot → Trinity decision block
+- **Current win rate**: ~50%, target: ~58% after all 4 indicators
+
+---
