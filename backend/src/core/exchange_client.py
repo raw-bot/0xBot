@@ -1,9 +1,9 @@
 """CCXT Exchange client wrapper for OKX trading."""
 
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
-import ccxt.async_support as ccxt
+import ccxt.async_support as ccxt  # type: ignore[import-untyped]
 
 from ..core.logger import get_logger
 
@@ -17,7 +17,7 @@ class ExchangeClient:
         """Initialize exchange client."""
         self.paper_trading = paper_trading
 
-        exchange_options = {
+        exchange_options: Dict[str, Any] = {
             "enableRateLimit": True,
             "options": {"defaultType": "swap"},
         }
@@ -27,7 +27,7 @@ class ExchangeClient:
             exchange_options["apiKey"] = os.getenv("OKX_API_KEY", "")
             exchange_options["secret"] = os.getenv("OKX_SECRET_KEY", "")
             exchange_options["password"] = os.getenv("OKX_PASSPHRASE", "")
-            exchange_options["options"]["sandboxMode"] = True
+            cast(Dict[str, Any], exchange_options["options"])["sandboxMode"] = True
 
         self.exchange = ccxt.okx(exchange_options)
 
@@ -48,7 +48,7 @@ class ExchangeClient:
         """Fetch OHLCV candlestick data."""
         try:
             normalized_symbol = self._normalize_symbol(symbol)
-            return await self.exchange.fetch_ohlcv(normalized_symbol, timeframe, limit=limit)
+            return cast(List[List[float]], await self.exchange.fetch_ohlcv(normalized_symbol, timeframe, limit=limit))
         except Exception as e:
             logger.error(f"Error fetching OHLCV for {symbol}: {e}")
             raise
@@ -57,7 +57,7 @@ class ExchangeClient:
         """Fetch current ticker data."""
         try:
             normalized_symbol = self._normalize_symbol(symbol)
-            ticker = await self.exchange.fetch_ticker(normalized_symbol)
+            ticker = cast(Dict[str, Any], await self.exchange.fetch_ticker(normalized_symbol))
             logger.debug(f"Fetched ticker for {normalized_symbol}: {ticker['last']}")
             return ticker
         except Exception as e:
@@ -75,11 +75,11 @@ class ExchangeClient:
         """Create a market or limit order."""
         try:
             if order_type == "market":
-                order = await self.exchange.create_market_order(symbol, side, amount)
+                order = cast(Dict[str, Any], await self.exchange.create_market_order(symbol, side, amount))
             else:
                 if price is None:
                     raise ValueError("Price required for limit orders")
-                order = await self.exchange.create_limit_order(symbol, side, amount, price)
+                order = cast(Dict[str, Any], await self.exchange.create_limit_order(symbol, side, amount, price))
 
             logger.info(f"Created {order_type} {side} order: {symbol} {amount} @ {price or 'market'}")
             return order
@@ -97,7 +97,7 @@ class ExchangeClient:
                 "orderType": "market",
                 "triggerType": "last",
             }
-            order = await self.exchange.create_order(symbol, "trigger", side, amount, params=params)
+            order = cast(Dict[str, Any], await self.exchange.create_order(symbol, "trigger", side, amount, params=params))
             logger.info(f"Created {order_name} order: {symbol} {amount} @ {trigger_price}")
             return order
         except Exception as e:
@@ -119,7 +119,7 @@ class ExchangeClient:
     async def fetch_balance(self) -> Dict[str, Any]:
         """Fetch account balance."""
         try:
-            balance = await self.exchange.fetch_balance()
+            balance = cast(Dict[str, Any], await self.exchange.fetch_balance())
             logger.debug("Fetched account balance")
             return balance
         except Exception as e:

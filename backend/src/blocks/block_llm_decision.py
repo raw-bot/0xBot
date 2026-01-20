@@ -3,7 +3,7 @@
 import os
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 from uuid import UUID
 
 from ..core.config import config
@@ -90,7 +90,7 @@ class LLMDecisionBlock:
             logger.error(f"Error getting LLM decisions: {e}")
             return {}
 
-    def _build_coins_data(self, market_data: Dict[str, Any]) -> Dict[str, dict]:
+    def _build_coins_data(self, market_data: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
         """Convert market snapshots to format expected by prompt service."""
         result = {}
         for symbol, snap in market_data.items():
@@ -117,7 +117,7 @@ class LLMDecisionBlock:
             }
         return result
 
-    def _parse_response(self, response: dict) -> Dict[str, dict]:
+    def _parse_response(self, response: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
         """Parse LLM response into raw decisions."""
         content = response.get("response", "")
         if not content:
@@ -128,18 +128,18 @@ class LLMDecisionBlock:
             return {}
 
         if "decisions" in parsed:
-            return parsed["decisions"]
+            return cast(Dict[str, Dict[str, Any]], parsed["decisions"])
 
         first_key = next(iter(parsed.keys()), "")
         if "/" in first_key or "USDT" in first_key:
-            return parsed
+            return cast(Dict[str, Dict[str, Any]], parsed)
 
         return {}
 
     def _validate_and_fix(
         self,
         symbol: str,
-        raw: dict,
+        raw: Dict[str, Any],
         market_data: Dict[str, Any],
     ) -> Optional[TradingDecision]:
         """Validate and fix a single decision."""
@@ -198,14 +198,14 @@ class LLMDecisionBlock:
             return float(snapshot.get("price", 0)) or None
         return None
 
-    def _get_stop_loss(self, raw: dict, price: float, side: str) -> float:
+    def _get_stop_loss(self, raw: Dict[str, Any], price: float, side: str) -> float:
         """Get stop loss price from decision or calculate default."""
         sl = raw.get("stop_loss")
         if sl and float(sl) > 0:
             return float(sl)
         return self._default_stop_loss(price, side)
 
-    def _get_take_profit(self, raw: dict, price: float, side: str) -> float:
+    def _get_take_profit(self, raw: Dict[str, Any], price: float, side: str) -> float:
         """Get take profit price from decision or calculate default."""
         tp = raw.get("take_profit")
         if tp and float(tp) > 0:
@@ -241,6 +241,8 @@ class LLMDecisionBlock:
         """
         try:
             # Get confidence adjustment factor from memory
+            if self.memory is None:
+                return decision
             adjustment = await self.memory.suggest_confidence_adjustment(symbol)
 
             # Apply adjustment

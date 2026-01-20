@@ -3,7 +3,7 @@
 import os
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 from sqlalchemy import select
@@ -24,7 +24,7 @@ class BotCreate:
         model_name: str,
         capital: Decimal,
         trading_symbols: Optional[list[str]] = None,
-        risk_params: Optional[dict] = None,
+        risk_params: Optional[dict[str, Any]] = None,
         paper_trading: bool = True,
     ):
         self.name = name
@@ -47,7 +47,7 @@ class BotUpdate:
         name: Optional[str] = None,
         capital: Optional[Decimal] = None,
         trading_symbols: Optional[list[str]] = None,
-        risk_params: Optional[dict] = None,
+        risk_params: Optional[dict[str, Any]] = None,
         status: Optional[str] = None,
     ):
         self.name = name
@@ -273,7 +273,7 @@ class BotService:
         result = await self.db.execute(query)
         return list(result.scalars().all())
 
-    def _validate_risk_params(self, risk_params: dict) -> None:
+    def _validate_risk_params(self, risk_params: dict[str, Any]) -> None:
         """
         Validate risk parameters.
 

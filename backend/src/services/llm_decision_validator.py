@@ -3,7 +3,7 @@ LLM Decision Validator - Validates trading decisions with safety limits only.
 Trusts the LLM's intelligence, intervening only for extreme values.
 """
 
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Any
 
 from ..core.logger import get_logger
 
@@ -25,8 +25,8 @@ class LLMDecisionValidator:
 
     @classmethod
     def validate_and_fix_decision(
-        cls, decision: dict, current_price: float, symbol: str = "UNKNOWN"
-    ) -> Tuple[bool, str, dict]:
+        cls, decision: Dict[str, Any], current_price: float, symbol: str = "UNKNOWN"
+    ) -> Tuple[bool, str, Dict[str, Any]]:
         """Validate and fix an LLM decision, applying safety limits only."""
         signal = decision.get("signal", "hold").lower()
 
@@ -60,8 +60,8 @@ class LLMDecisionValidator:
 
     @classmethod
     def _validate_entry_with_safety_limits(
-        cls, decision: dict, current_price: float, symbol: str
-    ) -> Tuple[bool, str, dict]:
+        cls, decision: Dict[str, Any], current_price: float, symbol: str
+    ) -> Tuple[bool, str, Dict[str, Any]]:
         """Validate entry decision with safety limits only."""
         fixed = decision.copy()
         notes = []
@@ -126,7 +126,7 @@ class LLMDecisionValidator:
 
 
 def validate_llm_decision(
-    decision: dict, current_price: float, symbol: str = "UNKNOWN"
-) -> Tuple[bool, str, dict]:
+    decision: Dict[str, Any], current_price: float, symbol: str = "UNKNOWN"
+) -> Tuple[bool, str, Dict[str, Any]]:
     """Convenience function to validate and fix an LLM decision."""
     return LLMDecisionValidator.validate_and_fix_decision(decision, current_price, symbol)

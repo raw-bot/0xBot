@@ -46,10 +46,10 @@ class StructuredLogger:
         operation: str,
         query_count: int,
         query_time_ms: float,
-        request_method: str = None,
-        request_path: str = None,
-        user_id: str = None,
-        bot_id: str = None,
+        request_method: str | None = None,
+        request_path: str | None = None,
+        user_id: str | None = None,
+        bot_id: str | None = None,
     ) -> None:
         """Log query metrics in structured format.
 
@@ -135,8 +135,6 @@ def configure_structured_logging(log_level: str = 'INFO') -> None:
     # Configure specific loggers
     logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
     logging.getLogger('sqlalchemy.pool').setLevel(logging.INFO)
-
-    return root_logger
 
 
 # Helper functions for common logging patterns

@@ -43,14 +43,14 @@ class PortfolioBlock:
             db = AsyncSessionLocal()
 
         try:
-            bot = await self._get_bot(db)
-            positions = await self._get_open_positions(db)
+            bot = await self._get_bot(db)  # type: ignore[arg-type]
+            positions = await self._get_open_positions(db)  # type: ignore[arg-type]
 
             cash = Decimal(str(bot.capital))
             initial = Decimal(str(bot.initial_capital))
 
-            invested = sum(self._calculate_margin(p) for p in positions)
-            unrealized_pnl = sum(p.unrealized_pnl for p in positions)
+            invested = sum((self._calculate_margin(p) for p in positions), Decimal(0))
+            unrealized_pnl = sum((p.unrealized_pnl for p in positions), Decimal(0))
             equity = cash + invested + unrealized_pnl
             return_pct = float((equity - initial) / initial * 100) if initial > 0 else 0
 
@@ -64,7 +64,7 @@ class PortfolioBlock:
                 open_positions=positions,
             )
         finally:
-            if should_close:
+            if should_close and db is not None:
                 await db.close()
 
     async def record_snapshot(self) -> None:

@@ -3,7 +3,7 @@ Prompt Builder - Generates multi-coin trading prompts with market context.
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from ..market_sentiment_service import MarketSentiment
 
@@ -19,7 +19,7 @@ class PromptBuilder:
         "XRP/USDT": "XRP",
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize PromptBuilder."""
         self.coin_mapping = self.COIN_MAPPING
 
@@ -31,7 +31,7 @@ class PromptBuilder:
         pain_trades_analysis: str,
         alpha_setups_analysis: str,
         fvg_analysis: str,
-        portfolio_state: Optional[Dict],
+        portfolio_state: Optional[Dict[str, Any]],
         positions_text: str,
         sentiment: Optional[MarketSentiment] = None,
     ) -> str:

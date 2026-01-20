@@ -1,7 +1,7 @@
 """Risk management service for validating trading decisions."""
 
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional
 
 from ..core.config import config
 from ..core.logger import get_logger
@@ -11,7 +11,7 @@ from ..models.position import Position, PositionStatus
 logger = get_logger(__name__)
 
 
-def _to_decimal(value) -> Decimal:
+def _to_decimal(value: object) -> Decimal:
     """Convert any numeric value to Decimal."""
     return Decimal(str(value))
 
@@ -21,7 +21,7 @@ class RiskManagerService:
 
     @staticmethod
     def validate_entry(
-        bot: Bot, decision: dict, current_positions: list[Position], current_price: Decimal
+        bot: Bot, decision: dict[str, Any], current_positions: list[Position], current_price: Decimal
     ) -> tuple[bool, str]:
         """Validate a new position entry against risk parameters."""
         try:
@@ -212,7 +212,7 @@ class RiskManagerService:
     @staticmethod
     def validate_complete_decision(
         bot: Bot,
-        decision: dict,
+        decision: dict[str, Any],
         current_positions: list[Position],
         current_price: Decimal,
         trades_today: int,
@@ -229,7 +229,7 @@ class RiskManagerService:
 
         dd_valid, dd_msg = RiskManagerService.check_drawdown(bot, portfolio_value or bot.capital)
         if not dd_valid:
-            return False, dd_msg
+            return False, dd_msg or "Drawdown check failed"
 
         entry_valid, entry_msg = RiskManagerService.validate_entry(
             bot, decision, current_positions, current_price

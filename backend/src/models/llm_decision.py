@@ -24,7 +24,7 @@ class LLMDecision(Base):
     )
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     response: Mapped[str] = mapped_column(Text, nullable=False)
-    parsed_decisions: Mapped[dict] = mapped_column(JSON, nullable=False)
+    parsed_decisions: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
     tokens_used: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     cost: Mapped[Decimal] = mapped_column(Numeric(precision=10, scale=6), nullable=False, default=Decimal("0"))
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)

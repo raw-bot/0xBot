@@ -8,7 +8,7 @@ Classifications: ABSORPTION, DISTRIBUTION, PRICED_IN, DIVERGENCE, IMPULSE
 import logging
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 logger = logging.getLogger(__name__)
 
@@ -37,13 +37,13 @@ class NarrativeAnalyzer:
     RECENT_NEWS_THRESHOLD = 120  # < 2 hours = recent
     STALE_NEWS_THRESHOLD = 360  # > 6 hours = stale
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the narrative analyzer."""
         pass
 
     def analyze_news_vs_reality(
-        self, news_items: List[Dict], price_data: Dict[str, Dict], symbols: List[str]
-    ) -> Dict[str, List[Dict]]:
+        self, news_items: List[Dict[str, Any]], price_data: Dict[str, Dict[str, Any]], symbols: List[str]
+    ) -> Dict[str, List[Dict[str, Any]]]:
         """
         Analyze all news items against price reality for given symbols.
 
@@ -55,7 +55,7 @@ class NarrativeAnalyzer:
         Returns:
             Dict mapping symbols to list of analyzed news items with classifications
         """
-        result = {symbol: [] for symbol in symbols}
+        result: Dict[str, List[Dict[str, Any]]] = {symbol: [] for symbol in symbols}
 
         for news in news_items:
             try:
@@ -138,7 +138,7 @@ class NarrativeAnalyzer:
         else:
             return f"~{minutes // 1440}d ago"
 
-    def _get_affected_symbols(self, news: Dict, available_symbols: List[str]) -> List[str]:
+    def _get_affected_symbols(self, news: Dict[str, Any], available_symbols: List[str]) -> List[str]:
         """
         Determine which trading symbols are affected by this news.
 
@@ -328,7 +328,7 @@ class NarrativeAnalyzer:
         }
         return interpretations.get(classification, "Unknown")
 
-    def format_for_prompt(self, analyzed_news: Dict[str, List[Dict]]) -> str:
+    def format_for_prompt(self, analyzed_news: Dict[str, List[Dict[str, Any]]]) -> str:
         """
         Format analyzed news into 0xBot-style prompt section.
 

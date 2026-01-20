@@ -29,16 +29,16 @@ class MultiCoinPromptService:
     def __init__(self, db: Any = None) -> None:
         """Initialize MultiCoinPromptService with all dependency modules."""
         self.db = db
-        self.narrative_analyzer = NarrativeAnalyzer()  # type: ignore[no-untyped-call]
-        self.pain_trade_analyzer = PainTradeAnalyzer()  # type: ignore[no-untyped-call]
-        self.alpha_setup_generator = AlphaSetupGenerator()  # type: ignore[no-untyped-call]
+        self.narrative_analyzer = NarrativeAnalyzer()
+        self.pain_trade_analyzer = PainTradeAnalyzer()
+        self.alpha_setup_generator = AlphaSetupGenerator()
         self.sentiment_service = get_sentiment_service()
         self.fvg_detector = get_fvg_detector()
         self.coin_mapping = self.COIN_MAPPING
 
         # Initialize new modular components
-        self.prompt_builder = PromptBuilder()  # type: ignore[no-untyped-call]
-        self.market_formatter = MarketDataFormatter()  # type: ignore[no-untyped-call]
+        self.prompt_builder = PromptBuilder()
+        self.market_formatter = MarketDataFormatter()
         self.analysis_integrator = AnalysisIntegrator()
 
     def get_simple_decision(

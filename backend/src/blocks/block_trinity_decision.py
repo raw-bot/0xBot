@@ -4,7 +4,7 @@ Trinity Decision Block - Generates trading signals based on indicator confluence
 Framework: 200 SMA (regime) + 20 EMA (entry) + ADX (strength) + RSI (momentum) + Supertrend (exit) + Volume
 """
 
-from typing import Dict, Optional, List
+from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -55,7 +55,7 @@ class TrinityDecisionBlock:
     async def get_decisions(
         self,
         market_data: Dict[str, MarketSnapshot],
-        portfolio_context: Dict,
+        portfolio_context: Dict[str, Any],
     ) -> Optional[Dict[str, TradingSignal]]:
         """
         Generate trading signals based on Trinity indicator confluence.

@@ -19,7 +19,7 @@ class ValidationResult:
     is_valid: bool
     reason: str
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return self.is_valid
 
 
@@ -48,9 +48,9 @@ class RiskBlock:
         current_positions: List[Position],
     ) -> ValidationResult:
         """Validate a new position entry."""
-        size_pct = Decimal(str(size_pct))
+        size_pct_decimal = Decimal(str(size_pct))
 
-        if size_pct > self.max_position_pct:
+        if size_pct_decimal > self.max_position_pct:
             return ValidationResult(
                 False, f"Position size {size_pct:.1%} exceeds max {self.max_position_pct:.1%}"
             )
@@ -58,7 +58,7 @@ class RiskBlock:
         if self._has_open_position(symbol, current_positions):
             return ValidationResult(False, f"Already have position in {symbol}")
 
-        margin_check = self._check_margin_exposure(size_pct, capital, current_positions)
+        margin_check = self._check_margin_exposure(size_pct_decimal, capital, current_positions)
         if not margin_check:
             return margin_check
 
@@ -70,7 +70,7 @@ class RiskBlock:
         if not rr_check:
             return rr_check
 
-        position_value = capital * size_pct
+        position_value = capital * size_pct_decimal
         if position_value < MIN_POSITION_VALUE:
             return ValidationResult(False, f"Position ${position_value:,.2f} below minimum $50")
 
@@ -83,14 +83,14 @@ class RiskBlock:
     ) -> Tuple[bool, str]:
         """Check if position should be closed."""
         if position.side == PositionSide.LONG:
-            if current_price <= position.stop_loss:
+            if position.stop_loss is not None and current_price <= position.stop_loss:
                 return True, "stop_loss"
-            if current_price >= position.take_profit:
+            if position.take_profit is not None and current_price >= position.take_profit:
                 return True, "take_profit"
         else:
-            if current_price >= position.stop_loss:
+            if position.stop_loss is not None and current_price >= position.stop_loss:
                 return True, "stop_loss"
-            if current_price <= position.take_profit:
+            if position.take_profit is not None and current_price <= position.take_profit:
                 return True, "take_profit"
 
         return False, ""

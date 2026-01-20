@@ -152,9 +152,9 @@ class IndicatorDecisionBlock:
         # Get position size
         size_pct = float(indicator_signal.size_pct)
 
-        # Format stop loss and take profit
-        stop_loss = float(indicator_signal.stop_loss) if indicator_signal.stop_loss else None
-        take_profit = float(indicator_signal.take_profit) if indicator_signal.take_profit else None
+        # Format stop loss and take profit as Decimal
+        stop_loss = Decimal(str(indicator_signal.stop_loss)) if indicator_signal.stop_loss else None
+        take_profit = Decimal(str(indicator_signal.take_profit)) if indicator_signal.take_profit else None
 
         return TradingDecision(
             symbol=symbol,
@@ -170,7 +170,7 @@ class IndicatorDecisionBlock:
             signal_type=indicator_signal.signal_type.value,
         )
 
-    def format_decisions_for_api(self, decisions: Dict[str, TradingDecision]) -> Dict[str, dict]:
+    def format_decisions_for_api(self, decisions: Dict[str, TradingDecision]) -> Dict[str, dict[str, Any]]:
         """Format decisions for API response."""
         return {
             symbol: {

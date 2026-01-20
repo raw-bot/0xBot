@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import select
@@ -29,7 +29,7 @@ class TradeExecutorService:
         self.position_service = PositionService(db)
 
     async def execute_entry(
-        self, bot: Bot, decision: dict, current_price: Decimal
+        self, bot: Bot, decision: dict[str, Any], current_price: Decimal
     ) -> Tuple[Optional[Position], Optional[Trade]]:
         """Execute an entry order (open new position)."""
         try:
@@ -125,6 +125,10 @@ class TradeExecutorService:
         try:
             order_side = "sell" if position.side == PositionSide.LONG else "buy"
             bot = await self._get_bot(position.bot_id)
+
+            if bot is None:
+                logger.error(f"Bot {position.bot_id} not found")
+                return None
 
             actual_price, fees = await self._execute_order(
                 bot, position.symbol, order_side, position.quantity, current_price, is_exit=True

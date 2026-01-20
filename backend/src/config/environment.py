@@ -12,7 +12,7 @@ from decimal import Decimal
 T = TypeVar("T")
 
 
-def get_env(key: str, default: Optional[T] = None, type_: Type[T] = str) -> Union[T, Optional[T]]:
+def get_env(key: str, default: Optional[T] = None, type_: Type[T] = str) -> T | None:  # type: ignore[assignment]
     """
     Get environment variable with type conversion.
 
@@ -81,7 +81,8 @@ def get_env_float(key: str, default: Optional[float] = None) -> Optional[float]:
 def get_env_bool(key: str, default: bool = False) -> bool:
     """Get environment variable as boolean."""
     try:
-        return get_env(key, default, bool)
+        result = get_env(key, default, bool)
+        return result if result is not None else default
     except ValueError:
         return default
 

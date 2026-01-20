@@ -38,7 +38,7 @@ class TradingEngineService:
         self.session_start = datetime.utcnow()
 
         self.cycle_manager = create_trading_cycle_manager(bot, db, llm_client)
-        self.decision_executor = DecisionExecutor(db, bot.id)
+        self.decision_executor = DecisionExecutor(db, str(bot.id))
         self.position_monitor = PositionMonitor(db, bot.id)
 
         logger.info(f"Trading engine service initialized for bot {bot.id} ({bot.name})")
@@ -103,7 +103,10 @@ class TradingEngineService:
     async def _get_bot_status(self) -> BotStatus:
         """Get the current bot status from database."""
         bot = await self._get_fresh_bot()
-        return bot.status
+        status = bot.status
+        if isinstance(status, BotStatus):
+            return status
+        return BotStatus(str(status))
 
     async def _get_fresh_bot(self) -> Bot:
         """Get fresh bot instance from database."""

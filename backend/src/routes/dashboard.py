@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Any, List, Optional
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -76,9 +76,9 @@ class TradeHistoryItem(BaseModel):
 
 class DashboardResponse(BaseModel):
     bot: Optional[DashboardBotResponse]
-    positions: List[DashboardPositionResponse]
-    equity_snapshots: List[DashboardEquitySnapshot]
-    trade_history: List[TradeHistoryItem]
+    positions: list[DashboardPositionResponse]
+    equity_snapshots: list[DashboardEquitySnapshot]
+    trade_history: list[TradeHistoryItem]
     current_equity: float
     total_return_pct: float
     total_unrealized_pnl: float
@@ -93,14 +93,14 @@ def get_period_start(period: str) -> Optional[datetime]:
     return datetime.utcnow() - time_delta if time_delta else None
 
 
-def calculate_margin_in_positions(positions: list) -> float:
+def calculate_margin_in_positions(positions: list[Any]) -> float:
     return sum(
         float(p.entry_price * p.quantity / p.leverage) if p.leverage else float(p.entry_price * p.quantity)
         for p in positions
     )
 
 
-def build_trade_history_item(trade, position, cumulative_pnl: float) -> TradeHistoryItem:
+def build_trade_history_item(trade: Any, position: Any, cumulative_pnl: float) -> TradeHistoryItem:
     pnl = float(trade.realized_pnl) if trade.realized_pnl else 0.0
     qty = float(trade.quantity) if trade.quantity else 0.0
     trade_price = float(trade.price) if trade.price else 0.0
@@ -135,7 +135,7 @@ def build_trade_history_item(trade, position, cumulative_pnl: float) -> TradeHis
     )
 
 
-async def get_hodl_comparison(db: AsyncSession, bot_id, total_return_pct: float) -> dict:
+async def get_hodl_comparison(db: AsyncSession, bot_id: Any, total_return_pct: float) -> dict[str, Any]:
     try:
         first_trade_query = (
             select(Trade)
@@ -192,7 +192,7 @@ async def get_dashboard_data(
     period: str = "24h",
     include_hodl: bool = Query(False, description="Include HODL comparison (slower)"),
     db: AsyncSession = Depends(get_db),
-):
+) -> DashboardResponse:
     """Get dashboard data with optimized queries.
 
     Performance targets:
@@ -261,8 +261,8 @@ async def get_dashboard_data(
     total_trades = total_trades_result.scalar() or 0
 
     # Build trade history
-    cumulative_by_symbol = {}
-    trade_history = []
+    cumulative_by_symbol: dict[str, float] = {}
+    trade_history: list[TradeHistoryItem] = []
     for trade, position in all_trade_rows:
         pnl = float(trade.realized_pnl) if trade.realized_pnl else 0.0
         cumulative_by_symbol[trade.symbol] = cumulative_by_symbol.get(trade.symbol, 0.0) + pnl
@@ -320,7 +320,7 @@ async def list_bots_public(
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     limit: int = Query(100, ge=10, le=1000, description="Results per page (10-1000)"),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """List all bots with pagination to prevent loading all bots.
 
     Performance targets:
@@ -360,7 +360,7 @@ async def list_bots_public(
 
 
 @router.get("/sentiment")
-async def get_market_sentiment():
+async def get_market_sentiment() -> dict[str, Any]:
     try:
         sentiment_service = get_sentiment_service()
         sentiment = await sentiment_service.get_market_sentiment()

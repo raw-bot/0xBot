@@ -15,7 +15,7 @@ But professional traders use 1/4 Kelly (quarter Kelly) for safety.
 """
 
 from decimal import Decimal
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List, Any
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
@@ -129,7 +129,7 @@ class KellyPositionSizingService:
 
         return kelly
 
-    def _analyze_trades(self, trades: list) -> Tuple[Decimal, Decimal, Decimal]:
+    def _analyze_trades(self, trades: List[Trade]) -> Tuple[Decimal, Decimal, Decimal]:
         """
         Analyze trade history to get win rate, avg win, avg loss.
 
@@ -144,23 +144,23 @@ class KellyPositionSizingService:
 
         win_rate = Decimal(len(wins)) / Decimal(len(trades))
 
-        # Average win as % of entry value
+        # Average win as % of trade value
         avg_win_pct = (
             Decimal(sum(t.realized_pnl for t in wins)) / Decimal(len(wins))
-            / Decimal(sum(t.entry_price * t.quantity for t in wins) / len(wins))
+            / Decimal(sum(t.price * t.quantity for t in wins) / len(wins))
             if wins else Decimal("0.05")
         )
 
-        # Average loss as % of entry value (absolute)
+        # Average loss as % of trade value (absolute)
         avg_loss_pct = (
             abs(Decimal(sum(t.realized_pnl for t in losses)) / Decimal(len(losses)))
-            / Decimal(sum(t.entry_price * t.quantity for t in losses) / len(losses))
+            / Decimal(sum(t.price * t.quantity for t in losses) / len(losses))
             if losses else Decimal("0.02")
         )
 
         return win_rate, avg_win_pct, avg_loss_pct
 
-    async def _get_recent_trades(self, bot_id: str, lookback_days: int = 90) -> list:
+    async def _get_recent_trades(self, bot_id: str, lookback_days: int = 90) -> List[Trade]:
         """Get recent closed trades for analysis."""
         try:
             cutoff_date = datetime.utcnow() - timedelta(days=lookback_days)
@@ -168,13 +168,13 @@ class KellyPositionSizingService:
             stmt = select(Trade).where(
                 and_(
                     Trade.bot_id == bot_id,
-                    Trade.created_at >= cutoff_date,
+                    Trade.executed_at >= cutoff_date,
                     Trade.realized_pnl != 0  # Only closed trades
                 )
-            ).order_by(Trade.created_at.desc())
+            ).order_by(Trade.executed_at.desc())
 
             result = await self.db_session.execute(stmt)
-            return result.scalars().all()
+            return list(result.scalars().all())
         except Exception as e:
             logger.error(f"Error fetching recent trades: {e}")
             return []

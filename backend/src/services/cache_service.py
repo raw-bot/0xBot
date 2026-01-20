@@ -243,7 +243,7 @@ class CacheService:
             logger.error(f"Error calculating hit rate: {e}")
             return None
 
-    async def get_cache_stats(self) -> dict:
+    async def get_cache_stats(self) -> dict[str, dict[str, int]]:
         """Get cache statistics.
 
         Returns:
@@ -251,7 +251,7 @@ class CacheService:
         """
         try:
             redis = await self._get_redis()
-            stats = {"hits": {}, "misses": {}}
+            stats: dict[str, dict[str, int]] = {"hits": {}, "misses": {}}
 
             # Scan for hit metrics
             cursor = 0

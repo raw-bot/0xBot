@@ -10,7 +10,7 @@ from .base import BaseMemoryProvider
 logger = get_logger(__name__)
 
 try:
-    from deepmem import DeepMem
+    from deepmem import DeepMem  # type: ignore[import-not-found]
     DEEPMEM_AVAILABLE = True
 except ImportError:
     DEEPMEM_AVAILABLE = False
@@ -42,7 +42,7 @@ class DeepMemProvider(BaseMemoryProvider):
             logger.error(f"Failed to initialize DeepMem: {e}")
             raise
 
-    async def remember(self, key: str, value: Any, metadata: Optional[Dict] = None) -> bool:
+    async def remember(self, key: str, value: Any, metadata: Optional[Dict[str, Any]] = None) -> bool:
         """Store a memory using DeepMem."""
         try:
             # Convert value to serializable format if needed
@@ -99,7 +99,7 @@ class DeepMemProvider(BaseMemoryProvider):
         try:
             # DeepMem doesn't have built-in pattern matching
             # So we'll use a simple string matching approach
-            results = {}
+            results: dict[str, Any] = {}
 
             if self.debug:
                 logger.debug(f"[MEMORY] Searching pattern: {pattern}")

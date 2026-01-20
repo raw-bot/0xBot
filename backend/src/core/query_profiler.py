@@ -3,13 +3,13 @@
 import logging
 import time
 from contextvars import ContextVar
-from typing import Optional
+from typing import Optional, List, Dict, Any, Callable
 
 logger = logging.getLogger(__name__)
 
 # Context variables for tracking query statistics in async context
 _query_count: ContextVar[int] = ContextVar('query_count', default=0)
-_query_times: ContextVar[list] = ContextVar('query_times', default=[])
+_query_times: ContextVar[List[float]] = ContextVar('query_times', default=[])
 _operation_name: ContextVar[str] = ContextVar('operation_name', default='unknown')
 
 
@@ -34,7 +34,7 @@ class QueryProfiler:
         _query_times.set(times)
 
     @staticmethod
-    def end_operation() -> dict:
+    def end_operation() -> Dict[str, Any]:
         """End operation and return statistics."""
         query_count = _query_count.get()
         query_times = _query_times.get()
@@ -57,7 +57,7 @@ class QueryProfiler:
         return stats
 
     @staticmethod
-    def log_stats(stats: dict, threshold_query_count: int = 5) -> None:
+    def log_stats(stats: Dict[str, Any], threshold_query_count: int = 5) -> None:
         """Log query statistics and warn if exceeds thresholds."""
         query_count = stats['query_count']
         total_time = stats['total_time_ms']
@@ -82,7 +82,7 @@ class QueryProfiler:
             )
 
 
-def profile_operation(operation_name: str, threshold_query_count: int = 5):
+def profile_operation(operation_name: str, threshold_query_count: int = 5) -> Callable[..., Any]:
     """Decorator to profile async operations for N+1 queries.
 
     Usage:
@@ -90,8 +90,8 @@ def profile_operation(operation_name: str, threshold_query_count: int = 5):
         async def get_dashboard_data(db: AsyncSession):
             ...
     """
-    def decorator(func):
-        async def wrapper(*args, **kwargs):
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
             QueryProfiler.start_operation(operation_name)
             try:
                 result = await func(*args, **kwargs)

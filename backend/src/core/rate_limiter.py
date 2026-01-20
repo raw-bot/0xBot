@@ -65,7 +65,7 @@ class RateLimiter:
             await redis.expire(key, 60)
 
         logger.debug(f"Rate limit counter for {model}: {count}")
-        return count
+        return int(count) if count is not None else 0
 
     async def track_token_usage(self, model: str, tokens: int, cost: float) -> None:
         """Track token usage and cost for analytics."""
@@ -76,7 +76,7 @@ class RateLimiter:
 
         logger.info(f"Tracked {tokens} tokens, ${cost:.6f} for {model}")
 
-    async def get_usage_stats(self, model: str) -> dict:
+    async def get_usage_stats(self, model: str) -> dict[str, object]:
         """Get usage statistics for model."""
         redis = await self._get_redis()
 

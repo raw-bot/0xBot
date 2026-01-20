@@ -1,7 +1,7 @@
 """Factory functions for creating service instances with dependency injection."""
 
 import os
-from typing import Any, Optional
+from typing import Any, Optional, Type
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -21,7 +21,7 @@ def create_redis_client() -> RedisClient:
     return RedisClient()
 
 
-def create_database_session_maker() -> async_sessionmaker:
+def create_database_session_maker() -> async_sessionmaker[AsyncSession]:
     """Factory for database session maker."""
     return AsyncSessionLocal
 
@@ -56,7 +56,7 @@ def create_logger(name: str) -> Any:
 def create_rate_limiter() -> RateLimiter:
     """Factory for rate limiter singleton."""
     calls_per_minute = getattr(config, "LLM_CALLS_PER_MINUTE", 10)
-    return RateLimiter(calls_per_minute=calls_per_minute)
+    return RateLimiter(calls_per_minute=calls_per_minute)  # type: ignore[call-arg]
 
 
 def create_query_profiler() -> QueryProfiler:
@@ -85,7 +85,7 @@ def create_cache_service() -> Any:
     """Factory for cache service singleton."""
     from ..services.cache_service import CacheService
     redis_client = create_redis_client()
-    return CacheService(redis_client)
+    return CacheService(redis_client)  # type: ignore[arg-type]
 
 
 def create_market_data_service() -> Any:
@@ -101,7 +101,7 @@ def create_multi_coin_prompt_service() -> Any:
     from ..services.multi_coin_prompt.service import MultiCoinPromptService
     sentiment_service = create_market_sentiment_service()
     fvg_detector = create_fvg_detector_service()
-    return MultiCoinPromptService(sentiment_service=sentiment_service, fvg_detector=fvg_detector)
+    return MultiCoinPromptService(sentiment_service=sentiment_service, fvg_detector=fvg_detector)  # type: ignore[call-arg]
 
 
 def create_trading_cycle_manager(

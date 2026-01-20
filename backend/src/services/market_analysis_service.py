@@ -1,7 +1,7 @@
 """Market analysis service for multi-coin analysis, correlations, and regime detection."""
 
 from datetime import datetime
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import numpy as np
 
@@ -15,8 +15,8 @@ class MarketAnalysisService:
 
     @staticmethod
     def calculate_correlation_matrix(
-        price_data: Dict[str, List[float]], period: int = 30
-    ) -> Dict[str, Dict[str, float]]:
+        price_data: dict[str, list[float]], period: int = 30
+    ) -> dict[str, dict[str, float]]:
         """Calculate correlation matrix between multiple assets."""
         try:
             symbols = list(price_data.keys())
@@ -31,7 +31,7 @@ class MarketAnalysisService:
                 for symbol, prices in price_data.items()
             }
 
-            correlation_matrix = {}
+            correlation_matrix: dict[str, dict[str, float]] = {}
             for symbol1 in symbols:
                 correlation_matrix[symbol1] = {}
                 for symbol2 in symbols:
@@ -46,7 +46,7 @@ class MarketAnalysisService:
             return {}
 
     @staticmethod
-    def calculate_btc_dominance(market_caps: Dict[str, float]) -> float:
+    def calculate_btc_dominance(market_caps: dict[str, float]) -> float:
         """Calculate BTC dominance (BTC market cap / total crypto market cap)."""
         try:
             btc_key = next((k for k in market_caps if "BTC" in k), None)
@@ -60,8 +60,8 @@ class MarketAnalysisService:
     
     @staticmethod
     def detect_market_regime(
-        price_data: Dict[str, List[float]], volatility_threshold: float = 0.02
-    ) -> Dict:
+        price_data: dict[str, list[float]], volatility_threshold: float = 0.02
+    ) -> dict[str, Any]:
         """Detect current market regime (risk-on/risk-off/neutral)."""
         try:
             if len(price_data) < 2:
@@ -123,7 +123,7 @@ class MarketAnalysisService:
             return {"regime": "unknown", "confidence": 0.0, "signals": {}}
     
     @staticmethod
-    def calculate_market_breadth(price_changes: Dict[str, float]) -> Dict:
+    def calculate_market_breadth(price_changes: dict[str, float]) -> dict[str, Any]:
         """Calculate market breadth indicators."""
         try:
             if not price_changes:
@@ -154,13 +154,13 @@ class MarketAnalysisService:
             }
 
     @staticmethod
-    def analyze_capital_flows(volumes: Dict[str, float], price_changes: Dict[str, float]) -> Dict:
+    def analyze_capital_flows(volumes: dict[str, float], price_changes: dict[str, float]) -> dict[str, Any]:
         """Analyze capital flows between assets."""
         try:
             if not volumes or not price_changes:
                 return {"btc_inflow": False, "alt_inflow": False, "dominant_flow": "unknown"}
 
-            def calc_flow(symbols):
+            def calc_flow(symbols: list[str]) -> float:
                 flow = sum(volumes.get(s, 0) * price_changes.get(s, 0) for s in symbols)
                 total = sum(volumes.get(s, 0) for s in symbols)
                 return flow / total if total else 0
@@ -191,7 +191,7 @@ class MarketAnalysisService:
             return {"btc_inflow": False, "alt_inflow": False, "dominant_flow": "unknown"}
 
     @staticmethod
-    def get_comprehensive_market_context(multi_coin_data: Dict[str, Dict]) -> Dict:
+    def get_comprehensive_market_context(multi_coin_data: dict[str, dict[str, Any]]) -> dict[str, Any]:
         """Get comprehensive market context from multi-coin data."""
         try:
             price_data, volumes, market_caps, price_changes = {}, {}, {}, {}

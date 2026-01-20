@@ -59,12 +59,12 @@ class ActivityLogger:
         cls._write_entry(entry)
 
     @classmethod
-    def log_cycle_start(cls, bot_name: str, symbols: list) -> None:
+    def log_cycle_start(cls, bot_name: str, symbols: list[str]) -> None:
         """Log the start of a trading cycle."""
         cls._entry("CYCLE_START", bot_name, symbols=symbols)
 
     @classmethod
-    def log_cycle_end(cls, bot_name: str, duration_seconds: float, decisions: Dict) -> None:
+    def log_cycle_end(cls, bot_name: str, duration_seconds: float, decisions: Dict[str, Any]) -> None:
         """Log the end of a trading cycle with summary."""
         decisions_summary = {
             symbol: {"signal": d.get("signal", "unknown"), "confidence": d.get("confidence", 0)}
@@ -114,7 +114,7 @@ class ActivityLogger:
 
     @classmethod
     def log_portfolio_snapshot(
-        cls, bot_name: str, capital: float, positions: list, unrealized_pnl: float
+        cls, bot_name: str, capital: float, positions: list[Any], unrealized_pnl: float
     ) -> None:
         """Log a portfolio snapshot."""
         position_data = []

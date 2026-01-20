@@ -1,6 +1,6 @@
 """WebSocket connection manager for real-time updates."""
 
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 class ConnectionManager:
     """Manager for WebSocket connections with broadcast capabilities."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize connection manager."""
         self.active_connections: Dict[str, List[WebSocket]] = {}
         self.all_connections: Set[WebSocket] = set()
@@ -40,7 +40,7 @@ class ConnectionManager:
         self.all_connections.discard(websocket)
         logger.info(f"WebSocket disconnected for bot {bot_id}. Total: {len(self.all_connections)}")
 
-    async def _safe_send(self, websocket: WebSocket, message: dict) -> bool:
+    async def _safe_send(self, websocket: WebSocket, message: Dict[str, Any]) -> bool:
         """Safely send message to websocket, return False if failed."""
         try:
             await websocket.send_json(message)
@@ -51,12 +51,12 @@ class ConnectionManager:
             logger.error(f"Error sending message: {e}")
             return False
 
-    async def send_personal_message(self, message: dict, websocket: WebSocket) -> None:
+    async def send_personal_message(self, message: Dict[str, Any], websocket: WebSocket) -> None:
         """Send a message to a specific WebSocket."""
         if not await self._safe_send(websocket, message):
             logger.warning("WebSocket already disconnected")
 
-    async def broadcast_to_bot(self, bot_id: str, message: dict) -> None:
+    async def broadcast_to_bot(self, bot_id: str, message: Dict[str, Any]) -> None:
         """Broadcast a message to all connections for a specific bot."""
         if bot_id not in self.active_connections:
             logger.debug(f"No active connections for bot {bot_id}")
@@ -75,7 +75,7 @@ class ConnectionManager:
         sent_count = len(connections) - len(disconnected)
         logger.debug(f"Broadcasted to {sent_count} connections for bot {bot_id}")
 
-    async def broadcast_to_all(self, message: dict) -> None:
+    async def broadcast_to_all(self, message: Dict[str, Any]) -> None:
         """Broadcast a message to all connected WebSockets."""
         disconnected = []
 

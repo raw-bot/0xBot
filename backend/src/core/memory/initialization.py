@@ -45,7 +45,7 @@ def initialize_memory_system() -> None:
         logger.warning("Using fallback no-op memory provider")
 
 
-def get_memory_status() -> dict:
+def get_memory_status() -> dict[str, object]:
     """Get current memory system status.
 
     Returns:

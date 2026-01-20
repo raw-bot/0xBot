@@ -8,7 +8,7 @@ class BaseMemoryProvider(ABC):
     """Abstract base class for memory providers."""
 
     @abstractmethod
-    async def remember(self, key: str, value: Any, metadata: Optional[Dict] = None) -> bool:
+    async def remember(self, key: str, value: Any, metadata: Optional[Dict[str, Any]] = None) -> bool:
         """Store a memory.
 
         Args:

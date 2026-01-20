@@ -127,7 +127,7 @@ app.include_router(dashboard_router, prefix="/api", tags=["Dashboard"])
 
 # Health check endpoint
 @app.get("/health", tags=["Health"])
-async def health_check() -> dict:
+async def health_check() -> dict[str, str]:
     """
     Health check endpoint.
 
@@ -139,7 +139,7 @@ async def health_check() -> dict:
 
 # Root endpoint
 @app.get("/", tags=["Root"])
-async def root() -> dict:
+async def root() -> dict[str, str]:
     """
     Root endpoint.
 

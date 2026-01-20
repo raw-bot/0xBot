@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import select
 
@@ -155,21 +155,21 @@ class ExecutionBlock:
                 logger.error(f"Error closing position: {e}")
                 return ExecutionResult(success=False, error=str(e))
 
-    async def _get_bot(self, db) -> Bot:
+    async def _get_bot(self, db: Any) -> Bot:
         """Get bot from database."""
         result = await db.execute(select(Bot).where(Bot.id == self.bot_id))
         bot = result.scalar_one_or_none()
         if not bot:
             raise ValueError(f"Bot {self.bot_id} not found in database")
-        return bot
+        return bot  # type: ignore[no-any-return]
 
-    async def _refresh_position(self, db, position_id: uuid.UUID) -> Position:
+    async def _refresh_position(self, db: Any, position_id: uuid.UUID) -> Position:
         """Refresh position from database."""
         result = await db.execute(select(Position).where(Position.id == position_id))
         position = result.scalar_one_or_none()
         if not position:
             raise ValueError(f"Position {position_id} not found in database")
-        return position
+        return position  # type: ignore[no-any-return]
 
     def _calculate_pnl(self, position: Position, current_price: Decimal) -> Decimal:
         """Calculate PnL for a position."""
@@ -190,7 +190,7 @@ class ExecutionBlock:
         try:
             # Create a pattern entry for memory
             entry_pattern = {
-                "side": position.side.value,
+                "side": str(position.side.value) if hasattr(position.side, 'value') else str(position.side),
                 "entry_price": float(position.entry_price),
                 "exit_price": float(position.current_price),
                 "stop_loss": float(position.stop_loss) if position.stop_loss else None,

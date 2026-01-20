@@ -3,7 +3,7 @@
 import json
 import logging
 import time
-from typing import Callable
+from typing import Any, Awaitable, Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -23,7 +23,7 @@ class QueryProfilingMiddleware(BaseHTTPMiddleware):
     - Excessive query counts (potential N+1)
     """
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         """Profile queries during request processing."""
         # Determine operation name from request
         operation_name = f"{request.method} {request.url.path}"
@@ -39,7 +39,7 @@ class QueryProfilingMiddleware(BaseHTTPMiddleware):
         finally:
             # Always log metrics, even if exception occurs
             try:
-                stats = QueryProfiler.end_operation()
+                stats: dict[str, Any] = QueryProfiler.end_operation()
                 request_duration_ms = (time.time() - request_start_time) * 1000
 
                 # Enhance stats with request info
@@ -57,7 +57,7 @@ class QueryProfilingMiddleware(BaseHTTPMiddleware):
                 pass
 
     @staticmethod
-    def _log_structured_metrics(stats: dict) -> None:
+    def _log_structured_metrics(stats: dict[str, Any]) -> None:
         """Log metrics in structured JSON format for monitoring systems."""
         metrics = {
             'type': 'query_profile',

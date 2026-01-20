@@ -3,7 +3,7 @@
 import os
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -58,7 +58,7 @@ class TradingCycleManager:
         self.timeframe = "5m"
         self.timeframe_long = "1h"
 
-    async def execute_cycle(self) -> None:
+    async def execute_cycle(self) -> Tuple[Any, Any, Any]:
         """Execute one complete trading cycle for all trading symbols."""
         cycle_start = datetime.utcnow()
         self.cycle_count += 1
@@ -80,7 +80,7 @@ class TradingCycleManager:
 
             if not all_coins_data:
                 logger.warning("No market data available")
-                return
+                return None, None, None
 
             portfolio_state, _ = await self._get_portfolio_state()
             news_data = await self.news_service.get_latest_news(self.trading_symbols)
@@ -109,7 +109,7 @@ class TradingCycleManager:
 
             if not response_text:
                 logger.error("Empty LLM response")
-                return
+                return None, None, None
 
             all_symbols = list(all_coins_data.keys())
             decisions = self.prompt_service.parse_multi_coin_response(response_text, all_symbols)
@@ -133,7 +133,7 @@ class TradingCycleManager:
             logger.error(f"Cycle error: {e}", exc_info=True)
             return None, None, None
 
-    async def _fetch_sentiment_data(self):
+    async def _fetch_sentiment_data(self) -> Any:
         """Fetch market sentiment data with error handling."""
         try:
             sentiment_data = await self.sentiment_service.get_market_sentiment()
@@ -164,7 +164,7 @@ class TradingCycleManager:
         except Exception as e:
             logger.debug(f"Could not write to LLM log: {e}")
 
-    async def _get_portfolio_state(self) -> tuple[dict, Bot]:
+    async def _get_portfolio_state(self) -> Tuple[Dict[str, Any], Bot]:
         """Get current portfolio state and bot."""
         async with AsyncSessionLocal() as fresh_db:
             query = select(Bot).where(Bot.id == self.bot_id)
@@ -187,7 +187,7 @@ class TradingCycleManager:
                 "unrealized_pnl": unrealized_pnl,
             }, bot
 
-    async def _get_all_coins_quick_snapshot(self) -> dict:
+    async def _get_all_coins_quick_snapshot(self) -> Dict[str, Any]:
         """Get complete snapshot of all tradable coins with technical indicators."""
         all_coins = {}
         for symbol in self.trading_symbols:

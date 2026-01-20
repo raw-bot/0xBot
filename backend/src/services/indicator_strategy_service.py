@@ -86,7 +86,7 @@ class IndicatorStrategyService:
     BASE_SIZE_PCT = Decimal("0.10")  # 10%
     MAX_SIZE_PCT = Decimal("0.25")  # 25%
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize strategy."""
         pass
 
@@ -346,8 +346,11 @@ class IndicatorStrategyService:
                 return False, "Missing stop loss or take profit"
 
             # Validate R/R ratio (reward >= 1.5x risk)
-            risk = signal.entry_price - signal.stop_loss
-            reward = signal.take_profit - signal.entry_price
+            if signal.entry_price is not None and signal.stop_loss is not None and signal.take_profit is not None:
+                risk = signal.entry_price - signal.stop_loss
+                reward = signal.take_profit - signal.entry_price
+            else:
+                return False, "Missing entry price or stop loss or take profit"
 
             if risk > 0 and reward / risk < Decimal("1.5"):
                 return False, f"Bad R/R ratio: {reward/risk:.2f}x (need 1.5x+)"

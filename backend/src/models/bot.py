@@ -46,8 +46,8 @@ class Bot(Base):
     model_name: Mapped[str] = mapped_column(String(50), nullable=False)
     initial_capital: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=2), nullable=False)
     capital: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=2), nullable=False)
-    trading_symbols: Mapped[list] = mapped_column(JSON, nullable=False, default=lambda: ["BTC/USDT"])
-    risk_params: Mapped[dict] = mapped_column(
+    trading_symbols: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=lambda: ["BTC/USDT"])
+    risk_params: Mapped[dict[str, float]] = mapped_column(
         JSON,
         nullable=False,
         default=lambda: {

@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict, Tuple, Any
 from uuid import UUID
 
 from sqlalchemy import select, and_, func
@@ -29,7 +29,7 @@ class TradeFilterService:
     MAX_DAILY_LOSS_USD = -100  # Circuit breaker: stop if down $100+ in a day
     RR_RATIO_MIN = 1.5  # Minimum risk/reward ratio
 
-    def __init__(self, db: Optional[AsyncSession] = None, bot_id: UUID = None):
+    def __init__(self, db: Optional[AsyncSession] = None, bot_id: Optional[UUID] = None):
         self.db = db
         self.bot_id = bot_id
 
@@ -119,7 +119,7 @@ class TradeFilterService:
             all_trades = trades_result.scalars().all()
 
             # Group trades by position_id for efficient lookup
-            trades_by_position = {}
+            trades_by_position: Dict[Optional[UUID], List[Trade]] = {}
             for trade in all_trades:
                 if trade.position_id not in trades_by_position:
                     trades_by_position[trade.position_id] = []
@@ -160,8 +160,8 @@ class TradeFilterService:
         min_profit_threshold = await self._get_dynamic_min_profit(symbol, bot_id=self.bot_id)
 
         # Calculate risk/reward
-        risk_usd = (entry_price - stop_loss).abs()
-        reward_usd = (take_profit - entry_price).abs()
+        risk_usd = abs(entry_price - stop_loss)
+        reward_usd = abs(take_profit - entry_price)
 
         if risk_usd <= 0:
             return False, f"Invalid SL: ${float(risk_usd):.2f}"
@@ -196,7 +196,7 @@ class TradeFilterService:
 
         return True, f"✓ Valid setup: ${float(expected_profit):.2f} expected profit, {float(rr_ratio):.2f}x R/R"
 
-    async def _get_dynamic_min_profit(self, symbol: str, bot_id: UUID = None) -> int:
+    async def _get_dynamic_min_profit(self, symbol: str, bot_id: Optional[UUID] = None) -> int:
         """Get dynamic minimum profit threshold based on symbol history.
 
         Adjusts the minimum profit requirement based on win rate:
@@ -215,6 +215,8 @@ class TradeFilterService:
             from ..services.trading_memory_service import TradingMemoryService
 
             # Create memory service with bot_id if provided
+            if bot_id is None:
+                return self.MIN_PROFIT_PER_TRADE_USD
             memory = TradingMemoryService(bot_id=bot_id)
             stats = await memory.recall_symbol_stats(symbol)
 
@@ -239,7 +241,7 @@ class TradeFilterService:
             logger.warning(f"[MEMORY] Error getting dynamic threshold for {symbol}: {e}")
             return self.MIN_PROFIT_PER_TRADE_USD
 
-    async def get_daily_stats(self, bot_id: UUID) -> Dict:
+    async def get_daily_stats(self, bot_id: UUID) -> Dict[str, Any]:
         """Get today's trading statistics."""
         db = await self._get_db()
 

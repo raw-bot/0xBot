@@ -1,5 +1,5 @@
 import traceback
-from typing import Callable
+from typing import Any, Awaitable, Callable
 
 from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
@@ -16,7 +16,7 @@ def create_error_response(
     error_type: str,
     message: str,
     status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
-    details: dict = None
+    details: dict[str, Any] | None = None
 ) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
@@ -25,7 +25,7 @@ def create_error_response(
 
 
 class ErrorHandlerMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         try:
             return await call_next(request)
         except Exception as e:

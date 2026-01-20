@@ -68,7 +68,7 @@ class PainTradeAnalyzer:
     EXTREME_FUNDING_THRESHOLD = 0.05  # 0.05% per 8h = extreme
     HIGH_OI_PERCENTILE = 0.80  # Top 20% is "high OI"
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the pain trade analyzer."""
         pass
 

@@ -60,7 +60,7 @@ class AlphaSetupGenerator:
     Plus identify latent risks that could invalidate all setups.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the alpha setup generator."""
         pass
 
@@ -380,12 +380,12 @@ class AlphaSetupGenerator:
     ) -> TradingBias:
         """Determine overall primary bias from 3 hypotheses."""
 
-        bias_scores = {TradingBias.BULLISH: 0, TradingBias.BEARISH: 0, TradingBias.NEUTRAL: 0}
+        bias_scores: dict[TradingBias, float] = {TradingBias.BULLISH: 0.0, TradingBias.BEARISH: 0.0, TradingBias.NEUTRAL: 0.0}
 
         # Weight: Trend (2x) > Microstructure (1.5x) > Mean Reversion (1x)
-        bias_scores[trend.bias] += 2
+        bias_scores[trend.bias] += 2.0
         bias_scores[micro.bias] += 1.5
-        bias_scores[mean_rev.bias] += 1
+        bias_scores[mean_rev.bias] += 1.0
 
         if bias_scores[TradingBias.BULLISH] > bias_scores[TradingBias.BEARISH]:
             return TradingBias.BULLISH

@@ -11,7 +11,7 @@ from ..core.memory.memory_manager import MemoryManager
 logger = get_logger(__name__)
 
 
-def get_trading_memory(db=None, bot_id=None):
+def get_trading_memory(db: Any = None, bot_id: Optional[UUID] = None) -> "TradingMemoryService":
     """Factory function to create TradingMemoryService instance.
 
     Args:
@@ -21,7 +21,7 @@ def get_trading_memory(db=None, bot_id=None):
     Returns:
         TradingMemoryService instance
     """
-    return TradingMemoryService(bot_id=bot_id)
+    return TradingMemoryService(bot_id=bot_id or UUID(int=0))
 
 
 class TradingMemoryService:
@@ -34,7 +34,7 @@ class TradingMemoryService:
     async def remember_profitable_setup(
         self,
         symbol: str,
-        entry_pattern: Dict,
+        entry_pattern: dict[str, Any],
         pnl: Decimal,
         confidence: Decimal,
     ) -> bool:
@@ -78,7 +78,7 @@ class TradingMemoryService:
     async def remember_losing_setup(
         self,
         symbol: str,
-        entry_pattern: Dict,
+        entry_pattern: dict[str, Any],
         pnl: Decimal,
     ) -> bool:
         """Remember a losing trading setup to avoid it.
@@ -116,7 +116,7 @@ class TradingMemoryService:
             logger.error(f"[MEMORY] Error remembering loss: {e}")
             return False
 
-    async def remember_symbol_stats(self, symbol: str, stats: Dict) -> bool:
+    async def remember_symbol_stats(self, symbol: str, stats: dict[str, Any]) -> bool:
         """Remember aggregate stats for a symbol.
 
         Args:
@@ -144,7 +144,7 @@ class TradingMemoryService:
             logger.error(f"[MEMORY] Error remembering stats: {e}")
             return False
 
-    async def recall_symbol_stats(self, symbol: str) -> Optional[Dict]:
+    async def recall_symbol_stats(self, symbol: str) -> Optional[dict[str, Any]]:
         """Recall stats for a symbol.
 
         Returns:
@@ -157,13 +157,13 @@ class TradingMemoryService:
             if stats:
                 logger.info(f"[MEMORY] Recalled stats for {symbol}")
 
-            return stats
+            return stats  # type: ignore[no-any-return]
 
         except Exception as e:
             logger.error(f"[MEMORY] Error recalling stats: {e}")
             return None
 
-    async def get_best_performing_setups(self, symbol: str, limit: int = 5) -> List[Dict]:
+    async def get_best_performing_setups(self, symbol: str, limit: int = 5) -> list[dict[str, Any]]:
         """Get best performing setups for a symbol.
 
         Returns:
@@ -177,7 +177,7 @@ class TradingMemoryService:
             logger.error(f"[MEMORY] Error getting best setups: {e}")
             return []
 
-    async def get_avoiding_patterns(self, symbol: str) -> List[Dict]:
+    async def get_avoiding_patterns(self, symbol: str) -> list[dict[str, Any]]:
         """Get patterns to avoid for a symbol.
 
         Returns:
