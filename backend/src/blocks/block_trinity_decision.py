@@ -154,6 +154,10 @@ class TrinityDecisionBlock:
         delta_bullish_cross = signals.get("delta_bullish_cross", False) # Delta crosses above 0
         delta_divergence = signals.get("delta_divergence", False) # Delta strength during consolidation
 
+        # Multi-timeframe signals (4h confluence)
+        mtf_4h_bullish = self._check_4h_bullish(snapshot)  # 4h price > EMA-20 AND ADX > 20
+        mtf_confluence = self._check_mtf_confluence(snapshot)  # 1h and 4h signals align
+
         # Log debugging signals
         if macd_positive or signals.get("macd_bullish_cross", False):
             self.logger.debug(f"[TRINITY] {symbol}: MACD positive={macd_positive}, bullish_cross={signals.get('macd_bullish_cross', False)}")
@@ -169,6 +173,8 @@ class TrinityDecisionBlock:
             self.logger.debug(f"[TRINITY] {symbol}: Ichimoku - Price above cloud={price_above_kumo}, Cloud cross={cloud_bullish_cross}, Tenkan>Kijun={tenkan_above_kijun}")
         if delta_positive or delta_surge or delta_bullish_cross:
             self.logger.debug(f"[TRINITY] {symbol}: OFI - Positive={delta_positive}, Surge={delta_surge}, Bullish Cross={delta_bullish_cross}, Divergence={delta_divergence}")
+        if mtf_4h_bullish or mtf_confluence:
+            self.logger.debug(f"[TRINITY] {symbol}: MTF - 4h Bullish={mtf_4h_bullish}, Confluence={mtf_confluence}")
 
         # Count how many signals met (including MACD, OBV, Bollinger, Stochastic, and VWAP)
         conditions = [regime_ok, trend_strength_ok, price_bounced, oversold, volume_confirmed, macd_positive, obv_accumulating]
@@ -236,6 +242,13 @@ class TrinityDecisionBlock:
             confluence += 12  # Extreme volume imbalance
         if delta_divergence:
             confluence += 10  # Strength during consolidation
+
+        # Multi-timeframe confluence boosts (per PRD specifications)
+        if mtf_confluence:
+            confluence += 10  # 1h and 4h signals aligned (strong confluence)
+        elif mtf_4h_bullish:
+            # 4h bullish trend but 1h entry signals weak - reduce confidence by 20%
+            confluence = confluence * 0.80  # Apply 20% penalty for conflicting timeframes
 
         # Decision logic: weighted threshold
         # Old system required 5/7 signals (71%), new system uses weighted confidence
@@ -353,3 +366,59 @@ class TrinityDecisionBlock:
             return 0.04
         else:
             return 0.00
+
+    def _check_4h_bullish(self, snapshot: MarketSnapshot) -> bool:
+        """
+        Check if 4h timeframe is in bullish trend.
+
+        Criteria:
+        - 4h price > 4h EMA-20 (above entry zone)
+        - 4h ADX > 20 (trend is established)
+
+        Returns: True if 4h trend is bullish and established
+        """
+        price = float(snapshot.price)
+        ema_20_4h = snapshot.ema_20_4h
+        adx_4h = snapshot.adx_4h
+
+        # Need both indicators available
+        if ema_20_4h is None or adx_4h is None:
+            return False
+
+        # 4h price above EMA-20 AND ADX > 20 (established trend)
+        return price > ema_20_4h and adx_4h > 20
+
+    def _check_mtf_confluence(self, snapshot: MarketSnapshot) -> bool:
+        """
+        Check if 1h and 4h timeframes are in confluence (aligned signals).
+
+        Criteria:
+        - 1h signals: At least one entry signal met (pullback + bounce, MACD, OBV, etc.)
+        - 4h signals: 4h is bullish trend (price > EMA-20 AND ADX > 20)
+
+        Returns: True if both timeframes aligned bullish
+        """
+        signals = snapshot.signals or {}
+        ema_20_4h = snapshot.ema_20_4h
+        adx_4h = snapshot.adx_4h
+        price = float(snapshot.price)
+
+        # Check if 4h is bullish
+        if ema_20_4h is None or adx_4h is None:
+            return False
+
+        mtf_4h_bullish = price > ema_20_4h and adx_4h > 20
+
+        # Check if 1h has entry signals
+        price_bounced = signals.get("price_bounced", False)
+        macd_positive = signals.get("macd_positive", False)
+        obv_accumulating = signals.get("obv_accumulating", False)
+        delta_bullish_cross = signals.get("delta_bullish_cross", False)
+        cloud_bullish_cross = signals.get("cloud_bullish_cross", False)
+
+        has_1h_entry_signal = (
+            price_bounced or macd_positive or obv_accumulating or delta_bullish_cross or cloud_bullish_cross
+        )
+
+        # Confluence: 4h bullish AND 1h entry signals present
+        return mtf_4h_bullish and has_1h_entry_signal

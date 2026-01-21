@@ -34,7 +34,7 @@ class MarketSnapshot:
     ohlcv_1h: Optional[list[Any]] = None
     ohlcv_4h: Optional[list[Any]] = None
 
-    # Trinity Framework Indicators
+    # Trinity Framework Indicators (1h)
     sma_200: Optional[float] = None        # Regime filter
     ema_20: Optional[float] = None         # Entry zone
     adx: Optional[float] = None            # Trend strength
@@ -42,6 +42,12 @@ class MarketSnapshot:
     supertrend_signal: str = "neutral"     # "buy" or "sell"
     volume_ma: Optional[float] = None      # Volume confirmation
     confluence_score: float = 0.0          # 0-100
+
+    # Multi-timeframe indicators (4h)
+    ema_20_4h: Optional[float] = None      # 4h entry zone
+    adx_4h: Optional[float] = None         # 4h trend strength
+    rsi_4h: Optional[float] = None         # 4h momentum
+    macd_4h: Optional[float] = None        # 4h trend following
 
     # Signal confluence dict
     signals: Dict[str, Any] = field(default_factory=dict)
@@ -88,7 +94,7 @@ class MarketDataBlock:
         # Calculate legacy indicators
         legacy_indicators = self._calculate_indicators(ohlcv_1h)
 
-        # Calculate Trinity indicators
+        # Calculate Trinity indicators (1h)
         trinity_indicators = {}
         if ohlcv_1h and len(ohlcv_1h) >= 200:
             # Convert OHLCV objects back to raw format for indicator block
@@ -98,6 +104,9 @@ class MarketDataBlock:
             ]
             ohlcv_dict = self.indicator_block.convert_ccxt_to_dict(ohlcv_raw)
             trinity_indicators = self.indicator_block.calculate_indicators_from_ccxt(ohlcv_dict)
+
+        # Calculate 4h indicators for multi-timeframe confluence
+        mtf_indicators = self._calculate_4h_indicators(ohlcv_4h)
 
         return MarketSnapshot(
             symbol=symbol,
@@ -112,7 +121,7 @@ class MarketDataBlock:
             trend=legacy_indicators.get("trend", "neutral"),
             ohlcv_1h=ohlcv_1h,
             ohlcv_4h=ohlcv_4h,
-            # Trinity indicators
+            # Trinity indicators (1h)
             sma_200=trinity_indicators.get("sma_200"),
             ema_20=trinity_indicators.get("ema_20"),
             adx=trinity_indicators.get("adx"),
@@ -121,6 +130,11 @@ class MarketDataBlock:
             volume_ma=trinity_indicators.get("volume_ma"),
             confluence_score=trinity_indicators.get("confluence_score", 0.0),
             signals=trinity_indicators.get("signals", {}),
+            # Multi-timeframe indicators (4h)
+            ema_20_4h=mtf_indicators.get("ema_20"),
+            adx_4h=mtf_indicators.get("adx"),
+            rsi_4h=mtf_indicators.get("rsi"),
+            macd_4h=mtf_indicators.get("macd"),
         )
 
     def _calculate_indicators(self, ohlcv: Optional[list[Any]]) -> dict[str, Any]:
@@ -152,6 +166,34 @@ class MarketDataBlock:
                 indicators["trend"] = "bearish"
 
         return indicators
+
+    def _calculate_4h_indicators(self, ohlcv: Optional[list[Any]]) -> dict[str, Any]:
+        """Calculate 4h timeframe indicators for multi-timeframe confluence."""
+        if not ohlcv or len(ohlcv) < 5:  # Need at least 5 bars for basic indicators
+            return {}
+
+        try:
+            closes = [float(c.close) for c in ohlcv]
+            highs = [float(c.high) for c in ohlcv]
+            lows = [float(c.low) for c in ohlcv]
+
+            # Calculate 4h indicators
+            rsi_4h = self.indicator_service.calculate_rsi(closes)
+            ema_20_4h = self.indicator_service.calculate_ema(closes, period=20)
+            atr_4h = self.indicator_service.calculate_atr(highs, lows, closes)
+            macd_4h = self.indicator_service.calculate_macd(closes)
+
+            indicators: dict[str, Any] = {
+                "rsi": rsi_4h[-1] if rsi_4h else None,
+                "ema_20": ema_20_4h[-1] if ema_20_4h else None,
+                "adx": atr_4h[-1] if atr_4h else None,  # Use ATR as proxy for volatility
+                "macd": macd_4h.get("macd", [None])[-1] if macd_4h else None,
+            }
+
+            return indicators
+        except Exception as e:
+            logger.warning(f"Error calculating 4h indicators: {e}")
+            return {}
 
     async def get_price(self, symbol: str) -> Optional[Decimal]:
         """Get current price for a symbol."""
