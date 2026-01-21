@@ -383,6 +383,30 @@ class IndicatorBlock:
         vwap_upper_str = f"{vwap_upper:.2f}" if vwap_upper else "N/A"
         logger.debug(f"[VWAP_BANDS] Lower: {vwap_lower_str}, VWAP: {vwap_value_str}, Upper: {vwap_upper_str}")
 
+        # === ICHIMOKU CLOUD (Market Structure Understanding) ===
+        ichimoku_data = IndicatorService.calculate_ichimoku(highs, lows, closes)
+        tenkan = ichimoku_data.get('tenkan')
+        kijun = ichimoku_data.get('kijun')
+        kumo_high = ichimoku_data.get('kumo_high')
+        kumo_low = ichimoku_data.get('kumo_low')
+        chikou = ichimoku_data.get('chikou')
+        ichimoku_signals = ichimoku_data.get('signals', {})
+
+        # Extract key Ichimoku signals
+        price_above_kumo = ichimoku_signals.get('price_above_kumo', False)
+        price_below_kumo = ichimoku_signals.get('price_below_kumo', False)
+        price_in_kumo = ichimoku_signals.get('price_in_kumo', False)
+        tenkan_above_kijun = ichimoku_signals.get('tenkan_above_kijun', False)
+        kumo_bullish = ichimoku_signals.get('kumo_bullish', False)
+        chikou_above_price = ichimoku_signals.get('chikou_above_price', False)
+        cloud_bullish_cross = ichimoku_signals.get('cloud_bullish_cross', False)
+        cloud_bearish_cross = ichimoku_signals.get('cloud_bearish_cross', False)
+        cloud_expansion = ichimoku_signals.get('cloud_expansion', False)
+        cloud_squeeze = ichimoku_signals.get('cloud_squeeze', False)
+
+        logger.debug(f"[ICHIMOKU] Tenkan: {tenkan:.2f}, Kijun: {kijun:.2f}, Kumo: {kumo_high:.2f}-{kumo_low:.2f}, "
+                    f"Price above cloud: {price_above_kumo}, Tenkan > Kijun: {tenkan_above_kijun}")
+
         # === SIGNAL GENERATION ===
         regime_ok = current_price > sma_200 if sma_200 else False
         trend_strength_ok = adx > 25
@@ -446,6 +470,11 @@ class IndicatorBlock:
             'bb_lower': bb_lower,
             'stoch_k': stoch_k,
             'stoch_d': stoch_d,
+            'tenkan': tenkan,
+            'kijun': kijun,
+            'kumo_high': kumo_high,
+            'kumo_low': kumo_low,
+            'chikou': chikou,
             'confluence_score': confluence_score,
             'signals': {
                 'regime_filter': regime_ok,
@@ -466,7 +495,17 @@ class IndicatorBlock:
                 'stoch_bullish_cross': stoch_bullish_cross,
                 'price_above_vwap_upper': price_above_vwap_upper,
                 'price_below_vwap_lower': price_below_vwap_lower,
-                'price_in_vwap_band': price_in_vwap_band
+                'price_in_vwap_band': price_in_vwap_band,
+                'price_above_kumo': price_above_kumo,
+                'price_below_kumo': price_below_kumo,
+                'price_in_kumo': price_in_kumo,
+                'tenkan_above_kijun': tenkan_above_kijun,
+                'kumo_bullish': kumo_bullish,
+                'chikou_above_price': chikou_above_price,
+                'cloud_bullish_cross': cloud_bullish_cross,
+                'cloud_bearish_cross': cloud_bearish_cross,
+                'cloud_expansion': cloud_expansion,
+                'cloud_squeeze': cloud_squeeze
             }
         }
 

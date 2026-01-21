@@ -142,6 +142,12 @@ class TrinityDecisionBlock:
         stoch_bullish_cross = signals.get("stoch_bullish_cross", False) # Stochastic K-D cross
         price_above_vwap_upper = signals.get("price_above_vwap_upper", False) # VWAP breakout
 
+        # Ichimoku signals (market structure understanding)
+        price_above_kumo = signals.get("price_above_kumo", False) # Price above cloud (bullish structure)
+        tenkan_above_kijun = signals.get("tenkan_above_kijun", False) # Bullish line structure
+        cloud_bullish_cross = signals.get("cloud_bullish_cross", False) # Price crossing above cloud
+        kumo_bullish = signals.get("kumo_bullish", False) # Cloud bullish orientation
+
         # Log debugging signals
         if macd_positive or signals.get("macd_bullish_cross", False):
             self.logger.debug(f"[TRINITY] {symbol}: MACD positive={macd_positive}, bullish_cross={signals.get('macd_bullish_cross', False)}")
@@ -153,6 +159,8 @@ class TrinityDecisionBlock:
             self.logger.debug(f"[TRINITY] {symbol}: Stochastic bullish cross detected")
         if price_above_vwap_upper:
             self.logger.debug(f"[TRINITY] {symbol}: Price above VWAP upper band detected")
+        if price_above_kumo or cloud_bullish_cross:
+            self.logger.debug(f"[TRINITY] {symbol}: Ichimoku - Price above cloud={price_above_kumo}, Cloud cross={cloud_bullish_cross}, Tenkan>Kijun={tenkan_above_kijun}")
 
         # Count how many signals met (including MACD, OBV, Bollinger, Stochastic, and VWAP)
         conditions = [regime_ok, trend_strength_ok, price_bounced, oversold, volume_confirmed, macd_positive, obv_accumulating]
@@ -169,12 +177,22 @@ class TrinityDecisionBlock:
         weight_volatility = 0.05    # 5% - Volatility readiness (Bollinger + Stochastic)
 
         # Map signals to weighted categories (1 = signal met, 0 = signal not met)
-        regime_score = 1 if regime_ok else 0
-        trend_score = 1 if trend_strength_ok else 0
+        # Ichimoku signals enhance regime confirmation (price above cloud + bullish structure)
+        ichimoku_regime_bonus = (price_above_kumo and tenkan_above_kijun and kumo_bullish)
+        regime_score = 1 if (regime_ok or ichimoku_regime_bonus) else 0
+
+        # Ichimoku structure can confirm trend
+        ichimoku_trend_signal = (price_above_kumo or tenkan_above_kijun)
+        trend_score = 1 if (trend_strength_ok or ichimoku_trend_signal) else 0
+
         entry_score = 1 if (pullback_detected and price_bounced) else 0  # Both pullback AND bounce
+        # Ichimoku cloud crossing is a strong entry signal
+        if cloud_bullish_cross:
+            entry_score = 1
+
         momentum_score = 1 if (oversold or macd_positive or obv_accumulating) else 0  # Any momentum signal
         volume_score = 1 if volume_confirmed else 0
-        volatility_score = 1 if (bollinger_expansion or stoch_bullish_cross or price_above_vwap_upper) else 0  # Any volatility signal
+        volatility_score = 1 if (bollinger_expansion or stoch_bullish_cross or price_above_vwap_upper or cloud_bullish_cross) else 0  # Any volatility signal
 
         # Calculate weighted confluence (0-1 scale)
         weighted_confluence = (
@@ -196,6 +214,13 @@ class TrinityDecisionBlock:
             confluence += 10
         if price_above_vwap_upper:
             confluence += 12
+        # Ichimoku boosts (per PRD specifications)
+        if price_above_kumo:
+            confluence += 20  # Strong bullish structure
+        if cloud_bullish_cross:
+            confluence += 25  # Strong trend confirmation via cloud crossing
+        if tenkan_above_kijun and kumo_bullish:
+            confluence += 15  # Bullish line structure + orientation
 
         # Decision logic: weighted threshold
         # Old system required 5/7 signals (71%), new system uses weighted confidence

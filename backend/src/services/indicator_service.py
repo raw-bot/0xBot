@@ -323,6 +323,183 @@ class IndicatorService:
         return current_obv, obv_ma, obv_trending
 
     @staticmethod
+    def calculate_ichimoku(
+        highs: list[float],
+        lows: list[float],
+        closes: list[float],
+    ) -> dict[str, Any]:
+        """Calculate Ichimoku Cloud (full Kumo + Senkou + Kijun).
+
+        Ichimoku provides complete market structure understanding:
+        - Tenkan-sen (Conversion Line): 9-period high/low midpoint
+        - Kijun-sen (Base Line): 26-period high/low midpoint
+        - Senkou A (Leading Span A): (Tenkan + Kijun) / 2, plotted 26 periods ahead
+        - Senkou B (Leading Span B): 52-period high/low midpoint, plotted 26 periods ahead
+        - Kumo (Cloud): Area between Senkou A and B
+        - Chikou (Lagging Span): Current close plotted 26 periods back
+
+        Args:
+            highs: List of high prices
+            lows: List of low prices
+            closes: List of close prices
+
+        Returns:
+            Dictionary with all Ichimoku components and signals
+        """
+        if not highs or not lows or not closes or len(closes) < 52:
+            # Need at least 52 periods for full Ichimoku
+            return {
+                "tenkan": None,
+                "kijun": None,
+                "senkou_a": None,
+                "senkou_b": None,
+                "senkou_a_future": [],
+                "senkou_b_future": [],
+                "chikou": None,
+                "kumo_high": None,
+                "kumo_low": None,
+                "signals": {},
+            }
+
+        # Calculate Tenkan-sen (9-period high/low midpoint)
+        tenkan = (max(highs[-9:]) + min(lows[-9:])) / 2.0
+
+        # Calculate Kijun-sen (26-period high/low midpoint)
+        kijun = (max(highs[-26:]) + min(lows[-26:])) / 2.0
+
+        # Calculate Senkou A (plotted 26 periods ahead)
+        senkou_a = (tenkan + kijun) / 2.0
+
+        # Calculate Senkou B (52-period high/low midpoint, plotted 26 periods ahead)
+        senkou_b = (max(highs[-52:]) + min(lows[-52:])) / 2.0
+
+        # Calculate Chikou (current close plotted 26 periods back)
+        # This is just the current close, but in practice it's shifted back 26 bars
+        chikou = closes[-1]
+
+        # Calculate historical Senkou A and B values for cloud visualization
+        # These are shifted 26 periods forward
+        senkou_a_future: list[Optional[float]] = [None] * 26
+        senkou_b_future: list[Optional[float]] = [None] * 26
+
+        for i in range(52, len(closes)):
+            # Tenkan for this period
+            tenkan_hist = (max(highs[i-9:i+1]) + min(lows[i-9:i+1])) / 2.0
+            # Kijun for this period
+            kijun_hist = (max(highs[i-26:i+1]) + min(lows[i-26:i+1])) / 2.0
+            # Senkou A for this period (plotted 26 ahead)
+            senkou_a_val = (tenkan_hist + kijun_hist) / 2.0
+            # Senkou B for this period (plotted 26 ahead)
+            senkou_b_val = (max(highs[i-52:i+1]) + min(lows[i-52:i+1])) / 2.0
+
+            senkou_a_future.append(senkou_a_val)
+            senkou_b_future.append(senkou_b_val)
+
+        # Calculate current Kumo (cloud) boundaries
+        current_price = closes[-1]
+
+        # Kumo top/bottom is based on the most recent Senkou A and B
+        # We need the values from 26 bars ago (since they're plotted 26 ahead)
+        if len(senkou_a_future) >= 27:
+            kumo_senkou_a_current = senkou_a_future[-27]
+            kumo_senkou_b_current = senkou_b_future[-27]
+        else:
+            kumo_senkou_a_current = None
+            kumo_senkou_b_current = None
+
+        if kumo_senkou_a_current is not None and kumo_senkou_b_current is not None:
+            kumo_high = max(kumo_senkou_a_current, kumo_senkou_b_current)
+            kumo_low = min(kumo_senkou_a_current, kumo_senkou_b_current)
+        else:
+            kumo_high = None
+            kumo_low = None
+
+        # Generate Ichimoku signals
+        signals: dict[str, bool | None] = {}
+
+        if kumo_high is not None and kumo_low is not None:
+            # Price vs Kumo signals
+            signals["price_above_kumo"] = current_price > kumo_high
+            signals["price_below_kumo"] = current_price < kumo_low
+            signals["price_in_kumo"] = not signals["price_above_kumo"] and not signals["price_below_kumo"]
+
+            # Tenkan vs Kijun signal (bullish structure)
+            signals["tenkan_above_kijun"] = tenkan > kijun
+
+            # Cloud orientation
+            signals["kumo_bullish"] = kumo_senkou_a_current > kumo_senkou_b_current if kumo_senkou_a_current is not None else None
+
+            # Chikou vs price signal
+            if len(closes) >= 27:
+                price_26_bars_ago = closes[-27]
+                signals["chikou_above_price"] = chikou > price_26_bars_ago
+            else:
+                signals["chikou_above_price"] = None
+
+            # Cloud crossing detection (comparing with previous values)
+            if len(senkou_a_future) >= 28:
+                prev_kumo_a = senkou_a_future[-28]
+                prev_kumo_b = senkou_b_future[-28]
+                if prev_kumo_a is not None and prev_kumo_b is not None:
+                    prev_kumo_high = max(prev_kumo_a, prev_kumo_b)
+                    prev_kumo_low = min(prev_kumo_a, prev_kumo_b)
+
+                    # Check for bullish cloud crossing
+                    prev_price = closes[-2] if len(closes) >= 2 else closes[-1]
+                    signals["cloud_bullish_cross"] = (prev_price < prev_kumo_low) and (current_price > kumo_low)
+                    signals["cloud_bearish_cross"] = (prev_price > prev_kumo_high) and (current_price < kumo_high)
+
+                    # Cloud expansion/squeeze
+                    current_kumo_width = kumo_high - kumo_low
+                    prev_kumo_width = prev_kumo_high - prev_kumo_low
+                    median_width = (current_kumo_width + prev_kumo_width) / 2.0
+
+                    signals["cloud_expansion"] = current_kumo_width > median_width * 1.2
+                    signals["cloud_squeeze"] = current_kumo_width < median_width * 0.8
+                else:
+                    signals["cloud_bullish_cross"] = None
+                    signals["cloud_bearish_cross"] = None
+                    signals["cloud_expansion"] = None
+                    signals["cloud_squeeze"] = None
+            else:
+                signals["cloud_bullish_cross"] = None
+                signals["cloud_bearish_cross"] = None
+                signals["cloud_expansion"] = None
+                signals["cloud_squeeze"] = None
+        else:
+            # Insufficient data
+            signals["price_above_kumo"] = None
+            signals["price_below_kumo"] = None
+            signals["price_in_kumo"] = None
+            signals["tenkan_above_kijun"] = None
+            signals["kumo_bullish"] = None
+            signals["chikou_above_price"] = None
+            signals["cloud_bullish_cross"] = None
+            signals["cloud_bearish_cross"] = None
+            signals["cloud_expansion"] = None
+            signals["cloud_squeeze"] = None
+
+        # Log Ichimoku state
+        logger.debug(
+            f"[ICHIMOKU] Price: {current_price:.2f}, Kumo: {kumo_high:.2f}-{kumo_low:.2f}, "
+            f"Tenkan/Kijun: {tenkan:.2f}/{kijun:.2f}, "
+            f"Signals: {sum(1 for v in signals.values() if v is True)}/{len(signals)}"
+        )
+
+        return {
+            "tenkan": tenkan,
+            "kijun": kijun,
+            "senkou_a": senkou_a,
+            "senkou_b": senkou_b,
+            "senkou_a_future": senkou_a_future,
+            "senkou_b_future": senkou_b_future,
+            "chikou": chikou,
+            "kumo_high": kumo_high,
+            "kumo_low": kumo_low,
+            "signals": signals,
+        }
+
+    @staticmethod
     def calculate_all_indicators(
         closes: list[float],
         highs: Optional[list[float]] = None,
