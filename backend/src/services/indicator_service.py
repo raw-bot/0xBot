@@ -61,15 +61,79 @@ class IndicatorService:
     @staticmethod
     def calculate_bollinger_bands(
         prices: list[float], period: int = 20, std_dev: int = 2
-    ) -> dict[str, list[Optional[float]]]:
-        """Calculate Bollinger Bands. Returns dict with 'upper', 'middle', 'lower' lists."""
+    ) -> dict[str, list[Optional[float | bool]]]:
+        """Calculate Bollinger Bands with squeeze detection.
+
+        Returns dict with:
+        - 'upper', 'middle', 'lower': Band values
+        - 'bandwidth': (upper - lower) / middle for each candle
+        - 'squeeze': True if bandwidth < median_bandwidth * 0.7
+        - 'expansion': True if bandwidth > median_bandwidth * 1.3
+        - 'price_near_band': True if abs(price - middle) / (upper - lower) > 0.8
+        """
         upper, middle, lower = talib.BBANDS(
             _to_array(prices), timeperiod=period, nbdevup=std_dev, nbdevdn=std_dev
         )
+
+        upper_clean = _clean_result(upper)
+        middle_clean = _clean_result(middle)
+        lower_clean = _clean_result(lower)
+
+        # Calculate bandwidth: (upper - lower) / middle
+        bandwidth: list[Optional[float]] = []
+        for i in range(len(prices)):
+            if upper_clean[i] is not None and middle_clean[i] is not None and lower_clean[i] is not None:
+                if middle_clean[i] != 0:
+                    bw = (upper_clean[i] - lower_clean[i]) / middle_clean[i]
+                    bandwidth.append(bw)
+                else:
+                    bandwidth.append(None)
+            else:
+                bandwidth.append(None)
+
+        # Calculate median bandwidth for squeeze detection
+        valid_bandwidths = [bw for bw in bandwidth if bw is not None]
+        median_bandwidth = None
+        if valid_bandwidths:
+            sorted_bw = sorted(valid_bandwidths)
+            median_idx = len(sorted_bw) // 2
+            median_bandwidth = sorted_bw[median_idx]
+
+        # Detect squeeze and expansion
+        squeeze_signals: list[Optional[bool]] = []
+        expansion_signals: list[Optional[bool]] = []
+        near_band_signals: list[Optional[bool]] = []
+
+        for i in range(len(prices)):
+            if bandwidth[i] is not None and median_bandwidth is not None:
+                squeeze = bandwidth[i] < median_bandwidth * 0.7
+                expansion = bandwidth[i] > median_bandwidth * 1.3
+                squeeze_signals.append(squeeze)
+                expansion_signals.append(expansion)
+
+                # Check if price is near the band
+                if upper_clean[i] is not None and lower_clean[i] is not None and middle_clean[i] is not None:
+                    band_width = upper_clean[i] - lower_clean[i]
+                    if band_width != 0:
+                        price_distance = abs(prices[i] - middle_clean[i]) / band_width
+                        near_band_signals.append(price_distance > 0.8)
+                    else:
+                        near_band_signals.append(False)
+                else:
+                    near_band_signals.append(False)
+            else:
+                squeeze_signals.append(None)
+                expansion_signals.append(None)
+                near_band_signals.append(None)
+
         return {
-            "upper": _clean_result(upper),
-            "middle": _clean_result(middle),
-            "lower": _clean_result(lower),
+            "upper": upper_clean,
+            "middle": middle_clean,
+            "lower": lower_clean,
+            "bandwidth": bandwidth,
+            "squeeze": squeeze_signals,
+            "expansion": expansion_signals,
+            "price_near_band": near_band_signals,
         }
 
     @staticmethod

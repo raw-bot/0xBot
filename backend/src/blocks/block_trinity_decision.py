@@ -138,17 +138,24 @@ class TrinityDecisionBlock:
         volume_confirmed = signals.get("volume_confirmed", False) # Vol > SMA vol
         macd_positive = signals.get("macd_positive", False)       # MACD line > signal line
         obv_accumulating = signals.get("obv_accumulating", False) # OBV trending up
+        bollinger_expansion = signals.get("bollinger_expansion", False) # BB expansion
 
-        # Log MACD and OBV for debugging
+        # Log debugging signals
         if macd_positive or signals.get("macd_bullish_cross", False):
             self.logger.debug(f"[TRINITY] {symbol}: MACD positive={macd_positive}, bullish_cross={signals.get('macd_bullish_cross', False)}")
         if obv_accumulating:
             self.logger.debug(f"[TRINITY] {symbol}: OBV accumulating={obv_accumulating}")
+        if bollinger_expansion:
+            self.logger.debug(f"[TRINITY] {symbol}: Bollinger expansion detected")
 
-        # Count how many signals met (including MACD and OBV)
+        # Count how many signals met (including MACD, OBV, and Bollinger)
         conditions = [regime_ok, trend_strength_ok, price_bounced, oversold, volume_confirmed, macd_positive, obv_accumulating]
         signals_met = sum(conditions)
         total_signals = 7
+
+        # Add Bollinger expansion to confluence score
+        if bollinger_expansion:
+            confluence += 15
 
         # Decision logic: need strong confluence
         if signals_met >= 5:

@@ -337,6 +337,16 @@ class IndicatorBlock:
         current_obv, obv_ma, obv_trending = IndicatorService.calculate_obv(closes, volumes, obv_ma_period=14)
         logger.debug(f"[OBV] Current: {current_obv:.0f}, MA: {obv_ma:.0f}, Accumulating: {obv_trending}")
 
+        # === BOLLINGER BANDS (Squeeze Detection) ===
+        bb_data = IndicatorService.calculate_bollinger_bands(closes, period=20, std_dev=2)
+        bb_upper = bb_data['upper'][-1] if bb_data['upper'] and bb_data['upper'][-1] is not None else None
+        bb_middle = bb_data['middle'][-1] if bb_data['middle'] and bb_data['middle'][-1] is not None else None
+        bb_lower = bb_data['lower'][-1] if bb_data['lower'] and bb_data['lower'][-1] is not None else None
+        bb_squeeze = bb_data['squeeze'][-1] if bb_data['squeeze'] and bb_data['squeeze'][-1] is not None else False
+        bb_expansion = bb_data['expansion'][-1] if bb_data['expansion'] and bb_data['expansion'][-1] is not None else False
+        bb_price_near_band = bb_data['price_near_band'][-1] if bb_data['price_near_band'] and bb_data['price_near_band'][-1] is not None else False
+        logger.debug(f"[BOLLINGER] Squeeze: {bb_squeeze}, Expansion: {bb_expansion}, Price near band: {bb_price_near_band}")
+
         # === SIGNAL GENERATION ===
         regime_ok = current_price > sma_200 if sma_200 else False
         trend_strength_ok = adx > 25
@@ -393,6 +403,9 @@ class IndicatorBlock:
             'macd_histogram': macd_histogram,
             'obv': current_obv,
             'obv_ma': obv_ma,
+            'bb_upper': bb_upper,
+            'bb_middle': bb_middle,
+            'bb_lower': bb_lower,
             'confluence_score': confluence_score,
             'signals': {
                 'regime_filter': regime_ok,
@@ -404,7 +417,10 @@ class IndicatorBlock:
                 'price_above_vwap': price_above_vwap,
                 'macd_positive': macd_positive,
                 'macd_bullish_cross': macd_bullish_cross,
-                'obv_accumulating': obv_trending
+                'obv_accumulating': obv_trending,
+                'bollinger_squeeze': bb_squeeze,
+                'bollinger_expansion': bb_expansion,
+                'price_near_band': bb_price_near_band
             }
         }
 
