@@ -185,10 +185,18 @@ class TestMACDInTrinityDecision:
 
         decision = trinity._analyze_confluence('BTC/USD', snapshot)
 
-        # Missing MACD signal - 6/7
+        # Missing MACD signal - 6/7 signals
+        # With weighted system:
+        # - regime_score=1 (0.25)
+        # - trend_score=1 (0.20)
+        # - entry_score=1 (pullback AND bounce, 0.20)
+        # - momentum_score=1 (oversold, 0.20)
+        # - volume_score=1 (0.10)
+        # - volatility_score=0 (no volatility signals in test data, 0.05)
+        # Total: 0.25 + 0.20 + 0.20 + 0.20 + 0.10 = 0.95 = 95% weighted confidence
         assert decision.signals_met == 6
-        assert decision.should_enter is True  # Still enters with 6/7
-        assert decision.confidence == pytest.approx(6/7, rel=0.01)
+        assert decision.should_enter is True  # Still enters with 6/7 / 95% weighted
+        assert decision.confidence == pytest.approx(0.95, rel=0.01)
 
     def test_macd_insufficient_signals_no_entry(self):
         """Test that without MACD and other signals, no entry."""

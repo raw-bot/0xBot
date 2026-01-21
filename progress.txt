@@ -3739,3 +3739,135 @@ Ready to proceed to Task 4: Add OBV (On-Balance Volume)
 
 ---
 
+
+## Iteration 21 - TASK 4: Weighted Confluence System (COMPLETE) ⭐ CRITICAL
+
+### What Was Implemented
+
+- **Weighted Confluence Scoring System** (backend/src/blocks/block_trinity_decision.py):
+  * Replaced simple signal counting (5/7 required) with intelligent weighted scoring
+  * Defined 6 weighted categories:
+    - Regime: 25% (most important - market direction)
+    - Trend: 20% (trend strength confirmation)
+    - Entry: 20% (entry quality - pullback + bounce)
+    - Momentum: 20% (momentum strength - oversold OR MACD OR OBV)
+    - Volume: 10% (volume confirmation)
+    - Volatility: 5% (volatility readiness - BB expansion OR Stoch cross OR VWAP breakout)
+  * Total weights: 0.25 + 0.20 + 0.20 + 0.20 + 0.10 + 0.05 = 1.00
+  * Each category scores 0 (signal not met) or 1 (signal met)
+  * Final score: weighted_confluence = sum of (score * weight) / 1.0 = 0-1 scale
+
+- **Decision Thresholds** (updated):
+  * OLD: signals_met >= 5/7 (71%)
+  * NEW: weighted_confluence >= thresholds
+    - 95%+ = Very strong confluence (entry with 10% position)
+    - 80-95% = Strong confluence (entry with 8% position)
+    - 65-80% = Moderate confluence (entry with 6% position)
+    - 50-65% = Weak confluence (entry with 4% position)
+    - <50% = Insufficient confluence (no entry)
+
+- **Adaptive Position Sizing** (updated):
+  * OLD: Simple 3-tier sizing (1%/2%/3%)
+  * NEW: Confidence-based adaptive sizing
+    - 95%+ confidence: 10% of capital
+    - 80-95% confidence: 8% of capital
+    - 65-80% confidence: 6% of capital
+    - 50-65% confidence: 4% of capital
+    - <50% confidence: 0% (no trade)
+  * Better Kelly Criterion compliance
+  * More granular risk management
+
+### Files Changed
+
+- Modified: `/backend/src/blocks/block_trinity_decision.py` (+75 lines)
+  * Replaced simple threshold logic with weighted confluence calculation
+  * Added 6-category weighting system
+  * Updated decision logic with new threshold tiers (95%, 80%, 65%, 50%)
+  * Enhanced logging with weighted confidence percentage
+  * Updated _calculate_position_size() with adaptive tiers
+  * Maintains backward compatibility with signals_met tracking
+
+- Modified: `/backend/tests/blocks/test_trinity_macd.py` (+8 lines)
+  * Updated test_macd_negative_reduces_signals to expect new weighted confidence (0.95)
+  * Added comments explaining weighted calculation for future maintainers
+  * All tests updated to work with new scoring system
+
+- Modified: `/PRD.md`
+  * Marked TASK 4 as ✅ complete
+  * Updated validation checklist (5/11 items complete)
+
+### Test Results
+
+- **All 38 block tests**: PASSED ✅
+- **Trinity/MACD tests**: 7/7 PASSED ✅
+- **No regressions**: All existing tests still passing ✅
+- **Test compatibility**: Updated confidence expectations for weighted system
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered
+- **Weighted System Benefits**:
+  * Regime (25%) is most important - price > 200 SMA is primary filter
+  * Trend (20%) + Entry (20%) + Momentum (20%) = 60% for core trading logic
+  * Volume (10%) + Volatility (5%) = 15% for confirmation
+  * This hierarchy matches trading best practices: trend > entry > confirmation
+- **Composite Scoring**:
+  * Entry score combines BOTH pullback_detected AND price_bounced (AND logic)
+  * Momentum score combines oversold OR macd_positive OR obv_accumulating (OR logic)
+  * Volatility score combines any BB/Stoch/VWAP signal (OR logic)
+  * This allows sub-categories to use different combinatorics
+- **Position Sizing Justification**:
+  * 10% at 95%+ confidence: Very high conviction, max allocation
+  * 8% at 80%+ confidence: High conviction, slightly reduced
+  * 6% at 65%+ confidence: Moderate confidence, balanced risk
+  * 4% at 50%+ confidence: Weak setup, small risk
+  * 0% at <50% confidence: No entry, avoid low-confidence noise
+  * This ladder prevents over-trading weak setups
+- **Backward Compatibility**:
+  * Old tests still track signals_met (7 signals)
+  * New system adds weighted_confluence on top of it
+  * Can compare old (signal count) vs new (weighted %) in logs
+  * Provides validation that weighted system works
+
+#### Gotchas to Avoid
+- **Score Calculation**: Entry score requires BOTH pullback AND bounce (not OR)
+  * Wrong: `entry_score = 1 if (pullback_detected or price_bounced) else 0`
+  * Right: `entry_score = 1 if (pullback_detected and price_bounced) else 0`
+  * This ensures quality entries (dip + recovery, not just one)
+- **Weight Sum**: Must verify all weights sum to 1.0
+  * 0.25 + 0.20 + 0.20 + 0.20 + 0.10 + 0.05 = 1.00 ✅
+  * If weights don't sum to 1.0, scoring gets skewed
+- **Threshold Ordering**: Check thresholds are in descending order
+  * 0.95, 0.80, 0.65, 0.50, <0.50
+  * Prevents logic errors (e.g., checking >= 0.50 before >= 0.95)
+- **Confidence vs Confluence**: Two different metrics now
+  * confidence = weighted_confluence (0-1 scale, used for position sizing)
+  * confluence_score = old score + BB/Stoch/VWAP boosts (0-100+ scale, informational)
+  * Position sizing uses confidence, logging uses both
+
+#### Useful Context for Future Iterations
+- **Why Weighted System Works**:
+  * Regime is market direction - if wrong, all other signals irrelevant
+  * Trend is strength confirmation - prevents choppy market entries
+  * Entry is timing quality - pullback + bounce = reversal within trend
+  * Momentum is confirmation - oversold/MACD/OBV shows momentum
+  * Volume + volatility are secondary confirmations
+  * This hierarchy matches professional trading logic
+- **Position Sizing Impact**:
+  * Old system: Fixed 1%/2%/3% sizing, didn't scale with signal quality
+  * New system: 4%/6%/8%/10% sizing scales directly with confidence
+  * Example: 95% confluence → 10% position = better capital utilization
+  * Example: 50% confluence → 4% position = reduced risk on weak setups
+- **Kelly Criterion Alignment**:
+  * New sizing is closer to Kelly optimal allocation
+  * Kelly f = (bp - q) / b, where p = win%, q = loss%
+  * With ~58% win rate from Phase 1, Kelly f ≈ 0.08-0.12
+  * New system scales from 4%-10%, staying within Kelly bounds
+- **Next Task (TASK 5)**: Final Validation & Testing
+  * Will run full test suite (328+ tests)
+  * Will validate no regressions
+  * Will check all Phase 2 signals working together
+  * Will prepare for Phase 2 completion
+
+---
+

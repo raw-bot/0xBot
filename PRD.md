@@ -138,7 +138,7 @@
 
 ---
 
-## TASK 4: Weighted Confluence System (2-3 hours) ⭐ CRITICAL
+## TASK 4: Weighted Confluence System (2-3 hours) ⭐ CRITICAL ✅
 
 **Goal**: Replace simple sum with intelligent weighted scoring
 
@@ -256,8 +256,8 @@ After all Phase 2 tasks:
 - [x] Bollinger Bands squeeze detection working
 - [x] Stochastic K/D crossovers detected
 - [x] VWAP Bands dynamic levels calculated
-- [ ] Weighted confluence scoring implemented
-- [ ] Position sizing adaptive to confidence
+- [x] Weighted confluence scoring implemented
+- [x] Position sizing adaptive to confidence
 - [ ] All 328+ tests passing (0 regressions)
 - [ ] No runtime errors
 - [ ] New signals logged for 24+ hours

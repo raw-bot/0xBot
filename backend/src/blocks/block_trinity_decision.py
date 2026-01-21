@@ -159,7 +159,37 @@ class TrinityDecisionBlock:
         signals_met = sum(conditions)
         total_signals = 7
 
-        # Add confluence boosts for secondary indicators
+        # === WEIGHTED CONFLUENCE SYSTEM ===
+        # Define weights for each signal category
+        weight_regime = 0.25        # 25% - Most important (regime filter)
+        weight_trend = 0.20         # 20% - Trend confirmation
+        weight_entry = 0.20         # 20% - Entry quality (pullback + bounce)
+        weight_momentum = 0.20      # 20% - Momentum strength (oversold + MACD + OBV)
+        weight_volume = 0.10        # 10% - Volume confirmation
+        weight_volatility = 0.05    # 5% - Volatility readiness (Bollinger + Stochastic)
+
+        # Map signals to weighted categories (1 = signal met, 0 = signal not met)
+        regime_score = 1 if regime_ok else 0
+        trend_score = 1 if trend_strength_ok else 0
+        entry_score = 1 if (pullback_detected and price_bounced) else 0  # Both pullback AND bounce
+        momentum_score = 1 if (oversold or macd_positive or obv_accumulating) else 0  # Any momentum signal
+        volume_score = 1 if volume_confirmed else 0
+        volatility_score = 1 if (bollinger_expansion or stoch_bullish_cross or price_above_vwap_upper) else 0  # Any volatility signal
+
+        # Calculate weighted confluence (0-1 scale)
+        weighted_confluence = (
+            (regime_score * weight_regime) +
+            (trend_score * weight_trend) +
+            (entry_score * weight_entry) +
+            (momentum_score * weight_momentum) +
+            (volume_score * weight_volume) +
+            (volatility_score * weight_volatility)
+        )
+
+        # Convert to 0-100 scale for consistency
+        weighted_confluence_pct = weighted_confluence * 100
+
+        # Add secondary confluence boosts (these further reinforce the weighted score)
         if bollinger_expansion:
             confluence += 15
         if stoch_bullish_cross:
@@ -167,10 +197,17 @@ class TrinityDecisionBlock:
         if price_above_vwap_upper:
             confluence += 12
 
-        # Decision logic: need strong confluence
-        if signals_met >= 5:
-            confidence = min(signals_met / total_signals, 1.0)
-            reason = f"Strong confluence ({signals_met}/{total_signals} signals) | Confluence score: {confluence:.0f}/100"
+        # Decision logic: weighted threshold
+        # Old system required 5/7 signals (71%), new system uses weighted confidence
+        # 95%+ = very strong (all major + some minor signals)
+        # 80%+ = strong (major signals met)
+        # 65%+ = moderate (some key signals met)
+        # 50%+ = weak (minimal signals met)
+        # <50% = no entry
+
+        if weighted_confluence >= 0.95:
+            confidence = min(weighted_confluence, 1.0)
+            reason = f"Very strong confluence ({signals_met}/{total_signals} signals, {weighted_confluence_pct:.0f}% weighted)"
             return TrinityDecision(
                 symbol=symbol,
                 should_enter=True,
@@ -180,9 +217,33 @@ class TrinityDecisionBlock:
                 confluence_score=confluence,
                 signals_met=signals_met,
             )
-        elif signals_met >= 4:
-            confidence = signals_met / total_signals
-            reason = f"Moderate confluence ({signals_met}/{total_signals} signals) | Confluence score: {confluence:.0f}/100"
+        elif weighted_confluence >= 0.80:
+            confidence = weighted_confluence
+            reason = f"Strong confluence ({signals_met}/{total_signals} signals, {weighted_confluence_pct:.0f}% weighted)"
+            return TrinityDecision(
+                symbol=symbol,
+                should_enter=True,
+                entry_side=SignalSide.LONG,
+                confidence=confidence,
+                reason=reason,
+                confluence_score=confluence,
+                signals_met=signals_met,
+            )
+        elif weighted_confluence >= 0.65:
+            confidence = weighted_confluence
+            reason = f"Moderate confluence ({signals_met}/{total_signals} signals, {weighted_confluence_pct:.0f}% weighted)"
+            return TrinityDecision(
+                symbol=symbol,
+                should_enter=True,
+                entry_side=SignalSide.LONG,
+                confidence=confidence,
+                reason=reason,
+                confluence_score=confluence,
+                signals_met=signals_met,
+            )
+        elif weighted_confluence >= 0.50:
+            confidence = weighted_confluence
+            reason = f"Weak confluence ({signals_met}/{total_signals} signals, {weighted_confluence_pct:.0f}% weighted) - marginal entry"
             return TrinityDecision(
                 symbol=symbol,
                 should_enter=True,
@@ -193,8 +254,8 @@ class TrinityDecisionBlock:
                 signals_met=signals_met,
             )
         else:
-            confidence = signals_met / total_signals
-            reason = f"Weak confluence ({signals_met}/{total_signals} signals) - waiting for more confirmation"
+            confidence = weighted_confluence
+            reason = f"Insufficient confluence ({weighted_confluence_pct:.0f}% weighted) - waiting for more signals"
             return TrinityDecision(
                 symbol=symbol,
                 should_enter=False,
@@ -231,15 +292,24 @@ class TrinityDecisionBlock:
 
     def _calculate_position_size(self, confidence: float) -> float:
         """
-        Calculate position size based on signal confidence.
+        Calculate adaptive position size based on weighted confidence (0-1 scale).
 
-        - Low confidence (0.4-0.6): 1% of capital
-        - Medium confidence (0.6-0.8): 2% of capital
-        - High confidence (0.8+): 3% of capital
+        Weighted Confluence Position Sizing:
+        - 95%+ confidence: 10% of capital (very strong setup)
+        - 80-95% confidence: 8% of capital (strong setup)
+        - 65-80% confidence: 6% of capital (moderate setup)
+        - 50-65% confidence: 4% of capital (weak setup)
+        - <50% confidence: 0% (no entry)
+
+        This adaptive sizing ensures better risk management and Kelly-compatible position allocation.
         """
-        if confidence < 0.6:
-            return 0.01
-        elif confidence < 0.8:
-            return 0.02
+        if confidence >= 0.95:
+            return 0.10
+        elif confidence >= 0.80:
+            return 0.08
+        elif confidence >= 0.65:
+            return 0.06
+        elif confidence >= 0.50:
+            return 0.04
         else:
-            return 0.03
+            return 0.00
