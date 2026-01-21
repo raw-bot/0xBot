@@ -75,7 +75,7 @@
 
 ---
 
-## TASK 2: MACD Divergence Detection (2-3 hours)
+## TASK 2: MACD Divergence Detection (2-3 hours) ✅ COMPLETE
 
 **Goal**: Detect hidden + regular divergences for early trend reversals
 

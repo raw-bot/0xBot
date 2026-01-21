@@ -500,6 +500,192 @@ class IndicatorService:
         }
 
     @staticmethod
+    def detect_macd_divergence(
+        closes: list[float],
+        highs: Optional[list[float]] = None,
+        lows: Optional[list[float]] = None,
+        macd_values: Optional[list[Optional[float]]] = None,
+    ) -> dict[str, Any]:
+        """Detect MACD divergences (regular + hidden) for reversal/continuation signals.
+
+        Regular Divergence (Reversal Signal):
+        - Bearish: Price makes higher high (HH) but MACD makes lower high (LH)
+        - Bullish: Price makes lower low (LL) but MACD makes higher low (HL)
+
+        Hidden Divergence (Continuation Signal):
+        - Bullish: In uptrend, price makes LL but MACD makes HL (continue up)
+        - Bearish: In downtrend, price makes HH but MACD makes LH (continue down)
+
+        Args:
+            closes: List of close prices
+            highs: Optional list of high prices (for swing detection)
+            lows: Optional list of low prices (for swing detection)
+            macd_values: Optional pre-calculated MACD values. If None, calculated internally.
+
+        Returns:
+            Dictionary with divergence signals and analysis
+        """
+        if not closes or len(closes) < 26:
+            # Need at least 26 periods for MACD
+            return {
+                "has_divergence": False,
+                "divergence_type": None,
+                "divergence_strength": 0.0,
+                "signals": {},
+            }
+
+        # Calculate MACD if not provided
+        if macd_values is None:
+            macd_result = IndicatorService.calculate_macd(closes)
+            macd_values = macd_result["macd"]
+
+        # Use highs/lows if provided, otherwise use closes
+        if highs is None:
+            highs = closes
+        if lows is None:
+            lows = closes
+
+        # Extract MACD values (skip None values)
+        macd_valid = []
+        macd_indices = []
+        for i, val in enumerate(macd_values):
+            if val is not None:
+                macd_valid.append(val)
+                macd_indices.append(i)
+
+        if len(macd_valid) < 6:
+            # Need at least 6 valid MACD values for divergence detection
+            return {
+                "has_divergence": False,
+                "divergence_type": None,
+                "divergence_strength": 0.0,
+                "signals": {},
+            }
+
+        # Find last 3 MACD peaks and troughs
+        macd_extrema: list[tuple[int, float, str]] = []  # (index, value, 'peak'/'trough')
+
+        for i in range(1, len(macd_valid) - 1):
+            if macd_valid[i] > macd_valid[i-1] and macd_valid[i] > macd_valid[i+1]:
+                # Peak
+                macd_extrema.append((macd_indices[i], macd_valid[i], "peak"))
+            elif macd_valid[i] < macd_valid[i-1] and macd_valid[i] < macd_valid[i+1]:
+                # Trough
+                macd_extrema.append((macd_indices[i], macd_valid[i], "trough"))
+
+        # Get last 3 extrema
+        last_extrema = macd_extrema[-3:] if len(macd_extrema) >= 3 else macd_extrema
+
+        # Find corresponding price extrema
+        current_idx = len(closes) - 1
+        price_extrema: list[tuple[int, float, str]] = []
+
+        for macd_idx, _, extrema_type in last_extrema:
+            if extrema_type == "peak":
+                # Find price peak near this MACD peak
+                search_window = slice(max(0, macd_idx - 5), min(len(closes), macd_idx + 6))
+                window_highs = highs[search_window]
+                if window_highs:
+                    peak_price = max(window_highs)
+                    peak_idx = macd_idx - 5 + window_highs.index(peak_price)
+                    price_extrema.append((peak_idx, peak_price, "peak"))
+            else:  # trough
+                # Find price trough near this MACD trough
+                search_window = slice(max(0, macd_idx - 5), min(len(closes), macd_idx + 6))
+                window_lows = lows[search_window]
+                if window_lows:
+                    trough_price = min(window_lows)
+                    trough_idx = macd_idx - 5 + window_lows.index(trough_price)
+                    price_extrema.append((trough_idx, trough_price, "trough"))
+
+        # Detect divergences by comparing last 2 extrema
+        signals: dict[str, bool | None] = {
+            "macd_bullish_divergence": None,
+            "macd_bearish_divergence": None,
+            "macd_hidden_bullish": None,
+            "macd_hidden_bearish": None,
+        }
+        divergence_type = None
+        divergence_strength = 0.0
+
+        if len(price_extrema) >= 2 and len(last_extrema) >= 2:
+            # Get last two extrema (most recent and previous)
+            prev_price_idx, prev_price_val, prev_price_type = price_extrema[-2]
+            curr_price_idx, curr_price_val, curr_price_type = price_extrema[-1]
+
+            prev_macd_idx, prev_macd_val, prev_macd_type = last_extrema[-2]
+            curr_macd_idx, curr_macd_val, curr_macd_type = last_extrema[-1]
+
+            # Check if we have valid comparison (same extrema type)
+            if prev_price_type == curr_price_type and prev_macd_type == curr_macd_type:
+                if prev_price_type == "peak":  # Both are peaks (HH/LH pattern)
+                    # Compare price highs and MACD highs
+                    price_hh = curr_price_val > prev_price_val
+                    macd_lh = curr_macd_val < prev_macd_val
+
+                    if price_hh and macd_lh:
+                        # Regular bearish divergence (reversal)
+                        divergence_type = "regular_bearish"
+                        signals["macd_bearish_divergence"] = True
+                        # Strength: how much price went up vs MACD went down
+                        price_change_pct = (curr_price_val - prev_price_val) / prev_price_val if prev_price_val != 0 else 0
+                        macd_change_pct = (prev_macd_val - curr_macd_val) / abs(prev_macd_val) if prev_macd_val != 0 else 0
+                        divergence_strength = min(1.0, (price_change_pct + macd_change_pct) / 2)
+
+                    elif not price_hh and not macd_lh:
+                        # Hidden bearish divergence (continuation)
+                        divergence_type = "hidden_bearish"
+                        signals["macd_hidden_bearish"] = True
+                        # Strength: how much MACD stayed high while price fell
+                        price_change_pct = (prev_price_val - curr_price_val) / prev_price_val if prev_price_val != 0 else 0
+                        macd_change_pct = (curr_macd_val - prev_macd_val) / abs(curr_macd_val) if curr_macd_val != 0 else 0
+                        divergence_strength = min(1.0, (price_change_pct + macd_change_pct) / 2)
+
+                elif prev_price_type == "trough":  # Both are troughs (LL/HL pattern)
+                    # Compare price lows and MACD lows
+                    price_ll = curr_price_val < prev_price_val
+                    macd_hl = curr_macd_val > prev_macd_val
+
+                    if price_ll and macd_hl:
+                        # Regular bullish divergence (reversal)
+                        divergence_type = "regular_bullish"
+                        signals["macd_bullish_divergence"] = True
+                        # Strength: how much price went down vs MACD went up
+                        price_change_pct = (prev_price_val - curr_price_val) / prev_price_val if prev_price_val != 0 else 0
+                        macd_change_pct = (curr_macd_val - prev_macd_val) / abs(curr_macd_val) if curr_macd_val != 0 else 0
+                        divergence_strength = min(1.0, (price_change_pct + macd_change_pct) / 2)
+
+                    elif not price_ll and not macd_hl:
+                        # Hidden bullish divergence (continuation)
+                        divergence_type = "hidden_bullish"
+                        signals["macd_hidden_bullish"] = True
+                        # Strength: how much MACD stayed low while price rose
+                        price_change_pct = (curr_price_val - prev_price_val) / prev_price_val if prev_price_val != 0 else 0
+                        macd_change_pct = (prev_macd_val - curr_macd_val) / abs(prev_macd_val) if prev_macd_val != 0 else 0
+                        divergence_strength = min(1.0, (price_change_pct + macd_change_pct) / 2)
+
+        # Only signal if divergence strength > 5% (significant)
+        has_divergence = False
+        if divergence_strength >= 0.05:
+            has_divergence = True
+        else:
+            # Reset signals if not significant
+            signals = {k: None for k in signals}
+
+        # Log divergence detection
+        if divergence_type:
+            logger.debug(
+                f"[DIVERGENCE] Type: {divergence_type}, Strength: {divergence_strength:.1%}"
+            )
+
+        return {
+            "has_divergence": has_divergence,
+            "divergence_type": divergence_type,
+            "divergence_strength": divergence_strength,
+            "signals": signals,
+        }
+
+    @staticmethod
     def calculate_all_indicators(
         closes: list[float],
         highs: Optional[list[float]] = None,
