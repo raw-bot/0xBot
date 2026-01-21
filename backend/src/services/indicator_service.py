@@ -198,6 +198,52 @@ class IndicatorService:
         return cumulative_tp_volume / cumulative_volume
 
     @staticmethod
+    def calculate_vwap_bands(
+        candles: list[dict[str, float]],
+        highs: list[float],
+        lows: list[float],
+        closes: list[float],
+        atr_period: int = 14,
+    ) -> dict[str, Optional[float]]:
+        """Calculate VWAP Bands (VWAP ± 1 ATR).
+
+        VWAP Bands provide dynamic support/resistance based on volatility (ATR).
+        - VWAP Upper = VWAP + ATR
+        - VWAP Lower = VWAP - ATR
+
+        Args:
+            candles: List of dicts with 'high', 'low', 'close', 'volume' keys
+            highs: List of high prices
+            lows: List of low prices
+            closes: List of close prices
+            atr_period: ATR period (default 14)
+
+        Returns:
+            Dict with 'vwap', 'vwap_upper', 'vwap_lower'
+        """
+        if not candles or len(candles) < atr_period + 1:
+            return {"vwap": None, "vwap_upper": None, "vwap_lower": None}
+
+        # Calculate VWAP
+        vwap = IndicatorService.calculate_vwap(candles)
+
+        # Calculate ATR
+        atr_vals = IndicatorService.calculate_atr(highs, lows, closes, atr_period)
+        atr = atr_vals[-1] if atr_vals and atr_vals[-1] is not None else None
+
+        if vwap is None or atr is None:
+            return {"vwap": vwap, "vwap_upper": None, "vwap_lower": None}
+
+        vwap_upper = vwap + atr
+        vwap_lower = vwap - atr
+
+        return {
+            "vwap": vwap,
+            "vwap_upper": vwap_upper,
+            "vwap_lower": vwap_lower,
+        }
+
+    @staticmethod
     def calculate_adx(
         highs: list[float], lows: list[float], closes: list[float], period: int = 14
     ) -> Optional[float]:

@@ -140,6 +140,7 @@ class TrinityDecisionBlock:
         obv_accumulating = signals.get("obv_accumulating", False) # OBV trending up
         bollinger_expansion = signals.get("bollinger_expansion", False) # BB expansion
         stoch_bullish_cross = signals.get("stoch_bullish_cross", False) # Stochastic K-D cross
+        price_above_vwap_upper = signals.get("price_above_vwap_upper", False) # VWAP breakout
 
         # Log debugging signals
         if macd_positive or signals.get("macd_bullish_cross", False):
@@ -150,8 +151,10 @@ class TrinityDecisionBlock:
             self.logger.debug(f"[TRINITY] {symbol}: Bollinger expansion detected")
         if stoch_bullish_cross:
             self.logger.debug(f"[TRINITY] {symbol}: Stochastic bullish cross detected")
+        if price_above_vwap_upper:
+            self.logger.debug(f"[TRINITY] {symbol}: Price above VWAP upper band detected")
 
-        # Count how many signals met (including MACD, OBV, Bollinger, and Stochastic)
+        # Count how many signals met (including MACD, OBV, Bollinger, Stochastic, and VWAP)
         conditions = [regime_ok, trend_strength_ok, price_bounced, oversold, volume_confirmed, macd_positive, obv_accumulating]
         signals_met = sum(conditions)
         total_signals = 7
@@ -161,6 +164,8 @@ class TrinityDecisionBlock:
             confluence += 15
         if stoch_bullish_cross:
             confluence += 10
+        if price_above_vwap_upper:
+            confluence += 12
 
         # Decision logic: need strong confluence
         if signals_met >= 5:

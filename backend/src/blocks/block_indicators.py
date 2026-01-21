@@ -360,6 +360,29 @@ class IndicatorBlock:
         stoch_overbought = stoch_k > 70
         logger.debug(f"[STOCHASTIC] K: {stoch_k:.0f}, D: {stoch_d:.0f}, Oversold: {stoch_oversold}, Bullish Cross: {stoch_bullish_cross}")
 
+        # === VWAP BANDS (Dynamic Volatility) ===
+        # Convert OHLCV lists to candle dicts for calculate_vwap_bands
+        candles_for_bands = []
+        for i in range(len(closes)):
+            candles_for_bands.append({
+                'high': highs[i],
+                'low': lows[i],
+                'close': closes[i],
+                'volume': volumes[i]
+            })
+        vwap_bands = IndicatorService.calculate_vwap_bands(candles_for_bands, highs, lows, closes, atr_period=14)
+        vwap_value = vwap_bands['vwap']
+        vwap_upper = vwap_bands['vwap_upper']
+        vwap_lower = vwap_bands['vwap_lower']
+        price_above_vwap_upper = current_price > vwap_upper if vwap_upper else False
+        price_below_vwap_lower = current_price < vwap_lower if vwap_lower else False
+        price_in_vwap_band = (vwap_lower and vwap_upper and
+                             vwap_lower < current_price < vwap_upper) if (vwap_lower and vwap_upper) else False
+        vwap_lower_str = f"{vwap_lower:.2f}" if vwap_lower else "N/A"
+        vwap_value_str = f"{vwap_value:.2f}" if vwap_value else "N/A"
+        vwap_upper_str = f"{vwap_upper:.2f}" if vwap_upper else "N/A"
+        logger.debug(f"[VWAP_BANDS] Lower: {vwap_lower_str}, VWAP: {vwap_value_str}, Upper: {vwap_upper_str}")
+
         # === SIGNAL GENERATION ===
         regime_ok = current_price > sma_200 if sma_200 else False
         trend_strength_ok = adx > 25
@@ -410,7 +433,9 @@ class IndicatorBlock:
             'volume_ma': volume_ma,
             'current_volume': current_volume,
             'price': current_price,
-            'vwap': vwap,
+            'vwap': vwap_value,
+            'vwap_upper': vwap_upper,
+            'vwap_lower': vwap_lower,
             'macd_line': macd_line,
             'macd_signal': macd_signal,
             'macd_histogram': macd_histogram,
@@ -438,7 +463,10 @@ class IndicatorBlock:
                 'price_near_band': bb_price_near_band,
                 'stoch_oversold': stoch_oversold,
                 'stoch_overbought': stoch_overbought,
-                'stoch_bullish_cross': stoch_bullish_cross
+                'stoch_bullish_cross': stoch_bullish_cross,
+                'price_above_vwap_upper': price_above_vwap_upper,
+                'price_below_vwap_lower': price_below_vwap_lower,
+                'price_in_vwap_band': price_in_vwap_band
             }
         }
 

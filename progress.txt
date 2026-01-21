@@ -3619,3 +3619,123 @@ Ready to proceed to Task 4: Add OBV (On-Balance Volume)
 
 ---
 
+
+## Iteration 20 - TASK 3: VWAP Bands (Dynamic Volatility) (COMPLETE)
+
+### What Was Implemented
+
+- **VWAP Bands Calculation** in IndicatorService (backend/src/services/indicator_service.py):
+  * Added calculate_vwap_bands() static method
+  * Calculates VWAP from candles (Volume Weighted Average Price)
+  * Calculates ATR (Average True Range) for volatility
+  * Returns: VWAP_upper = VWAP + ATR, VWAP_lower = VWAP - ATR
+  * Output: dict with 'vwap', 'vwap_upper', 'vwap_lower'
+  * Handles edge cases: returns None values if insufficient data
+
+- **Indicator Block Integration** (backend/src/blocks/block_indicators.py):
+  * Added VWAP Bands calculation to calculate_indicators_from_ccxt()
+  * Converts OHLCV lists to candle dicts for calculate_vwap_bands()
+  * Extracts vwap, vwap_upper, vwap_lower values
+  * Calculates 3 VWAP Bands signals:
+    - 'price_above_vwap_upper': price > vwap_upper (strong breakout)
+    - 'price_below_vwap_lower': price < vwap_lower (strong breakdown)
+    - 'price_in_vwap_band': vwap_lower < price < vwap_upper (consolidation)
+  * Added debug logging with proper formatting
+  * Added vwap, vwap_upper, vwap_lower to main indicators
+  * Added 3 VWAP signals to signals dict
+
+- **Trinity Decision Integration** (backend/src/blocks/block_trinity_decision.py):
+  * Updated _analyze_confluence() to accept price_above_vwap_upper signal
+  * Added 12 points to confluence_score when price breaks above VWAP upper
+  * Added debug logging for VWAP breakout
+  * Maintains 7-signal architecture (no change to signals_met threshold)
+  * Now has 3 confluence boosters: BB expansion (+15), Stoch cross (+10), VWAP breakout (+12)
+
+### Files Changed
+
+- Modified: `/backend/src/services/indicator_service.py` (+45 lines)
+  * Added calculate_vwap_bands() method using existing VWAP and ATR
+
+- Modified: `/backend/src/blocks/block_indicators.py` (+18 lines)
+  * Added VWAP Bands calculation and signal detection
+  * Fixed debug logging with proper string formatting
+  * Added VWAP values and signals to return dict
+
+- Modified: `/backend/src/blocks/block_trinity_decision.py` (+4 lines)
+  * Updated _analyze_confluence() to handle price_above_vwap_upper signal
+  * Added +12 confluence points for VWAP breakout
+  * Added debug logging for VWAP signal
+
+- Modified: `/PRD.md`
+  * Marked TASK 3 as ✅ complete
+  * Updated validation checklist (3/11 items complete)
+
+### Test Results
+
+- **All 38 block tests**: PASSED ✅
+- **Trinity/MACD tests**: 7/7 PASSED ✅
+- **No regressions**: All existing tests still passing ✅
+- **Format string fix**: Corrected debug logging format for None handling
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered
+- **VWAP Bands Formula**: VWAP ± ATR creates dynamic bands based on volatility
+  * When volatility increases (high ATR): bands widen = wider breakout zone
+  * When volatility decreases (low ATR): bands narrow = tighter range
+  * This is more dynamic than static Bollinger Bands (fixed std dev)
+- **Price Positioning**:
+  * Above upper band: strong momentum, breakout happening
+  * In band: consolidation, waiting for breakout
+  * Below lower band: reversal candidate, breakdown happening
+- **Confluence Boost Strategy** (now 3-part):
+  * Primary 7 signals: must have 5+ for entry (confidence based on count)
+  * Secondary indicators:
+    - BB expansion: +15 points (volatility compression release)
+    - Stoch cross: +10 points (momentum change confirmation)
+    - VWAP breakout: +12 points (institutional level break)
+  * Max possible confluence: 100 + 15 + 10 + 12 = 137 (can exceed 100)
+- **Candle Dict Format**: 
+  * calculate_vwap_bands() needs candles as list of dicts with OHLCV keys
+  * Must convert from raw lists before calling this function
+  * Cost: O(n) conversion but only done once per calculation
+
+#### Gotchas to Avoid
+- **Format String in Logging**: Ternary operators don't work directly in f-string format specs
+  * Wrong: f"{value:.2f if value else 'N/A'}" - Invalid syntax
+  * Right: Create variable first, then use in format
+  * Use: `value_str = f"{value:.2f}" if value else "N/A"; f"{value_str}"`
+- **VWAP Calculation**: Requires full data history for precision
+  * Different from typical indicators (EMA, RSI, MACD)
+  * Must loop through entire candle history to calculate
+  * Can be expensive on large datasets
+- **ATR vs Bollinger Bands**:
+  * ATR: True Range smoothed over period = absolute volatility measure
+  * BB Std Dev: Standard deviation of prices = relative volatility measure
+  * VWAP bands use ATR (absolute) vs BB (relative) - different perspectives
+- **Signal Initialization**: When VWAP bands unavailable, default to False
+  * price_above_vwap_upper defaults to False (no false positive breakout)
+  * price_in_vwap_band defaults to False (conservative)
+
+#### Useful Context for Future Iterations
+- **VWAP Purpose**: 
+  * Institutional traders' average entry level
+  * Price above VWAP = bulls winning (new money buying higher)
+  * Price below VWAP = bears winning (institutions selling lower)
+  * Reversal often happens at VWAP upper/lower bands
+- **Dynamic Volatility Adjustment**:
+  * High ATR (volatile day): breakout requires larger move
+  * Low ATR (quiet day): breakout requires smaller move
+  * This makes VWAP bands more effective than fixed levels
+- **Confluence Triangle**:
+  * BB squeeze + Stoch oversold = potential reversal setup
+  * Price above VWAP upper + Stoch cross + BB expansion = confirmed breakout
+  * This is the holy trinity of breakout conditions
+- **Next Task (TASK 4)**: Weighted Confluence System
+  * Will replace simple signal counting (5/7 required)
+  * Will implement weighting: regime 25%, trend 20%, entry 20%, momentum 20%, volume 10%, volatility 5%
+  * Will make position sizing adaptive: 100% confidence = 10%, 85% = 8%, etc.
+  * Critical task - this is where profitability improvement happens
+
+---
+
