@@ -199,5 +199,201 @@ class TestRiskBlockEntryValidation:
         assert "Invalid LONG" in result.reason
 
 
+class TestAdvancedRiskManagement:
+    """Test advanced risk management features."""
+
+    def setup_method(self):
+        self.risk = RiskBlock()
+
+    def test_microstructure_stops_long(self):
+        """Test microstructure-aware stops for LONG position."""
+        entry_price = Decimal("100")
+        atr = Decimal("2")  # 2% volatility
+
+        sl, tp = self.risk.calculate_microstructure_stops(
+            entry_price=entry_price,
+            side="long",
+            atr=atr,
+            volatility_level="medium",
+        )
+
+        # SL should be below entry
+        assert sl < entry_price
+        # TP should be above entry
+        assert tp > entry_price
+        # TP should be roughly 2x distance from SL
+        assert tp > sl
+
+    def test_microstructure_stops_short(self):
+        """Test microstructure-aware stops for SHORT position."""
+        entry_price = Decimal("100")
+        atr = Decimal("2")
+
+        sl, tp = self.risk.calculate_microstructure_stops(
+            entry_price=entry_price,
+            side="short",
+            atr=atr,
+            volatility_level="medium",
+        )
+
+        # SL should be above entry
+        assert sl > entry_price
+        # TP should be below entry
+        assert tp < entry_price
+
+    def test_microstructure_stops_tight_cloud(self):
+        """Test tighter stops when Ichimoku cloud is tight."""
+        entry_price = Decimal("100")
+        atr = Decimal("5")  # High volatility
+        tight_kumo_width = Decimal("0.005")  # 0.5% - very tight
+
+        sl, tp = self.risk.calculate_microstructure_stops(
+            entry_price=entry_price,
+            side="long",
+            atr=atr,
+            kumo_width=tight_kumo_width,
+            volatility_level="high",
+        )
+
+        # With tight cloud, should use 1.5% stops
+        expected_sl = entry_price - (Decimal("0.015") * entry_price)
+        assert abs(sl - expected_sl) < Decimal("0.1")
+
+    def test_detect_structure_breaks_ichimoku(self):
+        """Test structure break detection for Ichimoku cloud."""
+        position = MagicMock(spec=Position)
+        position.symbol = "BTC/USDT"
+        position.side = PositionSide.LONG
+        position.entry_price = Decimal("100")
+
+        signals = {"price_breaks_kumo": True}
+
+        should_close, reason = self.risk.detect_structure_breaks(
+            position=position,
+            current_price=Decimal("85"),
+            signals=signals,
+        )
+
+        assert should_close is True
+        assert reason == "ichimoku_cloud_break"
+
+    def test_detect_structure_breaks_no_break(self):
+        """Test structure break detection with no breaks."""
+        position = MagicMock(spec=Position)
+        position.symbol = "BTC/USDT"
+
+        should_close, reason = self.risk.detect_structure_breaks(
+            position=position,
+            current_price=Decimal("100"),
+            signals={},
+        )
+
+        assert should_close is False
+        assert reason is None
+
+    def test_pyramid_first_entry_allowed(self):
+        """Test pyramid allows first entry when no positions exist."""
+        can_pyramid, reason = self.risk.can_pyramid_entry(
+            symbol="BTC/USDT",
+            current_positions=[],
+            first_position_profitable=False,
+        )
+
+        assert can_pyramid is True
+        assert "First entry" in reason
+
+    def test_pyramid_second_entry_requires_profitability(self):
+        """Test pyramid second entry requires first position to be profitable."""
+        existing = MagicMock(spec=Position)
+        existing.symbol = "BTC/USDT"
+        existing.status = PositionStatus.OPEN
+
+        # Not profitable
+        can_pyramid, reason = self.risk.can_pyramid_entry(
+            symbol="BTC/USDT",
+            current_positions=[existing],
+            first_position_profitable=False,
+        )
+
+        assert can_pyramid is False
+        assert "not profitable" in reason
+
+    def test_pyramid_second_entry_allowed_when_profitable(self):
+        """Test pyramid allows second entry when first is profitable."""
+        existing = MagicMock(spec=Position)
+        existing.symbol = "BTC/USDT"
+        existing.status = PositionStatus.OPEN
+
+        can_pyramid, reason = self.risk.can_pyramid_entry(
+            symbol="BTC/USDT",
+            current_positions=[existing],
+            first_position_profitable=True,
+        )
+
+        assert can_pyramid is True
+        assert "Second entry" in reason
+
+    def test_pyramid_max_positions_enforced(self):
+        """Test pyramid rejects entry when max positions reached."""
+        pos1 = MagicMock(spec=Position)
+        pos1.symbol = "BTC/USDT"
+        pos1.status = PositionStatus.OPEN
+
+        pos2 = MagicMock(spec=Position)
+        pos2.symbol = "BTC/USDT"
+        pos2.status = PositionStatus.OPEN
+
+        can_pyramid, reason = self.risk.can_pyramid_entry(
+            symbol="BTC/USDT",
+            current_positions=[pos1, pos2],
+            first_position_profitable=True,
+        )
+
+        assert can_pyramid is False
+        assert "max" in reason
+
+    def test_calculate_pyramid_size_first_entry(self):
+        """Test pyramid size calculation for first entry."""
+        capital = Decimal("10000")
+        current_exposure = Decimal("0")
+
+        size = self.risk.calculate_pyramid_size(
+            entry_number=1,
+            capital=capital,
+            current_exposure=current_exposure,
+        )
+
+        # First entry should be 10%
+        assert size == Decimal("0.10")
+
+    def test_calculate_pyramid_size_second_entry(self):
+        """Test pyramid size calculation for second entry."""
+        capital = Decimal("10000")
+        current_exposure = Decimal("1000")  # 10% already
+
+        size = self.risk.calculate_pyramid_size(
+            entry_number=2,
+            capital=capital,
+            current_exposure=current_exposure,
+        )
+
+        # Second entry should be 5%
+        assert size == Decimal("0.05")
+
+    def test_calculate_pyramid_size_respects_max(self):
+        """Test pyramid size respects 15% max total."""
+        capital = Decimal("10000")
+        current_exposure = Decimal("1100")  # 11% already
+
+        size = self.risk.calculate_pyramid_size(
+            entry_number=2,
+            capital=capital,
+            current_exposure=current_exposure,
+        )
+
+        # Should allow 4% more (total 15%)
+        assert size == Decimal("0.05") or size == Decimal("0")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
