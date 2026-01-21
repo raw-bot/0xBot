@@ -282,6 +282,7 @@ class IndicatorBlock:
             return {}
 
         closes = ohlcv_dict['close']
+        opens = ohlcv_dict['open']
         highs = ohlcv_dict['high']
         lows = ohlcv_dict['low']
         volumes = ohlcv_dict['volume']
@@ -407,6 +408,23 @@ class IndicatorBlock:
         logger.debug(f"[ICHIMOKU] Tenkan: {tenkan:.2f}, Kijun: {kijun:.2f}, Kumo: {kumo_high:.2f}-{kumo_low:.2f}, "
                     f"Price above cloud: {price_above_kumo}, Tenkan > Kijun: {tenkan_above_kijun}")
 
+        # === ORDER FLOW IMBALANCE (Microstructure Analysis) ===
+        from ..services.order_flow_service import OrderFlowService
+        ofi_signals = OrderFlowService.detect_ofi_signals(closes, opens, highs, lows, volumes)
+        ofi_values = OrderFlowService.get_ofi_values(closes, opens, highs, lows, volumes)
+
+        delta_positive = ofi_signals.get('delta_positive', False)
+        delta_surge = ofi_signals.get('delta_surge', False)
+        delta_bullish_cross = ofi_signals.get('delta_bullish_cross', False)
+        delta_bearish_cross = ofi_signals.get('delta_bearish_cross', False)
+        delta_divergence = ofi_signals.get('delta_divergence', False)
+        delta_strength = ofi_signals.get('delta_strength', 0.0)
+        current_delta = ofi_values.get('current_delta', 0.0)
+        current_cum_delta = ofi_values.get('current_cum_delta', 0.0)
+
+        logger.debug(f"[ORDER_FLOW] Delta: {current_delta:.0f}, Cum: {current_cum_delta:.0f}, "
+                    f"Positive: {delta_positive}, Surge: {delta_surge}, Bullish Cross: {delta_bullish_cross}")
+
         # === SIGNAL GENERATION ===
         regime_ok = current_price > sma_200 if sma_200 else False
         trend_strength_ok = adx > 25
@@ -475,6 +493,9 @@ class IndicatorBlock:
             'kumo_high': kumo_high,
             'kumo_low': kumo_low,
             'chikou': chikou,
+            'current_delta': current_delta,
+            'current_cum_delta': current_cum_delta,
+            'delta_strength': delta_strength,
             'confluence_score': confluence_score,
             'signals': {
                 'regime_filter': regime_ok,
@@ -505,7 +526,12 @@ class IndicatorBlock:
                 'cloud_bullish_cross': cloud_bullish_cross,
                 'cloud_bearish_cross': cloud_bearish_cross,
                 'cloud_expansion': cloud_expansion,
-                'cloud_squeeze': cloud_squeeze
+                'cloud_squeeze': cloud_squeeze,
+                'delta_positive': delta_positive,
+                'delta_surge': delta_surge,
+                'delta_bullish_cross': delta_bullish_cross,
+                'delta_bearish_cross': delta_bearish_cross,
+                'delta_divergence': delta_divergence
             }
         }
 

@@ -148,6 +148,12 @@ class TrinityDecisionBlock:
         cloud_bullish_cross = signals.get("cloud_bullish_cross", False) # Price crossing above cloud
         kumo_bullish = signals.get("kumo_bullish", False) # Cloud bullish orientation
 
+        # Order Flow Imbalance signals (microstructure analysis)
+        delta_positive = signals.get("delta_positive", False) # Cumulative delta > 0 (buyers in control)
+        delta_surge = signals.get("delta_surge", False) # Extreme volume imbalance
+        delta_bullish_cross = signals.get("delta_bullish_cross", False) # Delta crosses above 0
+        delta_divergence = signals.get("delta_divergence", False) # Delta strength during consolidation
+
         # Log debugging signals
         if macd_positive or signals.get("macd_bullish_cross", False):
             self.logger.debug(f"[TRINITY] {symbol}: MACD positive={macd_positive}, bullish_cross={signals.get('macd_bullish_cross', False)}")
@@ -161,6 +167,8 @@ class TrinityDecisionBlock:
             self.logger.debug(f"[TRINITY] {symbol}: Price above VWAP upper band detected")
         if price_above_kumo or cloud_bullish_cross:
             self.logger.debug(f"[TRINITY] {symbol}: Ichimoku - Price above cloud={price_above_kumo}, Cloud cross={cloud_bullish_cross}, Tenkan>Kijun={tenkan_above_kijun}")
+        if delta_positive or delta_surge or delta_bullish_cross:
+            self.logger.debug(f"[TRINITY] {symbol}: OFI - Positive={delta_positive}, Surge={delta_surge}, Bullish Cross={delta_bullish_cross}, Divergence={delta_divergence}")
 
         # Count how many signals met (including MACD, OBV, Bollinger, Stochastic, and VWAP)
         conditions = [regime_ok, trend_strength_ok, price_bounced, oversold, volume_confirmed, macd_positive, obv_accumulating]
@@ -190,9 +198,9 @@ class TrinityDecisionBlock:
         if cloud_bullish_cross:
             entry_score = 1
 
-        momentum_score = 1 if (oversold or macd_positive or obv_accumulating) else 0  # Any momentum signal
-        volume_score = 1 if volume_confirmed else 0
-        volatility_score = 1 if (bollinger_expansion or stoch_bullish_cross or price_above_vwap_upper or cloud_bullish_cross) else 0  # Any volatility signal
+        momentum_score = 1 if (oversold or macd_positive or obv_accumulating or delta_positive or delta_bullish_cross) else 0  # Any momentum signal
+        volume_score = 1 if (volume_confirmed or delta_surge) else 0  # Volume or delta surge
+        volatility_score = 1 if (bollinger_expansion or stoch_bullish_cross or price_above_vwap_upper or cloud_bullish_cross or delta_divergence) else 0  # Any volatility signal
 
         # Calculate weighted confluence (0-1 scale)
         weighted_confluence = (
@@ -221,6 +229,13 @@ class TrinityDecisionBlock:
             confluence += 25  # Strong trend confirmation via cloud crossing
         if tenkan_above_kijun and kumo_bullish:
             confluence += 15  # Bullish line structure + orientation
+        # Order Flow Imbalance boosts (per PRD specifications)
+        if delta_bullish_cross:
+            confluence += 18  # Institutional buying reversal
+        if delta_surge:
+            confluence += 12  # Extreme volume imbalance
+        if delta_divergence:
+            confluence += 10  # Strength during consolidation
 
         # Decision logic: weighted threshold
         # Old system required 5/7 signals (71%), new system uses weighted confidence
