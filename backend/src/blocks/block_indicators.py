@@ -347,6 +347,19 @@ class IndicatorBlock:
         bb_price_near_band = bb_data['price_near_band'][-1] if bb_data['price_near_band'] and bb_data['price_near_band'][-1] is not None else False
         logger.debug(f"[BOLLINGER] Squeeze: {bb_squeeze}, Expansion: {bb_expansion}, Price near band: {bb_price_near_band}")
 
+        # === STOCHASTIC OSCILLATOR (Intra-candle Momentum) ===
+        stoch_data = IndicatorService.calculate_stochastic(highs, lows, closes, fastk_period=14, slowk_period=3, slowd_period=3)
+        stoch_k = stoch_data['k'][-1] if stoch_data['k'] and stoch_data['k'][-1] is not None else 50
+        stoch_d = stoch_data['d'][-1] if stoch_data['d'] and stoch_data['d'][-1] is not None else 50
+        # Check for K-D crossover: K crosses above D (bullish signal)
+        stoch_k_prev = stoch_data['k'][-2] if len(stoch_data['k']) > 1 and stoch_data['k'][-2] is not None else None
+        stoch_d_prev = stoch_data['d'][-2] if len(stoch_data['d']) > 1 and stoch_data['d'][-2] is not None else None
+        stoch_bullish_cross = (stoch_k_prev is not None and stoch_d_prev is not None and
+                              stoch_k_prev <= stoch_d_prev and stoch_k > stoch_d)
+        stoch_oversold = stoch_k < 30
+        stoch_overbought = stoch_k > 70
+        logger.debug(f"[STOCHASTIC] K: {stoch_k:.0f}, D: {stoch_d:.0f}, Oversold: {stoch_oversold}, Bullish Cross: {stoch_bullish_cross}")
+
         # === SIGNAL GENERATION ===
         regime_ok = current_price > sma_200 if sma_200 else False
         trend_strength_ok = adx > 25
@@ -406,6 +419,8 @@ class IndicatorBlock:
             'bb_upper': bb_upper,
             'bb_middle': bb_middle,
             'bb_lower': bb_lower,
+            'stoch_k': stoch_k,
+            'stoch_d': stoch_d,
             'confluence_score': confluence_score,
             'signals': {
                 'regime_filter': regime_ok,
@@ -420,7 +435,10 @@ class IndicatorBlock:
                 'obv_accumulating': obv_trending,
                 'bollinger_squeeze': bb_squeeze,
                 'bollinger_expansion': bb_expansion,
-                'price_near_band': bb_price_near_band
+                'price_near_band': bb_price_near_band,
+                'stoch_oversold': stoch_oversold,
+                'stoch_overbought': stoch_overbought,
+                'stoch_bullish_cross': stoch_bullish_cross
             }
         }
 

@@ -3514,3 +3514,108 @@ Ready to proceed to Task 4: Add OBV (On-Balance Volume)
 
 ---
 
+
+## Iteration 19 - TASK 2: Stochastic Integration (COMPLETE)
+
+### What Was Implemented
+
+- **Stochastic Oscillator Calculation** (already existed in IndicatorService):
+  * calculate_stochastic() uses talib.STOCH with fastk_period=14, slowk_period=3, slowd_period=3
+  * Returns dict with 'k' (Stochastic K line) and 'd' (Stochastic D line) lists
+
+- **Indicator Block Integration** (backend/src/blocks/block_indicators.py):
+  * Added Stochastic calculation to calculate_indicators_from_ccxt()
+  * Extracts latest K and D values with defaults to 50 if unavailable
+  * Detects K-D crossover: bullish when K crosses above D
+  * Signals:
+    - 'stoch_oversold': K < 30 (overbought zone)
+    - 'stoch_overbought': K > 70 (overbought zone)
+    - 'stoch_bullish_cross': K[-1] > D[-1] AND K[-2] <= D[-2]
+  * Added debug logging for K, D, oversold, and bullish cross signals
+  * Added stoch_k and stoch_d to main indicators return
+  * Added 3 stochastic signals to signals dict
+
+- **Trinity Decision Integration** (backend/src/blocks/block_trinity_decision.py):
+  * Updated _analyze_confluence() to accept stoch_bullish_cross signal
+  * Added 10 points to confluence_score when stoch_bullish_cross is detected
+  * Added debug logging for Stochastic bullish cross
+  * Maintains 7-signal architecture (no change to signals_met threshold)
+
+### Files Changed
+
+- Modified: `/backend/src/blocks/block_indicators.py` (+12 lines)
+  * Added Stochastic calculation call in calculate_indicators_from_ccxt()
+  * Extracted K, D values and calculated bullish cross and overbought/oversold signals
+  * Added stoch_k, stoch_d to return dict
+  * Added stoch_oversold, stoch_overbought, stoch_bullish_cross to signals dict
+
+- Modified: `/backend/src/blocks/block_trinity_decision.py` (+5 lines)
+  * Updated _analyze_confluence() to handle stoch_bullish_cross signal
+  * Added +10 confluence points for stochastic bullish cross
+  * Added debug logging for Stochastic signal
+
+- Modified: `/PRD.md`
+  * Marked TASK 2 as ✅ complete
+  * Updated validation checklist (2/11 items complete)
+
+### Test Results
+
+- **All 38 block tests**: PASSED ✅
+- **Trinity/MACD tests**: 7/7 PASSED ✅
+- **No regressions**: All existing tests still passing ✅
+- **Coverage maintained**: Stochastic integration doesn't break any existing signals
+
+### Learnings for Future Iterations
+
+#### Patterns Discovered
+- **Stochastic K-D Crossover**: Bullish signal when K crosses above D from below
+  * Previous: K[-2] <= D[-2]
+  * Current: K[-1] > D[-1]
+  * Indicates momentum shift from negative to positive
+- **Stochastic Levels**:
+  * K < 30: Oversold zone (potential bounce)
+  * K > 70: Overbought zone (potential pullback)
+  * K between 30-70: Neutral/consolidation
+- **Confluence Integration**: Similar to Bollinger Bands
+  * K-D crossover adds +10 to confluence_score (vs +15 for BB expansion)
+  * Separate from 7-signal threshold (signals_met unchanged)
+  * Boosts confidence when secondary momentum indicators align
+- **K vs D Line**:
+  * K line is the raw stochastic (fast)
+  * D line is the SMA of K (smooth)
+  * Crossover uses 3-period smoothing on both for momentum filtering
+
+#### Gotchas to Avoid
+- **Index Safety**: K-D crossover requires at least 2 previous candles
+  * Always check: `len(stoch_data['k']) > 1` before accessing [-2]
+  * Default crossover to False if insufficient history
+  * Use fallback values (50) for K/D if None (neutral, no signal)
+- **TA-Lib Stochastic**: Uses slowk_period smoothing on raw K
+  * With fastk_period=14, slowk_period=3, slowd_period=3, we get double-smoothed data
+  * This is different from "fast" stochastic (no slowk smoothing)
+- **Signal Order**: Must check both conditions for crossover
+  * Only bullish if: (prev_k <= prev_d) AND (current_k > current_d)
+  * Prevents false signals from multiple crosses in one bar
+- **Confluence Scale**: +10 points for stoch bullish cross is less than +15 for BB expansion
+  * This reflects different signal strengths: BB setup is primary, Stoch is confirmation
+
+#### Useful Context for Future Iterations
+- **Stochastic Purpose**: Measures closing price relative to high-low range
+  * Shows momentum exhaustion (overbought/oversold)
+  * K-D cross detects trend reversals within current move
+  * Best used with trend confirmation (our ADX and MACD already do this)
+- **Synergy with Other Indicators**:
+  * BB squeeze + RSI < 40 + Stoch K-D bullish cross = strong reversal setup
+  * This is exactly what Trinity checks: 7 signals + 2 secondary confluence boosters
+  * When all align, very high probability entry
+- **Confluence Boost Strategy**:
+  * Primary 7 signals: must have 5+ for entry (confidence based on count)
+  * Secondary indicators (BB, Stoch): boost confluence_score for better RR on trades
+  * Example: 4 primary signals (weak) + BB expansion + Stoch cross = decent entry
+- **Next Task (TASK 3)**: Will add VWAP Bands
+  * VWAP ± 1 ATR = dynamic support/resistance
+  * Price above VWAP_upper = strong breakout (+12 confluence points)
+  * Similar integration pattern: calculate, detect signals, add to confluence
+
+---
+
